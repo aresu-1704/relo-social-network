@@ -1,119 +1,119 @@
 # Miscellaneous
-*.class
-*.lock
-*.log
-*.pyc
-*.swp
-.buildlog/
-.history
+relo/*.class
+relo/*.lock
+relo/*.log
+relo/*.pyc
+relo/*.swp
+relo/.buildlog/
+relo/.history
 
 
 
 # Flutter repo-specific
-/bin/cache/
-/bin/internal/bootstrap.bat
-/bin/internal/bootstrap.sh
-/bin/mingit/
-/dev/benchmarks/mega_gallery/
-/dev/bots/.recipe_deps
-/dev/bots/android_tools/
-/dev/devicelab/ABresults*.json
-/dev/docs/doc/
-/dev/docs/flutter.docs.zip
-/dev/docs/lib/
-/dev/docs/pubspec.yaml
-/dev/integration_tests/**/xcuserdata
-/dev/integration_tests/**/Pods
-/packages/flutter/coverage/
-version
-analysis_benchmark.json
+relo//bin/cache/
+relo//bin/internal/bootstrap.bat
+relo//bin/internal/bootstrap.sh
+relo//bin/mingit/
+relo//dev/benchmarks/mega_gallery/
+relo//dev/bots/.recipe_deps
+relo//dev/bots/android_tools/
+relo//dev/devicelab/ABresults*.json
+relo//dev/docs/doc/
+relo//dev/docs/flutter.docs.zip
+relo//dev/docs/lib/
+relo//dev/docs/pubspec.yaml
+relo//dev/integration_tests/**/xcuserdata
+relo//dev/integration_tests/**/Pods
+relo//packages/flutter/coverage/
+relo/version
+relo/analysis_benchmark.json
 
 # packages file containing multi-root paths
-.packages.generated
+relo/.packages.generated
 
 # Flutter/Dart/Pub related
-**/doc/api/
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-**/generated_plugin_registrant.dart
-.packages
-.pub-preload-cache/
-.pub/
-build/
-flutter_*.png
-linked_*.ds
-unlinked.ds
-unlinked_spec.ds
+relo/**/doc/api/
+relo/.dart_tool/
+relo/.flutter-plugins
+relo/.flutter-plugins-dependencies
+relo/**/generated_plugin_registrant.dart
+relo/.packages
+relo/.pub-preload-cache/
+relo/.pub/
+relo/build/
+relo/flutter_*.png
+relo/linked_*.ds
+relo/unlinked.ds
+relo/unlinked_spec.ds
 
 # Android related
-**/android/**/gradle-wrapper.jar
-.gradle/
-**/android/captures/
-**/android/gradlew
-**/android/gradlew.bat
-**/android/local.properties
-**/android/**/GeneratedPluginRegistrant.java
-**/android/key.properties
-*.jks
+relo/**/android/**/gradle-wrapper.jar
+relo/.gradle/
+relo/**/android/captures/
+relo/**/android/gradlew
+relo/**/android/gradlew.bat
+relo/**/android/local.properties
+relo/**/android/**/GeneratedPluginRegistrant.java
+relo/**/android/key.properties
+relo/*.jks
 
 # iOS/XCode related
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*sync/
-**/ios/**/.sconsign.dblite
-**/ios/**/.tags*
-**/ios/**/.vagrant/
-**/ios/**/DerivedData/
-**/ios/**/Icon?
-**/ios/**/Pods/
-**/ios/**/.symlinks/
-**/ios/**/profile
-**/ios/**/xcuserdata
-**/ios/.generated/
-**/ios/Flutter/.last_build_id
-**/ios/Flutter/App.framework
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/ephemeral
-**/ios/Flutter/app.flx
-**/ios/Flutter/app.zip
-**/ios/Flutter/flutter_assets/
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
+relo/**/ios/**/*.mode1v3
+relo/**/ios/**/*.mode2v3
+relo/**/ios/**/*.moved-aside
+relo/**/ios/**/*.pbxuser
+relo/**/ios/**/*.perspectivev3
+relo/**/ios/**/*sync/
+relo/**/ios/**/.sconsign.dblite
+relo/**/ios/**/.tags*
+relo/**/ios/**/.vagrant/
+relo/**/ios/**/DerivedData/
+relo/**/ios/**/Icon?
+relo/**/ios/**/Pods/
+relo/**/ios/**/.symlinks/
+relo/**/ios/**/profile
+relo/**/ios/**/xcuserdata
+relo/**/ios/.generated/
+relo/**/ios/Flutter/.last_build_id
+relo/**/ios/Flutter/App.framework
+relo/**/ios/Flutter/Flutter.framework
+relo/**/ios/Flutter/Flutter.podspec
+relo/**/ios/Flutter/Generated.xcconfig
+relo/**/ios/Flutter/ephemeral
+relo/**/ios/Flutter/app.flx
+relo/**/ios/Flutter/app.zip
+relo/**/ios/Flutter/flutter_assets/
+relo/**/ios/Flutter/flutter_export_environment.sh
+relo/**/ios/ServiceDefinitions.json
+relo/**/ios/Runner/GeneratedPluginRegistrant.*
 
 # macOS
-**/Flutter/ephemeral/
-**/Pods/
-**/macos/Flutter/GeneratedPluginRegistrant.swift
-**/macos/Flutter/ephemeral
-**/xcuserdata/
+relo/**/Flutter/ephemeral/
+relo/**/Pods/
+relo/**/macos/Flutter/GeneratedPluginRegistrant.swift
+relo/**/macos/Flutter/ephemeral
+relo/**/xcuserdata/
 
 # Windows
-**/windows/flutter/generated_plugin_registrant.cc
-**/windows/flutter/generated_plugin_registrant.h
-**/windows/flutter/generated_plugins.cmake
+relo/**/windows/flutter/generated_plugin_registrant.cc
+relo/**/windows/flutter/generated_plugin_registrant.h
+relo/**/windows/flutter/generated_plugins.cmake
 
 # Linux
-**/linux/flutter/generated_plugin_registrant.cc
-**/linux/flutter/generated_plugin_registrant.h
-**/linux/flutter/generated_plugins.cmake
+relo/**/linux/flutter/generated_plugin_registrant.cc
+relo/**/linux/flutter/generated_plugin_registrant.h
+relo/**/linux/flutter/generated_plugins.cmake
 
 # Coverage
-coverage/
+relo/coverage/
 
 # Symbols
-app.*.symbols
+relo/app.*.symbols
 
 # Exceptions to above rules.
-!**/ios/**/default.mode1v3
-!**/ios/**/default.mode2v3
-!**/ios/**/default.pbxuser
-!**/ios/**/default.perspectivev3
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
-!/dev/ci/**/Gemfile.lock
+!relo/**/ios/**/default.mode1v3
+!relo/**/ios/**/default.mode2v3
+!relo/**/ios/**/default.pbxuser
+!relo/**/ios/**/default.perspectivev3
+!relo//packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+!relo//dev/ci/**/Gemfile.lock

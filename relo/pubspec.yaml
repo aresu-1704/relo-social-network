@@ -1,0 +1,46 @@
+name: relo
+description: "Mạng xã hội Relo"
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.1
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+
+#Cấu hình Icon
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_logo.png"
+  adaptive_icon_foreground: "assets/icons/app_logo.png"
+
+#Cấu hình splash
+flutter_native_splash:
+  color: "#8B38D7"
+  image: assets/icons/icon.png
+  android: true
+  ios: true
+  android_gravity: center
+  ios_content_mode: center
