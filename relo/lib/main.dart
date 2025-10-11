@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:relo/screen/default_screen.dart';
 import 'dart:async';
-import 'screen/login_screen.dart';
 
 void main() {
   runApp(const MyApp());

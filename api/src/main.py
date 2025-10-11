@@ -1,9 +1,32 @@
 from fastapi import FastAPI
+from .routers import auth_router, user_router, post_router, message_router
+from .models import Database
 
-app = FastAPI()
+# Khởi tạo app FastAPI với thông tin Swagger UI
+app = FastAPI(
+    title="Relo Social Network",
+    description="Backend mạng xã hội nhắn tin trực tuyến **Relo**.\n\n"
+                "Hệ thống hỗ trợ đăng ký, đăng nhập, kết bạn, nhắn tin thời gian thực "
+                "và quản lý bài viết cá nhân.",
+    version="1.0.0"
+)
 
-# Import routers here
+# Kết nối với cơ sở dữ liệu khi khởi động
+@app.on_event("startup")
+def startup_db_client():
+    Database.connect()
+
+# Ngắt kết nối khỏi cơ sở dữ liệu khi tắt
+@app.on_event("shutdown")
+def shutdown_db_client():
+    Database.disconnect()
+
+# Gắn các router
+app.include_router(auth_router.router)
+app.include_router(user_router.router)
+app.include_router(post_router.router)
+app.include_router(message_router.router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Server is running"}
+    return {"message": "Máy chủ đang chạy"}

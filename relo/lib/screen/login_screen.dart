@@ -77,10 +77,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: isLoading
                       ? null
                       : () {
-                    // Navigator.push(context,
-                    //     // MaterialPageRoute(builder: (_) => ForgotPasswordScreen()));
-                  },
-                  child: const Text('Quên mật khẩu ?', style: TextStyle(color: Color(0xFF7A2FC0))),
+                          // Navigator.push(context,
+                          //     // MaterialPageRoute(builder: (_) => ForgotPasswordScreen()));
+                        },
+                  child: const Text(
+                    'Quên mật khẩu ?',
+                    style: TextStyle(color: Color(0xFF7A2FC0)),
+                  ),
                 ),
               ),
 
@@ -93,39 +96,49 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: isLoading
                       ? null
                       : () async {
-                    if (_formKey.currentState!.validate()) {
-                      // FocusScope.of(context).unfocus();
-                      // final userId = await login(_onSetState);
-                      //
-                      // if(userId == -3) {
-                      //   _showSnackBar('Không thể kết nối đến máy chủ, vui lòng thử lại sau.');
-                      // } else if (userId == -2) {
-                      //   _showSnackBar('Bạn đã đăng nhập quá nhiều lần, vui lòng thử lại sau.');
-                      // } else if (userId != null && userId > 0) {
-                      //   _showSnackBar('Đăng nhập thành công');
-                      //   await Future.delayed(const Duration(seconds: 1));
-                      //   Navigator.push(
-                      //     context,
-                      //     MaterialPageRoute(
-                      //       builder: (context) => CameraScreen(UserId: userId),
-                      //     ),
-                      //   );
-                      // } else {
-                      //   _showSnackBar('Sai tài khoản hoặc mật khẩu.');
-                      // }
-                      //
-                    }
-                  },
+                          if (_formKey.currentState!.validate()) {
+                            // FocusScope.of(context).unfocus();
+                            // final userId = await login(_onSetState);
+                            //
+                            // if(userId == -3) {
+                            //   _showSnackBar('Không thể kết nối đến máy chủ, vui lòng thử lại sau.');
+                            // } else if (userId == -2) {
+                            //   _showSnackBar('Bạn đã đăng nhập quá nhiều lần, vui lòng thử lại sau.');
+                            // } else if (userId != null && userId > 0) {
+                            //   _showSnackBar('Đăng nhập thành công');
+                            //   await Future.delayed(const Duration(seconds: 1));
+                            //   Navigator.push(
+                            //     context,
+                            //     MaterialPageRoute(
+                            //       builder: (context) => CameraScreen(UserId: userId),
+                            //     ),
+                            //   );
+                            // } else {
+                            //   _showSnackBar('Sai tài khoản hoặc mật khẩu.');
+                            // }
+                            //
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF8B38D7),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: isLoading
                       ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  )
-                      : const Text('Đăng nhập',
-                      style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Đăng nhập',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
 
@@ -137,17 +150,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: isLoading
                         ? null
                         : () {
-                      // Navigator.push(
-                      //     context,
-                      //     MaterialPageRoute(builder: (_) => RegisterScreen()
-                      //     )
-                      // );
-                    },
-                    child: const Text('Đăng ký',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF7A2FC0)
-                        )
+                            // Navigator.push(
+                            //     context,
+                            //     MaterialPageRoute(builder: (_) => RegisterScreen()
+                            //     )
+                            // );
+                          },
+                    child: const Text(
+                      'Đăng ký',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF7A2FC0),
+                      ),
                     ),
                   ),
                 ],
@@ -176,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
       obscureText: obscure,
       cursorColor: const Color(0xFF8B38D7),
       validator: (value) =>
-      (value == null || value.trim().isEmpty) ? validatorMsg : null,
+          (value == null || value.trim().isEmpty) ? validatorMsg : null,
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon),
@@ -193,7 +207,10 @@ class _LoginScreenState extends State<LoginScreen> {
   OutlineInputBorder _buildBorder({Color? color, double width = 1}) {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: color ?? const Color(0xFF8B38D7), width: width),
+      borderSide: BorderSide(
+        color: color ?? const Color(0xFF8B38D7),
+        width: width,
+      ),
     );
   }
 }
