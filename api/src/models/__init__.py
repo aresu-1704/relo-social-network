@@ -3,7 +3,7 @@ from .post import Post
 from .message import Message
 from .conversation import Conversation
 from .friend_request import FriendRequest
-from .database import Database
+from .database import init_db
 
 __all__ = [
     "User",
@@ -11,5 +11,5 @@ __all__ = [
     "Message",
     "Conversation",
     "FriendRequest",
-    "Database"
+    "init_db"
 ]

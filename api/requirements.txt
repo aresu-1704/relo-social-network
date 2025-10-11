@@ -7,3 +7,5 @@ python-jose[cryptography]
 pydantic
 email-validator
 python-multipart
+beanie
+motor

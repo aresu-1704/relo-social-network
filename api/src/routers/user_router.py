@@ -7,8 +7,9 @@ from ..security import get_current_user
 
 router = APIRouter(tags=["User"])
 
+# Lấy hồ sơ của người dùng hiện tại
 @router.get("/api/users/me", response_model=UserPublic)
-def read_users_me(current_user: User = Depends(get_current_user)):
+async def read_users_me(current_user: User = Depends(get_current_user)):
     """
     Lấy hồ sơ của người dùng hiện được xác thực.
     """
@@ -19,42 +20,45 @@ def read_users_me(current_user: User = Depends(get_current_user)):
         displayName=current_user.displayName
     )
 
+# Gửi yêu cầu kết bạn
 @router.post("/api/users/friend-request", status_code=201)
-def send_friend_request(
+async def send_friend_request(
     request_data: FriendRequestCreate,
     current_user: User = Depends(get_current_user)
 ):
     try:
         to_user_id = request_data.to_user_id
-        UserService.send_friend_request(from_user_id=current_user._id, to_user_id=to_user_id)
-        return {"message": "Friend request sent successfully."}
+        await UserService.send_friend_request(from_user_id=current_user._id, to_user_id=to_user_id)
+        return {"message": "Gửi yêu cầu kết bạn thành công."}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# Phản hồi yêu cầu kết bạn
 @router.post("/api/users/friend-request/{request_id}", status_code=200)
-def respond_to_friend_request(
+async def respond_to_friend_request(
     request_id: str,
     response_data: FriendRequestResponse,
     current_user: User = Depends(get_current_user)
 ):
     try:
-        UserService.respond_to_friend_request(
+        await UserService.respond_to_friend_request(
             request_id=request_id,
             user_id=current_user._id,
             response=response_data.response
         )
-        return {"message": f"Friend request {response_data.response}ed."}
+        return {"message": f"Yêu cầu kết bạn đã được {response_data.response}."}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# Lấy danh sách bạn bè
 @router.get("/api/users/friends", response_model=List[UserPublic])
-def get_friends(current_user: User = Depends(get_current_user)):
+async def get_friends(current_user: User = Depends(get_current_user)):
     """
     Lấy danh sách bạn bè cho người dùng hiện được xác thực.
     """
     try:
-        friends = UserService.get_friends(user_id=current_user._id)
-        # Convert User model objects to UserPublic schema
+        friends = await UserService.get_friends(user_id=current_user._id)
+        # Chuyển đổi đối tượng User model thành UserPublic schema
         return [
             UserPublic(
                 id=str(friend._id),
@@ -66,17 +70,19 @@ def get_friends(current_user: User = Depends(get_current_user)):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+# Lấy hồ sơ công khai của người dùng
 @router.get("/api/users/{user_id}", response_model=UserPublic)
-def get_user_profile(user_id: str):
+async def get_user_profile(user_id: str):
     """
     Lấy hồ sơ công khai của bất kỳ người dùng nào.
     """
-    user = User.find_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return UserPublic(
-        id=str(user._id),
-        username=user.username,
-        email=user.email,
-        displayName=user.displayName
-    )
+    try:
+        user = await UserService.get_user_profile(user_id)
+        return UserPublic(
+            id=str(user._id),
+            username=user.username,
+            email=user.email,
+            displayName=user.displayName
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

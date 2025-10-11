@@ -1,55 +1,43 @@
+# Nhập các thư viện cần thiết
 import os
-from pymongo import MongoClient
-from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient # Thư viện bất đồng bộ cho MongoDB
+from beanie import init_beanie # ODM (Object-Document Mapper) cho MongoDB
+from dotenv import load_dotenv # Để tải các biến môi trường từ file .env
+from typing import Type
 
-# Load environment variables from .env file
-load_dotenv()
+# Nhập các model từ các file khác
+from .user import User
+from .conversation import Conversation
+from .message import Message
+from .post import Post
+from .friend_request import FriendRequest
 
-class Database:
+# Danh sách các model Beanie sẽ được khởi tạo
+# Thêm tất cả các model của bạn vào đây
+DOCUMENT_MODELS: list[Type] = [User, Conversation, Message, Post, FriendRequest]
+
+async def init_db():
     """
-    A class to manage the connection to the MongoDB Atlas database.
+    Khởi tạo kết nối cơ sở dữ liệu và Beanie ODM.
+    Hàm này nên được gọi khi FastAPI khởi động.
     """
-    client = None
-    db = None
+    # Tải các biến môi trường từ file .env
+    load_dotenv()
+    # Lấy chuỗi kết nối MongoDB từ biến môi trường
+    mongo_uri = os.getenv("MONGO_URI")
+    # Nếu không tìm thấy chuỗi kết nối, báo lỗi
+    if not mongo_uri:
+        raise ValueError("Không tìm thấy MONGO_URI trong các biến môi trường.")
 
-    @staticmethod
-    def connect():
-        """
-        Connects to the MongoDB database using the URI from the environment variables.
-        """
-        if Database.client is None:
-            try:
-                # The .env file should be structured as follows:
-                # MONGO_URI=mongodb+srv://<username>:<password>@<cluster-url>/
-                mongo_uri = os.getenv("MONGO_URI")
-                if not mongo_uri:
-                    raise ValueError("MONGO_URI not found in environment variables.")
-                
-                Database.client = MongoClient(mongo_uri)
-                # You can specify a default database name here if you want
-                # For example: Database.db = Database.client['your_db_name']
-                Database.db = Database.client['relo-social-network'] # Example database name
-                print("Successfully connected to MongoDB Atlas!")
+    # Tạo một client kết nối đến MongoDB
+    client = AsyncIOMotorClient(mongo_uri)
+    # Lấy cơ sở dữ liệu có tên "relo-social-network" (hoặc có thể lấy từ biến môi trường)
+    database = client.get_database("relo-social-network")
 
-            except Exception as e:
-                print(f"Error connecting to MongoDB: {e}")
-
-    @staticmethod
-    def get_database():
-        """
-        Returns the database object.
-        """
-        if Database.db is None:
-            Database.connect()
-        return Database.db
-
-    @staticmethod
-    def close():
-        """
-        Closes the MongoDB connection.
-        """
-        if Database.client:
-            Database.client.close()
-            Database.client = None
-            Database.db = None
-            print("MongoDB connection closed.")
+    # Khởi tạo Beanie với cơ sở dữ liệu và các model đã định nghĩa
+    await init_beanie(
+        database=database,
+        document_models=DOCUMENT_MODELS
+    )
+    # In thông báo khi kết nối và khởi tạo thành công
+    print("Kết nối thành công đến MongoDB và khởi tạo Beanie!")

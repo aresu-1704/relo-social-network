@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:relo/screen/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,22 +12,21 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final bool isLoading = false;
-  final TextEditingController email = TextEditingController();
-  final TextEditingController password = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  final bool _isLoading = false;
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   @override
   void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    const Color primaryColor = Color(0xFF7A2FC0);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -35,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(30), // chỉnh độ bo tròn
+                borderRadius: BorderRadius.circular(30),
                 child: Image.asset(
                   'assets/icons/app_logo.png',
                   width: 200,
@@ -47,24 +48,26 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 'ĐĂNG NHẬP',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.lato(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF8B38D7),
+                  color: primaryColor,
                 ),
               ),
               const SizedBox(height: 32),
 
+              // Trường nhập tên đăng nhập
               _buildTextField(
-                controller: email,
-                hint: 'Địa chỉ Email',
-                icon: Icons.email_outlined,
-                validatorMsg: 'Email không được để trống',
+                controller: _usernameController,
+                hint: 'Tên đăng nhập',
+                icon: Icons.person_outline,
+                validatorMsg: 'Tên đăng nhập không được để trống',
               ),
               const SizedBox(height: 16),
 
+              // Trường nhập mật khẩu
               _buildTextField(
-                controller: password,
+                controller: _passwordController,
                 hint: 'Mật khẩu',
                 icon: Icons.lock_outline,
                 obscure: true,
@@ -74,15 +77,12 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: isLoading
-                      ? null
-                      : () {
-                          // Navigator.push(context,
-                          //     // MaterialPageRoute(builder: (_) => ForgotPasswordScreen()));
-                        },
-                  child: const Text(
+                  onPressed: _isLoading ? null : () {
+                    // TODO: Implement forgot password functionality
+                  },
+                  child: Text(
                     'Quên mật khẩu ?',
-                    style: TextStyle(color: Color(0xFF7A2FC0)),
+                    style: GoogleFonts.lato(color: primaryColor),
                   ),
                 ),
               ),
@@ -93,47 +93,29 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: isLoading
+                  onPressed: _isLoading
                       ? null
-                      : () async {
+                      : () {
                           if (_formKey.currentState!.validate()) {
-                            // FocusScope.of(context).unfocus();
-                            // final userId = await login(_onSetState);
-                            //
-                            // if(userId == -3) {
-                            //   _showSnackBar('Không thể kết nối đến máy chủ, vui lòng thử lại sau.');
-                            // } else if (userId == -2) {
-                            //   _showSnackBar('Bạn đã đăng nhập quá nhiều lần, vui lòng thử lại sau.');
-                            // } else if (userId != null && userId > 0) {
-                            //   _showSnackBar('Đăng nhập thành công');
-                            //   await Future.delayed(const Duration(seconds: 1));
-                            //   Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //       builder: (context) => CameraScreen(UserId: userId),
-                            //     ),
-                            //   );
-                            // } else {
-                            //   _showSnackBar('Sai tài khoản hoặc mật khẩu.');
-                            // }
-                            //
+                            // TODO: Call login service
+                            FocusScope.of(context).unfocus();
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B38D7),
+                    backgroundColor: primaryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: isLoading
+                  child: _isLoading
                       ? const CircularProgressIndicator(
                           valueColor: AlwaysStoppedAnimation<Color>(
                             Colors.white,
                           ),
                         )
-                      : const Text(
+                      : Text(
                           'Đăng nhập',
-                          style: TextStyle(
+                          style: GoogleFonts.lato(
                             fontSize: 20,
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -145,22 +127,21 @@ class _LoginScreenState extends State<LoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Không có tài khoản ?'),
+                  Text('Không có tài khoản ?', style: GoogleFonts.lato()),
                   TextButton(
-                    onPressed: isLoading
+                    onPressed: _isLoading
                         ? null
                         : () {
-                            // Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(builder: (_) => RegisterScreen()
-                            //     )
-                            // );
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const RegisterScreen()));
                           },
-                    child: const Text(
+                    child: Text(
                       'Đăng ký',
-                      style: TextStyle(
+                      style: GoogleFonts.lato(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF7A2FC0),
+                        color: primaryColor,
                       ),
                     ),
                   ),
@@ -174,10 +155,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showSnackBar(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
@@ -188,12 +165,14 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextFormField(
       controller: controller,
       obscureText: obscure,
-      cursorColor: const Color(0xFF8B38D7),
+      cursorColor: const Color(0xFF7A2FC0),
       validator: (value) =>
           (value == null || value.trim().isEmpty) ? validatorMsg : null,
+      style: GoogleFonts.lato(),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon),
+        hintStyle: GoogleFonts.lato(),
+        prefixIcon: Icon(icon, color: const Color(0xFF7A2FC0)),
         filled: true,
         fillColor: Colors.white,
         enabledBorder: _buildBorder(),
@@ -208,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(8),
       borderSide: BorderSide(
-        color: color ?? const Color(0xFF8B38D7),
+        color: color ?? const Color(0xFF7A2FC0),
         width: width,
       ),
     );

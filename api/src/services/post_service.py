@@ -1,64 +1,101 @@
-from ..models.post import Post
+from ..models.post import Post, AuthorInfo, Reaction
 from ..models.user import User
 
 class PostService:
 
     @staticmethod
-    def create_post(author_id, content, media_urls=None):
+    async def create_post(author_id: str, content: str, media_urls: list = None):
         """
         Tạo một bài đăng mới.
         Nó tìm nạp thông tin của tác giả để khử chuẩn hóa nó vào tài liệu bài đăng.
         """
-        author = User.find_by_id(author_id)
+        # Lấy thông tin tác giả một cách bất đồng bộ
+        author = await User.get(author_id)
         if not author:
             raise ValueError("Không tìm thấy tác giả.")
 
-        author_info = {
-            "displayName": author.displayName,
-            "avatarUrl": author.avatarUrl
-        }
+        # Tạo một đối tượng thông tin tác giả được nhúng
+        author_info = AuthorInfo(
+            displayName=author.displayName,
+            avatarUrl=author.avatarUrl
+        )
 
+        # Tạo thực thể bài đăng mới
         new_post = Post(
-            authorId=str(author_id),
+            authorId=author_id,
             authorInfo=author_info,
             content=content,
             mediaUrls=media_urls if media_urls else []
         )
-        new_post.save()
+        
+        # Lưu bài đăng vào cơ sở dữ liệu
+        await new_post.save()
         return new_post
 
     @staticmethod
-    def get_post_feed(limit=20, skip=0):
+    async def get_post_feed(limit: int = 20, skip: int = 0):
         """
         Lấy một nguồn cấp dữ liệu chung về các bài đăng gần đây.
         """
-        posts_cursor = Post.get_collection().find().sort('createdAt', -1).skip(skip).limit(limit)
-        return [Post(**post_data) for post_data in posts_cursor]
+        # Truy vấn các bài đăng gần đây nhất, được sắp xếp theo ngày tạo
+        posts = await Post.find_all(sort="-createdAt", skip=skip, limit=limit).to_list()
+        return posts
 
     @staticmethod
-    def react_to_post(user_id, post_id, reaction_type):
+    async def react_to_post(user_id: str, post_id: str, reaction_type: str):
         """
         Thêm hoặc thay đổi phản ứng của người dùng đối với một bài đăng.
         """
-        post = Post.find_by_id(post_id)
+        post = await Post.get(post_id)
         if not post:
             raise ValueError("Không tìm thấy bài đăng.")
         
-        # Phương thức mô hình xử lý tất cả logic để thêm/cập nhật các phản ứng
-        post.add_reaction(user_id, reaction_type)
+        # Tìm phản ứng hiện có của người dùng
+        existing_reaction_index = -1
+        for i, reaction in enumerate(post.reactions):
+            if reaction.userId == user_id:
+                existing_reaction_index = i
+                break
+
+        if existing_reaction_index != -1:
+            # Nếu người dùng đã phản ứng
+            old_reaction_type = post.reactions[existing_reaction_index].type
+            if old_reaction_type == reaction_type:
+                # Nếu loại phản ứng giống nhau, không làm gì cả
+                return post
+            
+            # Giảm số lượng của phản ứng cũ
+            post.reactionCounts[old_reaction_type] -= 1
+            if post.reactionCounts[old_reaction_type] == 0:
+                del post.reactionCounts[old_reaction_type]
+            
+            # Cập nhật phản ứng
+            post.reactions[existing_reaction_index].type = reaction_type
+        else:
+            # Nếu người dùng chưa phản ứng, hãy thêm một phản ứng mới
+            post.reactions.append(Reaction(userId=user_id, type=reaction_type))
+
+        # Tăng số lượng của phản ứng mới
+        post.reactionCounts[reaction_type] = post.reactionCounts.get(reaction_type, 0) + 1
+        
+        # Lưu bài đăng đã cập nhật
+        await post.save()
         return post
 
     @staticmethod
-    def delete_post(post_id, user_id):
+    async def delete_post(post_id: str, user_id: str):
         """
         Xóa một bài đăng, đảm bảo người dùng là tác giả.
         """
-        post = Post.find_by_id(post_id)
+        # Lấy bài đăng
+        post = await Post.get(post_id)
         if not post:
             raise ValueError("Không tìm thấy bài đăng.")
 
-        if str(post.authorId) != str(user_id):
+        # Kiểm tra quyền
+        if post.authorId != user_id:
             raise PermissionError("Bạn không được phép xóa bài đăng này.")
 
-        post.delete()
+        # Xóa bài đăng
+        await post.delete()
         return {"message": "Bài đăng đã được xóa thành công"}

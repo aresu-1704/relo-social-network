@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/screen/default_screen.dart';
 import 'dart:async';
 
@@ -11,11 +12,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeData(primarySwatch: Colors.purple);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: "Relo",
-      theme: ThemeData(
-        primarySwatch: Colors.purple,
+      theme: theme.copyWith(
+        textTheme: GoogleFonts.robotoTextTheme(theme.textTheme),
       ),
       home: const SplashScreen(),
     );
@@ -46,11 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF8b38d7),
       body: Center(
-        child: Image.asset(
-          "assets/icons/icon.png",
-          width: 250,
-          height: 250,
-        ),
+        child: Image.asset("assets/icons/icon.png", width: 250, height: 250),
       ),
     );
   }
