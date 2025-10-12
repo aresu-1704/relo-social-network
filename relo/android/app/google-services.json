@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "224309039675",
+    "project_id": "relo-e6b93",
+    "storage_bucket": "relo-e6b93.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:224309039675:android:1e9f2e2e0afc070d38821e",
+        "android_client_info": {
+          "package_name": "com.example.relo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwhoJU45Lb3KDF81bV0YF-j4tclDl4r0g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

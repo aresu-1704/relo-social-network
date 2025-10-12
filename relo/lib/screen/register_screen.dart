@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:relo/widgets/text_form_field.dart';
+import '../services/auth_service.dart'; // Import service
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -8,6 +11,9 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  // Service để gọi API
+  final AuthService _authService = AuthService();
+
   // Key để quản lý Form state
   final _formKey = GlobalKey<FormState>();
 
@@ -36,46 +42,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
     // Bắt đầu loading
     setState(() => _isLoading = true);
 
-    // Lấy dữ liệu từ controllers
-    final username = _usernameController.text;
-    final email = _emailController.text;
-    final password = _passwordController.text;
-    final displayName = _displayNameController.text;
+    try {
+      // Gọi service đăng ký
+      await _authService.register(
+        username: _usernameController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+        displayName: _displayNameController.text,
+      );
 
-    // TODO: Gọi service đăng ký ở đây
-    // Ví dụ:
-    // try {
-    //   await authService.register(username, email, password, displayName);
-    //   if (!mounted) return;
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('Đăng ký thành công!')),
-    //   );
-    //   Navigator.pop(context);
-    // } catch (e) {
-    //   if (!mounted) return;
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     SnackBar(content: Text('Đăng ký thất bại: $e')),
-    //   );
-    // } finally {
-    //   setState(() => _isLoading = false);
-    // }
+      // Kiểm tra nếu widget còn tồn tại trước khi thao tác với context
+      if (!mounted) return;
 
-    // Giả lập gọi API để test UI
-    await Future.delayed(const Duration(seconds: 2));
+      // Hiển thị thông báo thành công
+      Fluttertoast.showToast(
+        msg: "Đăng ký thành công! Chuẩn bị quay lại trang đăng nhập",
+        toastLength: Toast.LENGTH_LONG, // Để toast hiển thị đủ lâu
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: const Color(0xFF7A2FC0), // Màu tím chủ đạo
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
 
-    // Dừng loading
-    setState(() => _isLoading = false);
+      // Chờ 2 giây rồi quay về
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      });
+    } catch (e) {
+      // Kiểm tra nếu widget còn tồn tại
+      if (!mounted) return;
 
-    // Kiểm tra nếu widget còn tồn tại
-    if (!mounted) return;
+      // Dừng loading khi có lỗi
+      setState(() => _isLoading = false);
 
-    // Hiển thị thông báo thành công và quay về màn hình trước đó
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đăng ký thành công!')),
-    );
-    Future.delayed(const Duration(seconds: 1), () {
-      Navigator.pop(context);
-    });
+      // Hiển thị lỗi
+      Fluttertoast.showToast(
+        msg: e.toString().replaceFirst(
+          "Exception: ",
+          "",
+        ), // Chỉ hiển thị nội dung lỗi
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM, // Cho toast lỗi hiện từ trên xuống
+        backgroundColor: Colors.redAccent,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
   }
 
   @override
@@ -95,7 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
+      body: Container(
         padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 58),
         child: Form(
           key: _formKey,
@@ -116,12 +130,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const Text(
                 'ĐĂNG KÝ TÀI KHOẢN',
                 style: TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.bold, color: mainColor),
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: mainColor,
+                ),
               ),
               const SizedBox(height: 25),
 
               // Trường nhập Tên đăng nhập
-              _buildTextFormField(
+              BuildTextFormField.buildTextFormField(
                 controller: _usernameController,
                 hintText: 'Tên đăng nhập',
                 icon: Icons.person,
@@ -138,7 +155,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 15),
 
               // Trường nhập Tên hiển thị
-              _buildTextFormField(
+              BuildTextFormField.buildTextFormField(
                 controller: _displayNameController,
                 hintText: 'Tên hiển thị',
                 icon: Icons.badge,
@@ -152,7 +169,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 15),
 
               // Trường nhập Email
-              _buildTextFormField(
+              BuildTextFormField.buildTextFormField(
                 controller: _emailController,
                 hintText: 'Email',
                 icon: Icons.email,
@@ -169,7 +186,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 15),
 
               // Trường nhập Mật khẩu
-              _buildTextFormField(
+              BuildTextFormField.buildTextFormField(
                 controller: _passwordController,
                 hintText: 'Mật khẩu',
                 icon: Icons.lock,
@@ -191,7 +208,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 15),
 
               // Trường nhập Xác nhận mật khẩu
-              _buildTextFormField(
+              BuildTextFormField.buildTextFormField(
                 controller: _confirmPasswordController,
                 hintText: 'Xác nhận mật khẩu',
                 icon: Icons.lock_outline,
@@ -199,7 +216,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 obscureText: _obscureConfirmPassword,
                 toggleObscure: () {
                   setState(
-                      () => _obscureConfirmPassword = !_obscureConfirmPassword);
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                  );
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -236,9 +254,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       : const Text(
                           'ĐĂNG KÝ',
                           style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                 ),
               ),
@@ -254,7 +273,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: const Text(
                       'Đăng nhập',
                       style: TextStyle(
-                          fontWeight: FontWeight.bold, color: mainColor),
+                        fontWeight: FontWeight.bold,
+                        color: mainColor,
+                      ),
                     ),
                   ),
                 ],
@@ -262,56 +283,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // Widget helper để xây dựng các trường TextFormField cho gọn
-  Widget _buildTextFormField({
-    required TextEditingController controller,
-    required String hintText,
-    required IconData icon,
-    required String? Function(String?) validator,
-    bool isPassword = false,
-    bool obscureText = false,
-    VoidCallback? toggleObscure,
-  }) {
-    const Color mainColor = Color(0xFF7A2FC0);
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      validator: validator,
-      cursorColor: mainColor,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: mainColor),
-        hintText: hintText,
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 16),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: mainColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: mainColor, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.red),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.red, width: 2),
-        ),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                    obscureText ? Icons.visibility : Icons.visibility_off,
-                    color: mainColor),
-                onPressed: toggleObscure,
-              )
-            : null,
       ),
     );
   }

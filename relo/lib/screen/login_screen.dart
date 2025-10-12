@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:relo/screen/default_screen.dart';
 import 'package:relo/screen/register_screen.dart';
+import 'package:relo/services/auth_service.dart';
+import 'package:relo/services/notification_service.dart';
+import 'package:relo/screen/main_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:relo/services/websocket_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,8 +17,10 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
 
-  final bool _isLoading = false;
+  bool _isLoading = false;
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -21,6 +29,60 @@ class _LoginScreenState extends State<LoginScreen> {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _login() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+      FocusScope.of(context).unfocus();
+
+      try {
+        // Lấy device token
+        final String? deviceToken = await _notificationService.getDeviceToken();
+
+        // Đăng nhập và lấy kết quả trả về (Map<String, dynamic>)
+        final Map<String, dynamic> result = await _authService.login(
+          _usernameController.text,
+          _passwordController.text,
+          deviceToken: deviceToken,
+        );
+
+        // Lấy token từ kết quả trả về
+        final String? token = result['token'];
+        if (token != null && token.isNotEmpty) {
+          // Lưu token vào SharedPreferences để tự động đăng nhập lần sau
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', token);
+          // Kết nối WebSocket sau khi đăng nhập thành công
+          webSocketService.connect(token);
+        }
+
+        // Nếu đăng nhập thành công, chuyển đến màn hình chính
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+          );
+        }
+      } catch (e) {
+        // Hiển thị lỗi cho người dùng
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -77,9 +139,11 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: _isLoading ? null : () {
-                    // TODO: Implement forgot password functionality
-                  },
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          // TODO: Implement forgot password functionality
+                        },
                   child: Text(
                     'Quên mật khẩu ?',
                     style: GoogleFonts.lato(color: primaryColor),
@@ -93,14 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          if (_formKey.currentState!.validate()) {
-                            // TODO: Call login service
-                            FocusScope.of(context).unfocus();
-                          }
-                        },
+                  onPressed: _isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     shape: RoundedRectangleBorder(
@@ -133,9 +190,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? null
                         : () {
                             Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const RegisterScreen()));
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ),
+                            );
                           },
                     child: Text(
                       'Đăng ký',
