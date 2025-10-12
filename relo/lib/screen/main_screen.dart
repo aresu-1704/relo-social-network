@@ -1,28 +1,42 @@
-// Màn hình chính với AppBar có thanh tìm kiếm và Convex Bottom Bar
+// Màn hình chính với AppBar có thanh tìm kiếm và Bottom Bar được tùy chỉnh
 import 'package:flutter/material.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/auth_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:relo/screen/default_screen.dart';
+import 'messages_screen.dart';
+import 'friends_screen.dart';
 
 // TODO: Thêm các màn hình con vào list này
 final List<Widget> screens = [
-  // ...TODO
+  MessagesScreen(),
+  Center(child: Text('TODO: Tường nhà')), // Placeholder for Home Screen
+  const FriendsScreen(), // Placeholder for Friends Screen
+  Center(
+    child: Text('TODO: Thông báo'),
+  ), // Placeholder for Notifications Screen
+  Center(child: Text('TODO: Cá nhân')), // Placeholder for Profile Screen
 ];
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<MainScreen> createState() => MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
+  final AuthService _authService = AuthService();
 
   // Màu tím chủ đạo
-  final Color primaryColor = Color(0xFF7C3AED); // Đổi mã màu tím nếu bạn muốn
+  final Color primaryColor = Color(0xFF7C3AED);
+
+  void changeTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   // Màn hình cá nhân với nút logout
   Widget _buildProfileScreen() {
@@ -31,11 +45,10 @@ class _MainScreenState extends State<MainScreen> {
         onPressed: () async {
           // Ngắt kết nối WebSocket
           webSocketService.disconnect();
-          // Xóa token đăng nhập
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('auth_token');
-          // Gọi hàm logout của AuthService nếu cần
-          AuthService().logout();
+
+          // Gọi hàm logout của AuthService để xóa tokens an toàn
+          await _authService.logout();
+
           // Chuyển về màn hình đăng nhập
           if (mounted) {
             Navigator.of(context).pushAndRemoveUntil(
@@ -51,6 +64,15 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Cập nhật lại body để sử dụng _buildProfileScreen cho tab cá nhân
+    final List<Widget> currentScreens = [
+      MessagesScreen(),
+      Center(child: Text('TODO: Tường nhà')), 
+      const FriendsScreen(), 
+      Center(child: Text('TODO: Thông báo')), 
+      _buildProfileScreen(), // Sử dụng widget profile ở đây
+    ];
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -64,7 +86,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: GestureDetector(
                   onTap: () => {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const DefaultScreen()),
+                      MaterialPageRoute(builder: (_) => DefaultScreen()),
                     ), //TODO: Làm màn hình tìm kiếm
                   },
                   child: Row(
@@ -82,73 +104,81 @@ class _MainScreenState extends State<MainScreen> {
             ),
             IconButton(
               onPressed: () => {},
-              icon: Icon(Icons.settings, color: Colors.white),
+              icon: Icon(Icons.settings, color: Colors.white70),
             ),
           ],
         ),
       ),
-      body: screens.isNotEmpty
-          ? screens[_selectedIndex]
-          : (_selectedIndex == 4
-                ? _buildProfileScreen()
-                : Center(child: Text('TODO: Thêm màn hình con'))), // TODO
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.black,
-        onTap: (int i) {
-          setState(() {
-            _selectedIndex = i;
-            if (i == 3) {
-              _notificationCount =
-                  0; // Clear notification badge when "Thông báo" is tapped
-            }
-          });
-        },
-        items: [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Tin nhắn',
+      body: currentScreens[_selectedIndex],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[100], // Màu nền xám
+          border: Border(
+            top: BorderSide(color: Colors.grey[300]!, width: 0.5), // Viền trên mỏng
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.article_outlined),
-            label: 'Tường nhà',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            label: 'Bạn bè',
-          ),
-          BottomNavigationBarItem(
-            icon: Stack(
-              children: [
-                Icon(Icons.notifications_none),
-                if (_notificationCount > 0)
-                  Positioned(
-                    top: 0,
-                    right: 4,
-                    child: Container(
-                      padding: EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      constraints: BoxConstraints(minWidth: 16, minHeight: 16),
-                      child: Text(
-                        '$_notificationCount',
-                        style: TextStyle(color: Colors.white, fontSize: 10),
-                        textAlign: TextAlign.center,
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          selectedItemColor: primaryColor,
+          unselectedItemColor: Colors.grey, // Màu icon chưa chọn là xám
+          backgroundColor: Colors.transparent, // Nền trong suốt để màu của container hiển thị
+          elevation: 0, // Bỏ shadow mặc định
+          type: BottomNavigationBarType.fixed, // Giữ các item cố định
+          showSelectedLabels: true,
+          showUnselectedLabels: false,
+          onTap: (int i) {
+            setState(() {
+              _selectedIndex = i;
+              if (i == 3) {
+                _notificationCount = 0;
+              }
+            });
+          },
+          items: [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              label: 'Tin nhắn',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.article_outlined),
+              label: 'Tường nhà',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.group_outlined),
+              label: 'Bạn bè',
+            ),
+            BottomNavigationBarItem(
+              icon: Stack(
+                children: [
+                  Icon(Icons.notifications_none),
+                  if (_notificationCount > 0)
+                    Positioned(
+                      top: 0,
+                      right: 4,
+                      child: Container(
+                        padding: EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        constraints: BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '$_notificationCount',
+                          style: TextStyle(color: Colors.white, fontSize: 10),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
+              label: 'Thông báo',
             ),
-            label: 'Thông báo',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Cá nhân',
-          ),
-        ],
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: 'Cá nhân',
+            ),
+          ],
+        ),
       ),
     );
   }

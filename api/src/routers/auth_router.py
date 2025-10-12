@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from ..services import AuthService, jwt_service
-from ..schemas import UserCreate, UserPublic, UserLogin
+from ..schemas import UserCreate, UserPublic, UserLogin, RefreshTokenRequest
 from ..services.jwt_service import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(tags=["Auth"])
@@ -64,6 +64,37 @@ async def login_for_access_token(login_data: UserLogin):
     access_token = jwt_service.create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
+
+    # Tạo refresh token
+    refresh_token = jwt_service.create_refresh_token(
+        data={"sub": user.username}
+    )
     
-    # Trả về token
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Trả về cả hai token
+    return {
+        "access_token": access_token, 
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+@router.post("/api/auth/refresh")
+async def refresh_access_token(payload: RefreshTokenRequest):
+    """
+    Nhận một refresh token và trả về một access token mới.
+    """
+    token_data = jwt_service.decode_access_token(payload.refresh_token)
+    
+    if not token_data or not token_data.username:
+        raise HTTPException(
+            status_code=401,
+            detail="Refresh token không hợp lệ hoặc đã hết hạn",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Tạo access token mới
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_access_token = jwt_service.create_access_token(
+        data={"sub": token_data.username}, expires_delta=access_token_expires
+    )
+    
+    return {"access_token": new_access_token, "token_type": "bearer"}

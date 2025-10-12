@@ -1,8 +1,13 @@
-import './api_service.dart';
+import 'package:dio/dio.dart';
+import 'package:relo/services/secure_storage_service.dart';
+import 'package:relo/constants.dart';
 
-class AuthService extends ApiService {
-  /// Đăng nhập người dùng và lưu token nếu thành công.
-  Future<Map<String, dynamic>> login(
+class AuthService {
+  final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
+  final SecureStorageService _storageService = const SecureStorageService();
+
+  /// Đăng nhập người dùng và lưu tokens nếu thành công.
+  Future<void> login(
     String username,
     String password, {
     String? deviceToken,
@@ -13,48 +18,64 @@ class AuthService extends ApiService {
       body['device_token'] = deviceToken;
     }
 
-    final response = await post('auth/login', body: body);
+    try {
+      final response = await _dio.post('auth/login', data: body);
 
-    // Nếu đăng nhập thành công, trích xuất và lưu token
-    if (response['access_token'] != null) {
-      setAuthToken(response['access_token']);
+      if (response.statusCode == 200 && response.data != null) {
+        final accessToken = response.data['access_token'];
+        final refreshToken = response.data['refresh_token'];
+
+        if (accessToken != null && refreshToken != null) {
+          await _storageService.saveTokens(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+          );
+        } else {
+          throw Exception('Login failed: Tokens not received.');
+        }
+      } else {
+        throw Exception('Login failed: Invalid response from server.');
+      }
+    } on DioException catch (e) {
+      // Handle Dio-specific errors, e.g., 401 Unauthorized
+      if (e.response?.statusCode == 401) {
+        throw Exception('Tên đăng nhập hoặc mật khẩu không chính xác.');
+      }
+      throw Exception('Đã xảy ra lỗi mạng.');
+    } catch (e) {
+      throw Exception('Đã xảy ra lỗi không xác định.');
     }
-
-    return response;
   }
 
   /// Đăng ký người dùng mới.
-  Future<Map<String, dynamic>> register({
+  Future<void> register({
     required String username,
     required String email,
     required String password,
     required String displayName,
   }) async {
     try {
-      return await post(
+      await _dio.post(
         'auth/register',
-        body: {
+        data: {
           'username': username,
           'email': email,
           'password': password,
           'displayName': displayName,
         },
       );
-    } catch (e) {
-      final errorMessage = e.toString();
-      if (errorMessage.contains('Username already exists')) {
-        throw Exception('Tên người dùng đã tồn tại.');
-      } else if (errorMessage.contains('Email already registered')) {
-        throw Exception('Email đã tồn tại.');
-      } else {
-        // Ném lại lỗi gốc nếu không phải lỗi cụ thể cần xử lý
-        throw Exception('Đã xảy ra lỗi không xác định.');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception(e.response?.data['detail'] ?? 'Lỗi đăng ký.');
       }
+      throw Exception('Đã xảy ra lỗi mạng.');
+    } catch (e) {
+      throw Exception('Đã xảy ra lỗi không xác định.');
     }
   }
 
-  /// Đăng xuất người dùng (xóa token ở phía client).
-  void logout() {
-    setAuthToken(null);
+  /// Đăng xuất người dùng (xóa tokens ở phía client).
+  Future<void> logout() async {
+    await _storageService.deleteTokens();
   }
 }

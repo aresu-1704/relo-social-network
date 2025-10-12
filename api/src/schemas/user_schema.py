@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import List
 
 class FriendRequestCreate(BaseModel):
@@ -6,3 +6,9 @@ class FriendRequestCreate(BaseModel):
 
 class FriendRequestResponse(BaseModel):
     response: str # 'accept' or 'reject'
+
+class UserPublic(BaseModel):
+    id: str
+    username: str
+    email: EmailStr
+    displayName: str

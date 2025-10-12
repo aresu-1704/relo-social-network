@@ -3,21 +3,32 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/firebase_options.dart';
 import 'package:relo/screen/default_screen.dart';
 import 'package:relo/screen/main_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:relo/services/secure_storage_service.dart';
+import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/websocket_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // Kiểm tra trạng thái đăng nhập
-  final prefs = await SharedPreferences.getInstance();
-  final String? token = prefs.getString('auth_token');
-  // Nếu đã đăng nhập thì kết nối WebSocket luôn
-  if (token != null && token.isNotEmpty) {
-    webSocketService.connect(token);
+
+  // Initialize all services
+  ServiceLocator.init();
+
+  // Check for an existing session via the refresh token
+  final storage = const SecureStorageService();
+  final refreshToken = await storage.getRefreshToken();
+  final bool isLoggedIn = refreshToken != null;
+
+  // If logged in, connect the WebSocket
+  if (isLoggedIn) {
+    final accessToken = await storage.getAccessToken();
+    if (accessToken != null) {
+      webSocketService.connect(accessToken);
+    }
   }
-  runApp(MyApp(isLoggedIn: token != null && token.isNotEmpty));
+
+  runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
 class MyApp extends StatelessWidget {
@@ -29,12 +40,13 @@ class MyApp extends StatelessWidget {
     final theme = ThemeData(primarySwatch: Colors.purple);
 
     return MaterialApp(
+      navigatorKey:
+          ServiceLocator.navigatorKey, // Assign the global navigator key
       debugShowCheckedModeBanner: false,
       title: "Relo",
       theme: theme.copyWith(
         textTheme: GoogleFonts.robotoTextTheme(theme.textTheme),
       ),
-      // Nếu đã đăng nhập thì vào MainScreen, ngược lại vào DefaultScreen
       home: isLoggedIn ? const MainScreen() : const DefaultScreen(),
     );
   }
