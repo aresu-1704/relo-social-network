@@ -106,16 +106,91 @@ class UserService:
             raise ValueError("Không tìm thấy người dùng.")
         
         # Lấy tất cả bạn bè trong một truy vấn
-        friends = await User.find(User.id.in_([ObjectId(fid) for fid in user.friendIds])).to_list()
+        friends = await User.find({"_id": {"$in": [ObjectId(fid) for fid in user.friendIds]}}).to_list()
         
         return friends
 
     @staticmethod
-    async def get_user_profile(user_id: str):
+    async def get_user_profile(user_id: str, current_user_id: str):
         """
-        Lấy hồ sơ công khai của bất kỳ người dùng nào.
+        Lấy hồ sơ công khai của bất kỳ người dùng nào, trừ khi bị chặn.
         """
         user = await User.get(user_id)
         if not user:
             raise ValueError("Không tìm thấy người dùng")
+
+        current_user = await User.get(current_user_id)
+        if not current_user:
+            raise ValueError("Không tìm thấy người dùng hiện tại")
+
+        # Kiểm tra xem người dùng hiện tại có bị người dùng kia chặn không
+        if current_user_id in user.blockedUserIds:
+            raise ValueError("Bạn đã bị người dùng này chặn.")
+
+        # Kiểm tra xem người dùng hiện tại có chặn người dùng kia không
+        if user_id in current_user.blockedUserIds:
+            raise ValueError("Bạn đã chặn người dùng này.")
+
         return user
+
+    @staticmethod
+    async def block_user(user_id: str, block_user_id: str):
+        """
+        Chặn một người dùng.
+        """
+        if user_id == block_user_id:
+            raise ValueError("Không thể tự chặn chính mình.")
+
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+
+        if block_user_id not in user.blockedUserIds:
+            user.blockedUserIds.append(block_user_id)
+            await user.save()
+
+        return {"message": "Người dùng đã bị chặn thành công."}
+
+    @staticmethod
+    async def unblock_user(user_id: str, block_user_id: str):
+        """
+        Bỏ chặn một người dùng.
+        """
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+
+        if block_user_id in user.blockedUserIds:
+            user.blockedUserIds.remove(block_user_id)
+            await user.save()
+
+        return {"message": "Người dùng đã được bỏ chặn thành công."}
+
+    @staticmethod
+    async def search_users(query: str, current_user_id: str):
+        """
+        Tìm kiếm người dùng theo username hoặc displayName, loại trừ những người dùng bị chặn.
+        """
+        current_user = await User.get(current_user_id)
+        if not current_user:
+            raise ValueError("Không tìm thấy người dùng hiện tại.")
+
+        # Lấy danh sách những người dùng đã chặn người dùng hiện tại
+        users_blocking_me = await User.find({"blockedUserIds": current_user_id}).to_list()
+        ids_blocking_me = [str(u.id) for u in users_blocking_me]
+
+        # Tổng hợp danh sách ID bị chặn
+        excluded_ids = current_user.blockedUserIds + ids_blocking_me
+
+        # Tìm kiếm người dùng
+        users = await User.find(
+            {
+                "$or": [
+                    {"username": {"$regex": query, "$options": "i"}},
+                    {"displayName": {"$regex": query, "$options": "i"}}
+                ],
+                "_id": {"$nin": [ObjectId(uid) for uid in excluded_ids]}
+            }
+        ).to_list()
+
+        return users

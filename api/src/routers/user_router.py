@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from ..services import UserService
 from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic
+from ..schemas.block_schema import BlockUserRequest
 from ..models import User
 from ..security import get_current_user
 
@@ -14,7 +15,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
     Lấy hồ sơ của người dùng hiện được xác thực.
     """
     return UserPublic(
-        id=str(current_user._id),
+        id=str(current_user.id),
         username=current_user.username,
         email=current_user.email,
         displayName=current_user.displayName
@@ -28,7 +29,7 @@ async def send_friend_request(
 ):
     try:
         to_user_id = request_data.to_user_id
-        await UserService.send_friend_request(from_user_id=current_user._id, to_user_id=to_user_id)
+        await UserService.send_friend_request(from_user_id=str(current_user.id), to_user_id=to_user_id)
         return {"message": "Gửi yêu cầu kết bạn thành công."}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -43,7 +44,7 @@ async def respond_to_friend_request(
     try:
         await UserService.respond_to_friend_request(
             request_id=request_id,
-            user_id=current_user._id,
+            user_id=str(current_user.id),
             response=response_data.response
         )
         return {"message": f"Yêu cầu kết bạn đã được {response_data.response}."}
@@ -57,11 +58,11 @@ async def get_friends(current_user: User = Depends(get_current_user)):
     Lấy danh sách bạn bè cho người dùng hiện được xác thực.
     """
     try:
-        friends = await UserService.get_friends(user_id=current_user._id)
+        friends = await UserService.get_friends(user_id=str(current_user.id))
         # Chuyển đổi đối tượng User model thành UserPublic schema
         return [
             UserPublic(
-                id=str(friend._id),
+                id=str(friend.id),
                 username=friend.username,
                 email=friend.email,
                 displayName=friend.displayName
@@ -72,17 +73,54 @@ async def get_friends(current_user: User = Depends(get_current_user)):
 
 # Lấy hồ sơ công khai của người dùng
 @router.get("/api/users/{user_id}", response_model=UserPublic)
-async def get_user_profile(user_id: str):
+async def get_user_profile(user_id: str, current_user: User = Depends(get_current_user)):
     """
     Lấy hồ sơ công khai của bất kỳ người dùng nào.
     """
     try:
-        user = await UserService.get_user_profile(user_id)
+        user = await UserService.get_user_profile(user_id, str(current_user.id))
         return UserPublic(
-            id=str(user._id),
+            id=str(user.id),
             username=user.username,
             email=user.email,
             displayName=user.displayName
         )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+# Chặn người dùng
+@router.post("/api/users/block", status_code=200)
+async def block_user(request: BlockUserRequest, current_user: User = Depends(get_current_user)):
+    try:
+        result = await UserService.block_user(str(current_user.id), request.user_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Bỏ chặn người dùng
+@router.post("/api/users/unblock", status_code=200)
+async def unblock_user(request: BlockUserRequest, current_user: User = Depends(get_current_user)):
+    try:
+        result = await UserService.unblock_user(str(current_user.id), request.user_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Tìm kiếm người dùng
+@router.get("/api/users/search", response_model=List[UserPublic])
+async def search_users(query: str = Query(..., min_length=1), current_user: User = Depends(get_current_user)):
+    """
+    Tìm kiếm người dùng theo username hoặc displayName.
+    """
+    try:
+        users = await UserService.search_users(query, str(current_user.id))
+        return [
+            UserPublic(
+                id=str(user.id),
+                username=user.username,
+                email=user.email,
+                displayName=user.displayName
+            ) for user in users
+        ]
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

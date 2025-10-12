@@ -21,6 +21,10 @@ dependencies:
   convex_bottom_bar: ^3.2.0
   font_awesome_flutter: ^10.7.0
   shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.0.0 # For secure token storage
+  dio: ^5.4.1 # For advanced HTTP requests and interceptors
+  sqflite: ^2.0.0+4
+  path: ^1.8.3
 
   web_socket_channel: ^2.4.0
 
@@ -31,8 +35,10 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.4.1
+  build_runner: ^2.4.6
+  json_serializable: ^6.7.0
+  json_annotation: ^4.9.0
   
-
 flutter:
 
   uses-material-design: true

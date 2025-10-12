@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from .routers import auth_router, user_router, post_router, message_router
-from .models import init_db
+from src.routers import auth_router, user_router, post_router, message_router
+from src.models import init_db
 
 # Khởi tạo app FastAPI với thông tin Swagger UI
 app = FastAPI(
@@ -8,7 +8,7 @@ app = FastAPI(
     description="Backend mạng xã hội nhắn tin trực tuyến **Relo**.\n\n"
                 "Hệ thống hỗ trợ đăng ký, đăng nhập, kết bạn, nhắn tin thời gian thực "
                 "và quản lý bài viết cá nhân.",
-    version="1.0.11"
+    version="1.0.121025"
 )
 
 # Kết nối với cơ sở dữ liệu khi khởi động

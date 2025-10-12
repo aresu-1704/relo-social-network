@@ -25,3 +25,6 @@ class UserPublic(BaseModel):
         json_encoders = {
             'id': lambda v: str(v) # Convert ObjectId to string
         }
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

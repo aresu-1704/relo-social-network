@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:relo/screen/default_screen.dart';
 import 'package:relo/screen/register_screen.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/notification_service.dart';
 import 'package:relo/screen/main_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/websocket_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final AuthService _authService = AuthService();
   final NotificationService _notificationService = NotificationService();
+  final SecureStorageService _secureStorageService = const SecureStorageService();
 
   bool _isLoading = false;
   final TextEditingController _usernameController = TextEditingController();
@@ -42,27 +42,27 @@ class _LoginScreenState extends State<LoginScreen> {
         // Lấy device token
         final String? deviceToken = await _notificationService.getDeviceToken();
 
-        // Đăng nhập và lấy kết quả trả về (Map<String, dynamic>)
-        final Map<String, dynamic> result = await _authService.login(
+        // Đăng nhập. Service sẽ tự động lưu trữ tokens một cách an toàn.
+        await _authService.login(
           _usernameController.text,
           _passwordController.text,
           deviceToken: deviceToken,
         );
 
-        // Lấy token từ kết quả trả về
-        final String? token = result['token'];
-        if (token != null && token.isNotEmpty) {
-          // Lưu token vào SharedPreferences để tự động đăng nhập lần sau
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', token);
-          // Kết nối WebSocket sau khi đăng nhập thành công
-          webSocketService.connect(token);
+        // Sau khi đăng nhập thành công, lấy token để kết nối WebSocket
+        final accessToken = await _secureStorageService.getAccessToken();
+        if (accessToken != null) {
+          webSocketService.connect(accessToken);
+        } else {
+          // This should not happen if login was successful, but handle it just in case
+          throw Exception("Không thể lấy token sau khi đăng nhập.");
         }
 
         // Nếu đăng nhập thành công, chuyển đến màn hình chính
         if (mounted) {
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const MainScreen()),
+            (route) => false,
           );
         }
       } catch (e) {

@@ -1,4 +1,4 @@
-from .auth_schema import UserCreate, UserLogin, UserPublic
+from .auth_schema import UserCreate, UserLogin, UserPublic, RefreshTokenRequest
 from .message_schema import (
     ConversationCreate,
     MessageCreate,
@@ -8,6 +8,7 @@ from .message_schema import (
 )
 from .post_schema import PostCreate, PostPublic, ReactionCreate
 from .user_schema import FriendRequestCreate, FriendRequestResponse
+from .block_schema import BlockUserRequest
 
 __all__ = [
     "UserCreate",
@@ -23,4 +24,6 @@ __all__ = [
     "ReactionCreate",
     "FriendRequestCreate",
     "FriendRequestResponse",
+    "BlockUserRequest",
+    "RefreshTokenRequest"
 ]

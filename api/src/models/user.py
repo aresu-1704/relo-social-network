@@ -15,6 +15,7 @@ class User(Document):
     avatarUrl: Optional[str] = Field(default="", description="URL ảnh đại diện của người dùng.")
     bio: Optional[str] = Field(default="", description="Tiểu sử ngắn của người dùng.")
     friendIds: List[str] = Field(default_factory=list, description="Danh sách ID của bạn bè.")
+    blockedUserIds: List[str] = Field(default_factory=list, description="Danh sách ID của người dùng bị chặn.")
     createdAt: datetime = Field(default_factory=datetime.utcnow, description="Thời điểm người dùng được tạo.")
     updatedAt: datetime = Field(default_factory=datetime.utcnow, description="Thời điểm thông tin người dùng được cập nhật lần cuối.")
 

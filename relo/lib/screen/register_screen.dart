@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+
 import 'package:relo/widgets/text_form_field.dart';
 import '../services/auth_service.dart'; // Import service
 
@@ -36,14 +36,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Hàm xử lý đăng ký
   Future<void> _register() async {
-    // Validate form, nếu không hợp lệ thì dừng
     if (!_formKey.currentState!.validate()) return;
 
-    // Bắt đầu loading
     setState(() => _isLoading = true);
+    FocusScope.of(context).unfocus();
 
     try {
-      // Gọi service đăng ký
       await _authService.register(
         username: _usernameController.text,
         email: _emailController.text,
@@ -51,44 +49,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
         displayName: _displayNameController.text,
       );
 
-      // Kiểm tra nếu widget còn tồn tại trước khi thao tác với context
       if (!mounted) return;
 
-      // Hiển thị thông báo thành công
-      Fluttertoast.showToast(
-        msg: "Đăng ký thành công! Chuẩn bị quay lại trang đăng nhập",
-        toastLength: Toast.LENGTH_LONG, // Để toast hiển thị đủ lâu
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: const Color(0xFF7A2FC0), // Màu tím chủ đạo
-        textColor: Colors.white,
-        fontSize: 16.0,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Đăng ký thành công! Chuẩn bị quay lại trang đăng nhập."),
+          backgroundColor: Color(0xFF7A2FC0),
+        ),
       );
 
-      // Chờ 2 giây rồi quay về
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
           Navigator.pop(context);
         }
       });
     } catch (e) {
-      // Kiểm tra nếu widget còn tồn tại
       if (!mounted) return;
 
-      // Dừng loading khi có lỗi
-      setState(() => _isLoading = false);
-
-      // Hiển thị lỗi
-      Fluttertoast.showToast(
-        msg: e.toString().replaceFirst(
-          "Exception: ",
-          "",
-        ), // Chỉ hiển thị nội dung lỗi
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM, // Cho toast lỗi hiện từ trên xuống
-        backgroundColor: Colors.redAccent,
-        textColor: Colors.white,
-        fontSize: 16.0,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst("Exception: ", "")),
+          backgroundColor: Colors.redAccent,
+        ),
       );
+      // Only set loading to false on error, so the user can try again.
+      setState(() => _isLoading = false);
     }
   }
 
