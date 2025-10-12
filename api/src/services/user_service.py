@@ -1,5 +1,7 @@
+import asyncio
 from ..models.user import User
 from ..models.friend_request import FriendRequest
+from ..websocket import manager
 from bson import ObjectId
 
 class UserService:
@@ -71,6 +73,18 @@ class UserService:
             await friend_request.save()
             await from_user.save()
             await to_user.save()
+            
+            # Gửi thông báo real-time đến người gửi yêu cầu
+            notification_payload = {
+                "type": "friend_request_accepted",
+                "payload": {
+                    "user_id": str(to_user.id),
+                    "displayName": to_user.displayName
+                }
+            }
+            asyncio.create_task(
+                manager.broadcast_to_user(friend_request.fromUserId, notification_payload)
+            )
 
         elif response == 'reject':
             # Từ chối yêu cầu

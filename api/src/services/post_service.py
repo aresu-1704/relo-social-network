@@ -1,5 +1,7 @@
+import asyncio
 from ..models.post import Post, AuthorInfo, Reaction
 from ..models.user import User
+from ..websocket import manager
 
 class PostService:
 
@@ -30,6 +32,25 @@ class PostService:
         
         # Lưu bài đăng vào cơ sở dữ liệu
         await new_post.save()
+
+        # Gửi thông báo real-time đến bạn bè của tác giả
+        notification_payload = {
+            "type": "new_post",
+            "payload": {
+                "authorId": str(author.id),
+                "authorName": author.displayName,
+                "postId": str(new_post.id)
+            }
+        }
+        
+        broadcast_tasks = []
+        for friend_id in author.friendIds:
+            task = manager.broadcast_to_user(friend_id, notification_payload)
+            broadcast_tasks.append(task)
+        
+        if broadcast_tasks:
+            asyncio.gather(*broadcast_tasks)
+
         return new_post
 
     @staticmethod

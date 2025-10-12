@@ -14,6 +14,7 @@ class AuthService:
     @staticmethod
     def get_password_hash(password):
         """Băm một mật khẩu thuần túy."""
+        print(f"DEBUG Hashing password: '{password}', type: {type(password)}, len: {len(str(password))}")
         return pwd_context.hash(password)
 
     @staticmethod
@@ -37,7 +38,6 @@ class AuthService:
             username=username,
             email=email,
             hashedPassword=hashed_password,
-            salt="", # passlib bao gồm salt trong chuỗi băm
             displayName=displayName
         )
         
@@ -46,18 +46,22 @@ class AuthService:
         return new_user
 
     @staticmethod
-    async def login_user(email, password):
+    async def login_user(username, password, device_token: str = None):
         """
         Xử lý đăng nhập của người dùng.
-        Tìm người dùng bằng email và xác minh mật khẩu.
+        Tìm người dùng bằng username và xác minh mật khẩu.
         """
-        # Tìm người dùng bằng email một cách bất đồng bộ
-        user = await User.find_one(User.email == email)
+        # Tìm người dùng bằng username một cách bất đồng bộ
+        user = await User.find_one(User.username == username)
         if not user:
             return None # Không tìm thấy người dùng
         
         # Xác minh mật khẩu (hoạt động đồng bộ)
         if not AuthService.verify_password(password, user.hashedPassword):
             return None # Mật khẩu không hợp lệ
-            
+        
+        # Cập nhật device token nếu được cung cấp
+        if device_token:
+            user.deviceToken = device_token
+            await user.save()
         return user

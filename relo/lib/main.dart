@@ -1,14 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:relo/firebase_options.dart';
 import 'package:relo/screen/default_screen.dart';
-import 'dart:async';
+import 'package:relo/screen/main_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:relo/services/websocket_service.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Kiểm tra trạng thái đăng nhập
+  final prefs = await SharedPreferences.getInstance();
+  final String? token = prefs.getString('auth_token');
+  // Nếu đã đăng nhập thì kết nối WebSocket luôn
+  if (token != null && token.isNotEmpty) {
+    webSocketService.connect(token);
+  }
+  runApp(MyApp(isLoggedIn: token != null && token.isNotEmpty));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -20,37 +34,8 @@ class MyApp extends StatelessWidget {
       theme: theme.copyWith(
         textTheme: GoogleFonts.robotoTextTheme(theme.textTheme),
       ),
-      home: const SplashScreen(),
-    );
-  }
-}
-
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Sau 2s thì chuyển sang Login
-    Timer(const Duration(seconds: 2), () {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DefaultScreen()),
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF8b38d7),
-      body: Center(
-        child: Image.asset("assets/icons/icon.png", width: 250, height: 250),
-      ),
+      // Nếu đã đăng nhập thì vào MainScreen, ngược lại vào DefaultScreen
+      home: isLoggedIn ? const MainScreen() : const DefaultScreen(),
     );
   }
 }

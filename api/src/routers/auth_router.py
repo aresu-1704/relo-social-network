@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from ..services import AuthService, jwt_service
-from ..schemas import UserCreate, UserPublic
+from ..schemas import UserCreate, UserPublic, UserLogin
 from ..services.jwt_service import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(tags=["Auth"])
@@ -36,17 +36,21 @@ async def register_user(user_data: UserCreate):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/api/auth/login")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(login_data: UserLogin):
     """
     Endpoint để đăng nhập và nhận token truy cập.
-    - Sử dụng OAuth2PasswordRequestForm để nhận email (dưới dạng username) và mật khẩu.
+    - Sử dụng UserLogin schema để nhận email, mật khẩu và device_token.
     - Gọi AuthService để xác thực người dùng.
     - Nếu xác thực thành công, tạo token JWT.
     - Trả về token truy cập và loại token.
     - Ném lỗi HTTP 401 nếu thông tin đăng nhập không chính xác.
     """
-    # Xác thực người dùng bằng email và mật khẩu
-    user = await AuthService.login_user(email=form_data.username, password=form_data.password)
+    # Xác thực người dùng bằng username và mật khẩu
+    user = await AuthService.login_user(
+        username=login_data.username,
+        password=login_data.password,
+        device_token=login_data.device_token
+    )
     if not user:
         # Nếu không tìm thấy người dùng hoặc mật khẩu sai, trả về lỗi 401
         raise HTTPException(
