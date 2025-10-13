@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:relo/screen/login_screen.dart';
+import 'package:relo/services/connectivity_service.dart';
 import 'package:relo/services/dio_api_service.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/message_service.dart';
@@ -16,6 +17,7 @@ class ServiceLocator {
   static late final AuthService authService;
   static late final UserService userService;
   static late final MessageService messageService;
+  static late final ConnectivityService connectivityService;
 
   /// Initializes all the services.
   static void init() {
@@ -37,5 +39,8 @@ class ServiceLocator {
     authService = AuthService(); 
     userService = UserService(dio);
     messageService = MessageService(dio);
+
+    // Initialize the connectivity service
+    connectivityService = ConnectivityService();
   }
 }

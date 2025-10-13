@@ -1,5 +1,8 @@
 // Màn hình chính với AppBar có thanh tìm kiếm và Bottom Bar được tùy chỉnh
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:relo/services/connectivity_service.dart';
+import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:relo/screen/default_screen.dart';
@@ -29,8 +32,71 @@ class MainScreenState extends State<MainScreen> {
   int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
   final AuthService _authService = AuthService();
 
+  // Connectivity Status
+  late final ConnectivityService _connectivityService;
+  bool _showNotification = false;
+  String _notificationText = '';
+  Color _notificationColor = Colors.grey;
+  Timer? _onlineTimer;
+
   // Màu tím chủ đạo
   final Color primaryColor = Color(0xFF7C3AED);
+
+  @override
+  void initState() {
+    super.initState();
+    _connectivityService = ServiceLocator.connectivityService;
+    // Set initial state
+    _handleConnectivityChange();
+    // Listen for future changes
+    _connectivityService.addListener(_handleConnectivityChange);
+  }
+
+  @override
+  void dispose() {
+    _connectivityService.removeListener(_handleConnectivityChange);
+    _onlineTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleConnectivityChange() {
+    if (!mounted) return;
+
+    final status = _connectivityService.status;
+    _onlineTimer?.cancel(); // Cancel any existing timer
+
+    if (status == ConnectivityStatus.Offline) {
+      setState(() {
+        _showNotification = true;
+        _notificationText = 'Bạn đang ngoại tuyến';
+        _notificationColor = Colors.red;
+      });
+    } else if (status == ConnectivityStatus.Online) {
+      // Show 'reconnected' only if the previous state was offline
+      if (_notificationText == 'Bạn đang ngoại tuyến' ||
+          _notificationText == '') {
+        setState(() {
+          _showNotification = true;
+          _notificationText = 'Đã kết nối trở lại';
+          _notificationColor = const Color.fromARGB(255, 8, 235, 57);
+        });
+
+        // Hide the 'reconnected' banner after 3 seconds
+        _onlineTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _showNotification = false;
+            });
+          }
+        });
+      } else {
+        // If already online, just hide any persistent banner
+        setState(() {
+          _showNotification = false;
+        });
+      }
+    }
+  }
 
   void changeTab(int index) {
     setState(() {
@@ -67,9 +133,9 @@ class MainScreenState extends State<MainScreen> {
     // Cập nhật lại body để sử dụng _buildProfileScreen cho tab cá nhân
     final List<Widget> currentScreens = [
       MessagesScreen(),
-      Center(child: Text('TODO: Tường nhà')), 
-      const FriendsScreen(), 
-      Center(child: Text('TODO: Thông báo')), 
+      Center(child: Text('TODO: Tường nhà')),
+      const FriendsScreen(),
+      Center(child: Text('TODO: Thông báo')),
       _buildProfileScreen(), // Sử dụng widget profile ở đây
     ];
 
@@ -109,19 +175,42 @@ class MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
-      body: currentScreens[_selectedIndex],
+      body: Stack(
+        children: [
+          currentScreens[_selectedIndex],
+          // Connectivity Banner
+          AnimatedOpacity(
+            opacity: _showNotification ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: _notificationColor.withOpacity(0.9),
+              child: Text(
+                _notificationText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.grey[100], // Màu nền xám
           border: Border(
-            top: BorderSide(color: Colors.grey[300]!, width: 0.5), // Viền trên mỏng
+            top: BorderSide(
+              color: Colors.grey[300]!,
+              width: 0.5,
+            ), // Viền trên mỏng
           ),
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           selectedItemColor: primaryColor,
           unselectedItemColor: Colors.grey, // Màu icon chưa chọn là xám
-          backgroundColor: Colors.transparent, // Nền trong suốt để màu của container hiển thị
+          backgroundColor: Colors
+              .transparent, // Nền trong suốt để màu của container hiển thị
           elevation: 0, // Bỏ shadow mặc định
           type: BottomNavigationBarType.fixed, // Giữ các item cố định
           showSelectedLabels: true,
@@ -161,7 +250,10 @@ class MainScreenState extends State<MainScreen> {
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        constraints: BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints: BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
                         child: Text(
                           '$_notificationCount',
                           style: TextStyle(color: Colors.white, fontSize: 10),

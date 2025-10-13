@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
+from .user_schema import UserPublic
+
 
 class ConversationCreate(BaseModel):
     participant_ids: List[str]
@@ -8,7 +10,13 @@ class ConversationCreate(BaseModel):
 class MessageCreate(BaseModel):
     content: dict # e.g. {"text": "Hello"}
 
-# New Schemas
+# Schema for simplified message response
+class SimpleMessagePublic(BaseModel):
+    senderId: str
+    avatarUrl: Optional[str]
+    content: Dict
+    createdAt: datetime
+
 class MessagePublic(BaseModel):
     id: str
     conversationId: str
@@ -21,8 +29,6 @@ class MessagePublic(BaseModel):
         json_encoders = {
             datetime: lambda dt: dt.isoformat()
         }
-        # allow_population_by_field_name = True # not needed if we map manually
-
 
 class LastMessagePublic(BaseModel):
     text: str
@@ -46,4 +52,15 @@ class ConversationPublic(BaseModel):
         json_encoders = {
             datetime: lambda dt: dt.isoformat()
         }
-        # allow_population_by_field_name = True # not needed if we map manually
+
+class ConversationWithParticipants(BaseModel):
+    id: str
+    participants: List[UserPublic]
+    lastMessage: Optional[LastMessagePublic]
+    updatedAt: datetime
+
+    class Config:
+        orm_mode = True
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat()
+        }

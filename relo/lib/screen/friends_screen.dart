@@ -3,6 +3,8 @@ import 'package:relo/services/service_locator.dart';
 import '../services/user_service.dart';
 import '../models/user.dart';
 import 'dart:collection';
+import 'package:relo/screen/chat_screen.dart';
+import 'package:relo/services/message_service.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({Key? key}) : super(key: key);
@@ -14,6 +16,7 @@ class FriendsScreen extends StatefulWidget {
 class _FriendsScreenState extends State<FriendsScreen> {
   late Future<List<User>> _friendsFuture;
   final UserService _userService = ServiceLocator.userService;
+  final MessageService _messageService = ServiceLocator.messageService;
 
   @override
   void initState() {
@@ -59,7 +62,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(child: Text('Lỗi: ${snapshot.error}'));
+              return Center(
+                child: Text(
+                  snapshot.error.toString().replaceFirst('Exception: ', ''),
+                ),
+              );
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return const Center(child: Text('Bạn chưa có người bạn nào.'));
@@ -105,23 +112,62 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Widget _buildFriendTile(User friend) {
     return InkWell(
-      onTap: () {
-        // TODO: Navigate to the message screen for this user
-        // Navigator.push(context, MaterialPageRoute(builder: (context) => MessageScreen(userId: friend.id)));
-        print("Navigate to chat with ${friend.displayName}");
+      onTap: () async {
+        try {
+          // Gọi API get_or_create_conversation (tự xử lý trong backend)
+          final conversation = await _messageService.getOrCreateConversation([
+            friend.id,
+          ]);
+
+          if (conversation == null || conversation['id'] == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Không thể tạo cuộc trò chuyện")),
+            );
+            return;
+          }
+
+          // Lấy participants (nếu backend có trả về)
+          final participants = (conversation['participants'] ?? []) as List;
+
+          // Điều hướng sang ChatScreen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                conversationId: conversation['id'],
+                isGroup: false,
+                friendName: friend.displayName,
+                memberIds: participants.isNotEmpty
+                    ? participants
+                          .map((p) => p['id']?.toString() ?? '')
+                          .where((id) => id.isNotEmpty)
+                          .toList()
+                    : [friend.id],
+              ),
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Lỗi khi mở chat: $e")));
+        }
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         child: Row(
           children: [
             CircleAvatar(
-              child: Text(
-                friend.displayName.isNotEmpty
-                    ? friend.displayName[0].toUpperCase()
-                    : '#',
-              ),
-              // You can replace this with an actual image if you have avatar URLs
-              // backgroundImage: friend.avatarUrl != null ? NetworkImage(friend.avatarUrl!) : null,
+              backgroundImage:
+                  friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty
+                  ? NetworkImage(friend.avatarUrl!)
+                  : null,
+              child: friend.avatarUrl == null || friend.avatarUrl!.isEmpty
+                  ? Text(
+                      friend.displayName.isNotEmpty
+                          ? friend.displayName[0].toUpperCase()
+                          : '#',
+                    )
+                  : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -132,15 +178,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.call_outlined, color: Colors.grey),
-              onPressed: () {
-                // TODO: Implement phone call functionality
-              },
+              onPressed: () {},
             ),
             IconButton(
               icon: const Icon(Icons.videocam_outlined, color: Colors.grey),
-              onPressed: () {
-                // TODO: Implement video call functionality
-              },
+              onPressed: () {},
             ),
           ],
         ),

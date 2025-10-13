@@ -5,6 +5,8 @@ from .message_schema import (
     ConversationPublic,
     MessagePublic,
     LastMessagePublic,
+    SimpleMessagePublic,
+    ConversationWithParticipants
 )
 from .post_schema import PostCreate, PostPublic, ReactionCreate
 from .user_schema import FriendRequestCreate, FriendRequestResponse
@@ -25,5 +27,7 @@ __all__ = [
     "FriendRequestCreate",
     "FriendRequestResponse",
     "BlockUserRequest",
-    "RefreshTokenRequest"
+    "RefreshTokenRequest",
+    "SimpleMessagePublic",
+    "ConversationWithParticipants",
 ]

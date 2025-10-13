@@ -1,27 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
 from typing import List
-from ..services import MessageService
+from ..services import MessageService, UserService
 from ..schemas import (
     ConversationCreate,
     MessageCreate,
     ConversationPublic,
     MessagePublic,
-    LastMessagePublic
+    SimpleMessagePublic,
+    LastMessagePublic,
+    ConversationWithParticipants,
 )
+from ..schemas.user_schema import UserPublic
 from ..models import User, Conversation, Message
 from ..security import get_current_user, get_user_from_token
 from ..websocket import manager
 
-router = APIRouter(tags=["Chat"])
-
-# TODO: Chuyển các hàm map này sang một mô-đun tiện ích hoặc một phần của service layer
-# để tuân thủ nguyên tắc Single Responsibility Principle và giữ cho router layer gọn gàng.
-
 def map_conversation_to_public(convo: Conversation) -> ConversationPublic:
-    """
-    Hàm hỗ trợ để ánh xạ một đối tượng Conversation (mô hình Beanie)
-    sang một đối tượng ConversationPublic (lược đồ Pydantic).
-    """
     return ConversationPublic(
         id=str(convo.id),
         participantIds=convo.participantIds,
@@ -30,10 +24,6 @@ def map_conversation_to_public(convo: Conversation) -> ConversationPublic:
     )
 
 def map_message_to_public(msg: Message) -> MessagePublic:
-    """
-    Hàm hỗ trợ để ánh xạ một đối tượng Message (mô hình Beanie)
-    sang một đối tượng MessagePublic (lược đồ Pydantic).
-    """
     return MessagePublic(
         id=str(msg.id),
         conversationId=msg.conversationId,
@@ -42,17 +32,24 @@ def map_message_to_public(msg: Message) -> MessagePublic:
         createdAt=msg.createdAt
     )
 
+router = APIRouter(tags=["Chat"])
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
-    """
-    Điểm cuối WebSocket để quản lý kết nối thời gian thực của người dùng.
-    - Xác thực người dùng bằng token JWT được cung cấp dưới dạng tham số truy vấn.
-    - Quản lý vòng đời kết nối (kết nối, ngắt kết nối).
-    """
+    """Điểm cuối WebSocket để quản lý kết nối thời gian thực của người dùng."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         user = await get_user_from_token(token)
-    except HTTPException:
-        await websocket.close(code=1008)  # Policy Violation
+        logger.info(f"✅ WebSocket: User {user.id} connected")
+    except HTTPException as e:
+        logger.error(f"❌ WebSocket auth failed: {e.detail}")
+        await websocket.close(code=1008)
+        return
+    except Exception as e:
+        logger.error(f"❌ WebSocket unexpected error: {e}")
+        await websocket.close(code=1011)
         return
 
     user_id = str(user.id)
@@ -60,22 +57,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
     
     try:
         while True:
-            # Giữ kết nối mở để nhận các sự kiện trong tương lai từ server.
-            # Logic xử lý tin nhắn đến từ client có thể được thêm vào đây nếu cần.
             await websocket.receive_text()
     except WebSocketDisconnect:
+        logger.info(f"🔌 User {user_id} disconnected")
         manager.disconnect(user_id, websocket)
-
 
 @router.post("/api/messages/conversations", response_model=ConversationPublic, status_code=201)
 async def get_or_create_conversation(
     convo_data: ConversationCreate,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Lấy một cuộc trò chuyện hiện có hoặc tạo một cuộc trò chuyện mới giữa những người tham gia.
-    Người dùng hiện tại sẽ tự động được thêm vào cuộc trò chuyện.
-    """
+    """Lấy hoặc tạo một cuộc trò chuyện mới giữa những người tham gia."""
     participant_ids = set(convo_data.participant_ids)
     participant_ids.add(str(current_user.id))
     
@@ -85,22 +77,46 @@ async def get_or_create_conversation(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/api/messages/conversations", response_model=List[ConversationPublic])
+@router.get("/api/messages/conversations", response_model=List[ConversationWithParticipants])
 async def get_user_conversations(
     current_user: User = Depends(get_current_user),
     skip: int = 0,
     limit: int = 30
 ):
-    """
-    Lấy danh sách các cuộc trò chuyện của người dùng đã được xác thực,
-    sắp xếp theo hoạt động gần đây nhất.
-    """
+    """Lấy danh sách các cuộc trò chuyện của người dùng đã được xác thực."""
     convos = await MessageService.get_conversations_for_user(
         user_id=str(current_user.id),
         skip=skip,
         limit=limit
     )
-    return [map_conversation_to_public(convo) for convo in convos]
+    
+    result = []
+    
+    for convo in convos:
+        # Lấy thông tin chi tiết của những người tham gia
+        participants = await UserService.get_users_by_ids(convo.participantIds)
+        
+        # Chuyển đổi sang UserPublic
+        participant_publics = [
+            UserPublic(
+                id=str(p.id),
+                username=p.username,
+                email=p.email,
+                displayName=p.displayName
+            ) for p in participants
+        ]
+        
+        # Tạo đối tượng ConversationWithParticipants
+        convo_with_participants = ConversationWithParticipants(
+            id=str(convo.id),
+            participants=participant_publics,  # ✅ Dùng list đã convert
+            lastMessage=LastMessagePublic(**convo.lastMessage.model_dump()) if convo.lastMessage else None,
+            updatedAt=convo.updatedAt
+        )
+        result.append(convo_with_participants)
+        
+    return result
+
 
 @router.post("/api/messages/conversations/{conversation_id}/messages", response_model=MessagePublic, status_code=201)
 async def send_message(
@@ -108,12 +124,8 @@ async def send_message(
     message_data: MessageCreate,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Gửi một tin nhắn đến một cuộc trò chuyện cụ thể.
-    Tin nhắn sẽ được lưu và phát tới những người tham gia khác trong thời gian thực.
-    """
+    """Gửi một tin nhắn đến một cuộc trò chuyện cụ thể."""
     try:
-        # `sender_id` được lấy từ `current_user` để đảm bảo an toàn
         message = await MessageService.send_message(
             sender_id=str(current_user.id),
             conversation_id=conversation_id,
@@ -125,17 +137,14 @@ async def send_message(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
-@router.get("/api/messages/conversations/{conversation_id}/messages", response_model=List[MessagePublic])
+@router.get("/api/messages/conversations/{conversation_id}/messages", response_model=List[SimpleMessagePublic])
 async def get_conversation_messages(
     conversation_id: str,
     current_user: User = Depends(get_current_user),
     skip: int = 0,
     limit: int = 50
 ):
-    """
-    Lấy danh sách các tin nhắn trong một cuộc trò chuyện cụ thể.
-    Chỉ những người tham gia cuộc trò chuyện mới có quyền truy cập.
-    """
+    """Lấy danh sách các tin nhắn trong một cuộc trò chuyện với thông tin đơn giản."""
     try:
         messages = await MessageService.get_messages_for_conversation(
             conversation_id=conversation_id,
@@ -143,6 +152,6 @@ async def get_conversation_messages(
             skip=skip,
             limit=limit
         )
-        return [map_message_to_public(msg) for msg in messages]
+        return messages
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
