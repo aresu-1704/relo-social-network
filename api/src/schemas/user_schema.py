@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List
+from datetime import datetime
 
 class FriendRequestCreate(BaseModel):
     to_user_id: str
@@ -12,3 +12,16 @@ class UserPublic(BaseModel):
     username: str
     email: EmailStr
     displayName: str
+
+class FriendRequestPublic(BaseModel):
+    id: str
+    fromUserId: str
+    toUserId: str
+    status: str
+    createdAt: datetime
+
+    class Config:
+        allow_population_by_field_name = True
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat()
+        }

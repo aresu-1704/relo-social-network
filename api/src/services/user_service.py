@@ -111,6 +111,21 @@ class UserService:
         return friend_request
 
     @staticmethod
+    async def get_friend_requests(user_id: str):
+        """
+        Lấy danh sách các lời mời kết bạn đang chờ xử lý cho một người dùng.
+        """
+        # Tìm tất cả các yêu cầu kết bạn đang chờ xử lý gửi đến người dùng
+        pending_requests = await FriendRequest.find(
+            {
+                "toUserId": user_id,
+                "status": "pending"
+            }
+        ).to_list()
+        
+        return pending_requests
+
+    @staticmethod
     async def get_friends(user_id: str):
         """
         Lấy danh sách bạn bè đầy đủ của người dùng với chi tiết người dùng.

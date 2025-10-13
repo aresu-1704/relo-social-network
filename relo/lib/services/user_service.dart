@@ -70,10 +70,7 @@ class UserService {
   // Gửi yêu cầu kết bạn
   Future<void> sendFriendRequest(String userId) async {
     try {
-      await _dio.post(
-        'users/friend-request',
-        data: {'to_user_id': userId},
-      );
+      await _dio.post('users/friend-request', data: {'to_user_id': userId});
     } catch (e) {
       throw Exception('Failed to send friend request: $e');
     }
@@ -83,7 +80,7 @@ class UserService {
   Future<void> respondToFriendRequest(String requestId, String response) async {
     try {
       await _dio.post(
-        '/api/users/friend-request/$requestId',
+        'users/friend-request/$requestId',
         data: {'response': response}, // 'accepted' or 'declined'
       );
     } catch (e) {
@@ -94,10 +91,7 @@ class UserService {
   // Chặn người dùng
   Future<void> blockUser(String userId) async {
     try {
-      await _dio.post(
-        'users/block',
-        data: {'user_id': userId},
-      );
+      await _dio.post('users/block', data: {'user_id': userId});
     } catch (e) {
       throw Exception('Failed to block user: $e');
     }
@@ -106,16 +100,13 @@ class UserService {
   // Bỏ chặn người dùng
   Future<void> unblockUser(String userId) async {
     try {
-      await _dio.post(
-        'users/unblock',
-        data: {'user_id': userId},
-      );
+      await _dio.post('users/unblock', data: {'user_id': userId});
     } catch (e) {
       throw Exception('Failed to unblock user: $e');
     }
   }
 
-    // Lấy hồ sơ công khai của người dùng
+  // Lấy hồ sơ công khai của người dùng
   Future<User> getUserProfile(String userId) async {
     try {
       final response = await _dio.get('users/$userId');
@@ -127,6 +118,22 @@ class UserService {
       }
     } catch (e) {
       throw Exception('Failed to load user profile: $e');
+    }
+  }
+
+  // Lấy danh sách lời mời kết bạn đang chờ
+  Future<List<Map<String, dynamic>>> getPendingFriendRequests() async {
+    try {
+      final response = await _dio.get('users/friend-requests/pending');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => json as Map<String, dynamic>).toList();
+      } else {
+        throw Exception('Không thể tải danh sách lời mời kết bạn');
+      }
+    } catch (e) {
+      throw Exception('Failed to load pending friend requests: $e');
     }
   }
 }

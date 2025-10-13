@@ -3,6 +3,7 @@ from typing import List
 from ..services import UserService
 from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic
 from ..schemas.block_schema import BlockUserRequest
+from ..schemas import FriendRequestPublic
 from ..models import User
 from ..security import get_current_user
 
@@ -50,6 +51,26 @@ async def respond_to_friend_request(
         return {"message": f"Yêu cầu kết bạn đã được {response_data.response}."}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# Lấy danh sách lời mời kết bạn đang chờ
+@router.get("/api/users/friend-requests/pending", response_model=List[FriendRequestPublic])
+async def get_pending_friend_requests(current_user: User = Depends(get_current_user)):
+    """
+    Lấy danh sách các lời mời kết bạn đang chờ xử lý cho người dùng hiện tại.
+    """
+    try:
+        pending_requests = await UserService.get_friend_requests(user_id=str(current_user.id))
+        
+        requests_with_str_id = []
+        for req in pending_requests:
+            req_dict = req.dict()
+            req_dict['id'] = str(req.id)
+            requests_with_str_id.append(FriendRequestPublic(**req_dict))
+
+        return requests_with_str_id
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 # Lấy danh sách bạn bè
 @router.get("/api/users/friends", response_model=List[UserPublic])

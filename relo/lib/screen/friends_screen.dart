@@ -55,56 +55,66 @@ class _FriendsScreenState extends State<FriendsScreen> {
             _friendsFuture = _userService.getFriends();
           });
         },
-        child: FutureBuilder<List<User>>(
-          future: _friendsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  snapshot.error.toString().replaceFirst('Exception: ', ''),
-                ),
-              );
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('Bạn chưa có người bạn nào.'));
-            }
-
-            final friends = snapshot.data!;
-            final groupedFriends = _groupFriends(friends);
-            final sortedKeys = groupedFriends.keys.toList()..sort();
-
-            return ListView.builder(
-              itemCount: sortedKeys.length,
-              itemBuilder: (context, index) {
-                final letter = sortedKeys[index];
-                final friendsInGroup = groupedFriends[letter]!;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      child: Text(
-                        letter,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(),
+            FutureBuilder<List<User>>(
+              future: _friendsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      snapshot.error.toString().replaceFirst('Exception: ', ''),
                     ),
-                    ...friendsInGroup.map((friend) => _buildFriendTile(friend)),
-                  ],
+                  );
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                    child: Text('Bạn chưa có người bạn nào.'),
+                  );
+                }
+
+                final friends = snapshot.data!;
+                final groupedFriends = _groupFriends(friends);
+                final sortedKeys = groupedFriends.keys.toList()..sort();
+
+                return ListView.builder(
+                  itemCount: sortedKeys.length,
+                  itemBuilder: (context, index) {
+                    final letter = sortedKeys[index];
+                    final friendsInGroup = groupedFriends[letter]!;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
+                          child: Text(
+                            letter,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                        ...friendsInGroup.map(
+                          (friend) => _buildFriendTile(friend),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
-            );
-          },
+            ),
+          ],
         ),
       ),
     );
