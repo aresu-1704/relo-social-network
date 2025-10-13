@@ -164,9 +164,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         if (_currentUserId != null &&
             _currentUserId == conversation['lastMessage']?['senderId']) {
-          lastMessage =
-              'Bạn: ' + conversation['lastMessage']?['text'] ??
-              'Chưa có tin nhắn';
+          lastMessage = 'Bạn: ' + conversation['lastMessage']?['text'];
         } else {
           lastMessage =
               conversation['lastMessage']?['text'] ?? 'Chưa có tin nhắn';

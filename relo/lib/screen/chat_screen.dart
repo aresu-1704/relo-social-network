@@ -364,9 +364,8 @@ class _ChatScreenState extends State<ChatScreen> {
         : const Color(0xFFE5E7EB);
     final textColor = isMe ? Colors.white : Colors.black87;
 
-    final timeString = message.timestamp != null
-        ? "${message.timestamp!.hour.toString().padLeft(2, '0')}:${message.timestamp!.minute.toString().padLeft(2, '0')}"
-        : "";
+    final timeString =
+        "${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}";
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,

@@ -119,7 +119,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             friend.id,
           ]);
 
-          if (conversation == null || conversation['id'] == null) {
+          if (conversation.isEmpty || conversation['id'] == null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text("Không thể tạo cuộc trò chuyện")),
             );
