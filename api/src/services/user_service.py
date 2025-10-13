@@ -194,3 +194,18 @@ class UserService:
         ).to_list()
 
         return users
+
+    @staticmethod
+    async def get_users_by_ids(user_ids: list[str]):
+        """
+        Lấy danh sách người dùng bằng ID của họ.
+        """
+        if not user_ids:
+            return []
+        
+        # Chuyển đổi chuỗi ID thành ObjectId
+        object_ids = [ObjectId(uid) for uid in user_ids]
+        
+        # Tìm tất cả người dùng có ID trong danh sách
+        users = await User.find({"_id": {"$in": object_ids}}).to_list()
+        return users

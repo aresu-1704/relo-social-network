@@ -21,6 +21,7 @@ class User {
       username: json['username'],
       email: json['email'],
       displayName: json['displayName'],
+      avatarUrl: json['avatarUrl'],
     );
   }
 }

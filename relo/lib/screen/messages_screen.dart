@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:relo/models/user.dart';
+import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/screen/main_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
+import 'package:relo/services/user_service.dart';
+import 'package:intl/intl.dart';
 import 'package:relo/services/websocket_service.dart';
 import '../services/message_service.dart';
 
@@ -14,6 +18,7 @@ class MessagesScreen extends StatefulWidget {
 
 class _MessagesScreenState extends State<MessagesScreen> {
   final MessageService messageService = ServiceLocator.messageService;
+  final UserService userService = ServiceLocator.userService;
   final SecureStorageService _secureStorage = const SecureStorageService();
   StreamSubscription? _webSocketSubscription;
   String? _currentUserId;
@@ -39,18 +44,21 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _listenToWebSocket() {
-    _webSocketSubscription = webSocketService.stream.listen((message) {
-      final data = jsonDecode(message);
+    _webSocketSubscription = webSocketService.stream.listen(
+      (message) {
+        final data = jsonDecode(message);
 
-      // Assuming the server sends an event type
-      if (data['event'] == 'new_message') {
-        // A new message has arrived, refresh the conversation list
-        // A more optimized approach would be to update the specific conversation
-        fetchConversations();
-      }
-    }, onError: (error) {
-      print("WebSocket Error: $error");
-    });
+        // Assuming the server sends an event type
+        if (data['event'] == 'new_message') {
+          // A new message has arrived, refresh the conversation list
+          // A more optimized approach would be to update the specific conversation
+          fetchConversations();
+        }
+      },
+      onError: (error) {
+        print("WebSocket Error: $error");
+      },
+    );
   }
 
   @override
@@ -83,8 +91,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
     return _isLoading
         ? Center(child: CircularProgressIndicator())
         : conversations.isEmpty
-            ? _buildEmptyState()
-            : _buildConversationList();
+        ? _buildEmptyState()
+        : _buildConversationList();
   }
 
   Widget _buildEmptyState() {
@@ -125,45 +133,68 @@ class _MessagesScreenState extends State<MessagesScreen> {
       itemCount: conversations.length,
       itemBuilder: (context, index) {
         final conversation = conversations[index];
-        final participantIds = List<String>.from(
-          conversation['participantIds'] ?? [],
+        final participants = List<Map<String, dynamic>>.from(
+          conversation['participants'],
         );
+        final isGroupChat = participants.length > 2;
 
-        // Find the other participant's ID
-        final otherParticipant = participantIds.firstWhere(
-          (id) => id != _currentUserId,
-          orElse: () => "Unknown",
-        );
+        // Loại bỏ user hiện tại khỏi danh sách hiển thị
+        final otherParticipants = participants
+            .where((p) => p['id'] != _currentUserId)
+            .toList();
+
+        String title;
+        ImageProvider avatar;
+
+        if (isGroupChat) {
+          // Group chat
+          title =
+              conversation['name'] ??
+              otherParticipants.map((p) => p['displayName']).join(", ");
+          avatar = const AssetImage('assets/icons/group_icon.png');
+        } else {
+          // Chat 1-1
+          final friend = otherParticipants.first;
+          title = friend['displayName'];
+          avatar = const AssetImage(
+            'assets/icons/app_logo.png',
+          ); // hoặc friend['avatarUrl'] nếu có
+        }
+
+        final lastMessage =
+            conversation['lastMessage']?['content'] ?? 'Chưa có tin nhắn';
+        final updatedAt = conversation['updatedAt'];
 
         return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Theme.of(context).primaryColorLight,
-            child: Text(
-              otherParticipant.isNotEmpty
-                  ? otherParticipant[0].toUpperCase()
-                  : '?',
-              style: TextStyle(color: Theme.of(context).primaryColorDark),
-            ),
-          ),
+          leading: CircleAvatar(backgroundImage: avatar),
           title: Text(
-            'Conversation with $otherParticipant',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           subtitle: Text(
-            conversation['lastMessage']?['content'] ?? 'No messages yet',
+            lastMessage,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: conversation['updatedAt'] != null
+          trailing: updatedAt != null
               ? Text(
-                  conversation['updatedAt'].toString().substring(11, 16),
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                  DateFormat.Hm().format(DateTime.parse(updatedAt)),
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
                 )
               : null,
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Tapping on conversation ${conversation['id']}'),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(
+                  conversationId: conversation['id'],
+                  isGroup: isGroupChat,
+                  friendName: title,
+                  memberIds: participants
+                      .map((p) => p['id']?.toString() ?? '')
+                      .where((id) => id.isNotEmpty)
+                      .toList(),
+                ),
               ),
             );
           },
