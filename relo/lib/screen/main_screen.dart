@@ -1,7 +1,7 @@
 // Màn hình chính với AppBar có thanh tìm kiếm và Bottom Bar được tùy chỉnh
 import 'package:flutter/material.dart';
 import 'package:relo/services/websocket_service.dart';
-import 'package:relo/services/auth_service.dart';
+import 'package:relo/services/service_locator.dart';
 import 'package:relo/screen/default_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
@@ -27,10 +27,19 @@ class MainScreen extends StatefulWidget {
 class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
-  final AuthService _authService = AuthService();
-
+  final _authService = ServiceLocator.authService;
   // Màu tím chủ đạo
   final Color primaryColor = Color(0xFF7C3AED);
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 
   void changeTab(int index) {
     setState(() {
@@ -67,9 +76,9 @@ class MainScreenState extends State<MainScreen> {
     // Cập nhật lại body để sử dụng _buildProfileScreen cho tab cá nhân
     final List<Widget> currentScreens = [
       MessagesScreen(),
-      Center(child: Text('TODO: Tường nhà')), 
-      const FriendsScreen(), 
-      Center(child: Text('TODO: Thông báo')), 
+      Center(child: Text('TODO: Tường nhà')),
+      const FriendsScreen(),
+      Center(child: Text('TODO: Thông báo')),
       _buildProfileScreen(), // Sử dụng widget profile ở đây
     ];
 
@@ -114,14 +123,18 @@ class MainScreenState extends State<MainScreen> {
         decoration: BoxDecoration(
           color: Colors.grey[100], // Màu nền xám
           border: Border(
-            top: BorderSide(color: Colors.grey[300]!, width: 0.5), // Viền trên mỏng
+            top: BorderSide(
+              color: Colors.grey[300]!,
+              width: 0.5,
+            ), // Viền trên mỏng
           ),
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           selectedItemColor: primaryColor,
           unselectedItemColor: Colors.grey, // Màu icon chưa chọn là xám
-          backgroundColor: Colors.transparent, // Nền trong suốt để màu của container hiển thị
+          backgroundColor: Colors
+              .transparent, // Nền trong suốt để màu của container hiển thị
           elevation: 0, // Bỏ shadow mặc định
           type: BottomNavigationBarType.fixed, // Giữ các item cố định
           showSelectedLabels: true,
@@ -161,7 +174,10 @@ class MainScreenState extends State<MainScreen> {
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        constraints: BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints: BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
                         child: Text(
                           '$_notificationCount',
                           style: TextStyle(color: Colors.white, fontSize: 10),

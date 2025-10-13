@@ -1,3 +1,4 @@
+from bson import ObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from .services import jwt_service
@@ -12,21 +13,34 @@ credentials_exception = HTTPException(
 )
 
 async def get_user_from_token(token: str) -> User:
-    """
-    Decodes a JWT token, validates its data, and retrieves the corresponding user.
-    Raises HTTPException on failure.
-    """
-    token_data = jwt_service.decode_access_token(token)
-    if not token_data or not token_data.username:
-        raise credentials_exception
+    import logging
+    logger = logging.getLogger(__name__)
     
-    user = await User.find_one(User.username == token_data.username)
-    if user is None:
+    try:
+        token_data = jwt_service.decode_access_token(token)
+        if not token_data or not token_data.username:
+            logger.error(f"Token decode failed or missing username: {token_data}")
+            raise credentials_exception
+
+        # Kiểm tra định dạng ObjectId
+        try:
+            user_id = ObjectId(token_data.username)
+        except Exception as e:
+            logger.error(f"Invalid ObjectId format: {token_data.username}, error: {e}")
+            raise credentials_exception
+        
+        user = await User.find_one(User.id == user_id)
+        
+        if user is None:
+            logger.error(f"User not found with ID: {token_data.username}")
+            raise credentials_exception
+        
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_user_from_token: {e}")
         raise credentials_exception
-    return user
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    """
-    FastAPI dependency to get the current user from an OAuth2 token.
-    """
     return await get_user_from_token(token)

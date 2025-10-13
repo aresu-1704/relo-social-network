@@ -39,6 +39,21 @@ class UserService:
         # Tạo và lưu yêu cầu mới
         new_request = FriendRequest(fromUserId=from_user_id, toUserId=to_user_id)
         await new_request.save()
+
+        # Gửi thông báo real-time đến người nhận yêu cầu
+        notification_payload = {
+            "type": "friend_request_received",
+            "payload": {
+                "request_id": str(new_request.id),
+                "from_user_id": str(from_user.id),
+                "displayName": from_user.displayName,
+                "avatar": from_user.avatar
+            }
+        }
+        asyncio.create_task(
+            manager.broadcast_to_user(to_user_id, notification_payload)
+        )
+
         return new_request
 
     @staticmethod
@@ -193,4 +208,19 @@ class UserService:
             }
         ).to_list()
 
+        return users
+
+    @staticmethod
+    async def get_users_by_ids(user_ids: list[str]):
+        """
+        Lấy danh sách người dùng bằng ID của họ.
+        """
+        if not user_ids:
+            return []
+        
+        # Chuyển đổi chuỗi ID thành ObjectId
+        object_ids = [ObjectId(uid) for uid in user_ids]
+        
+        # Tìm tất cả người dùng có ID trong danh sách
+        users = await User.find({"_id": {"$in": object_ids}}).to_list()
         return users

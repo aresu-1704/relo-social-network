@@ -62,12 +62,12 @@ async def login_for_access_token(login_data: UserLogin):
     # Tạo token truy cập với thời gian hết hạn
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = jwt_service.create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
 
-    # Tạo refresh token
+        # Tạo refresh token (phải dùng user.id giống access token)
     refresh_token = jwt_service.create_refresh_token(
-        data={"sub": user.username}
+        data={"sub": str(user.id)}
     )
     
     # Trả về cả hai token
@@ -82,6 +82,10 @@ async def refresh_access_token(payload: RefreshTokenRequest):
     """
     Nhận một refresh token và trả về một access token mới.
     """
+    from bson import ObjectId
+    from ..models import User
+    
+    # Decode refresh token (dùng hàm decode_access_token vì logic giống nhau)
     token_data = jwt_service.decode_access_token(payload.refresh_token)
     
     if not token_data or not token_data.username:
@@ -91,10 +95,27 @@ async def refresh_access_token(payload: RefreshTokenRequest):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Tạo access token mới
+    # Xác minh user vẫn tồn tại trong database
+    try:
+        user_id = ObjectId(token_data.username)  # token_data.username chứa user ID
+        user = await User.find_one(User.id == user_id)
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="User không tồn tại",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="Refresh token không hợp lệ",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Tạo access token mới với user ID (không phải username)
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     new_access_token = jwt_service.create_access_token(
-        data={"sub": token_data.username}, expires_delta=access_token_expires
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
     
     return {"access_token": new_access_token, "token_type": "bearer"}

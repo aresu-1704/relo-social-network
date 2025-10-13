@@ -1,9 +1,11 @@
 import asyncio
 from ..models.conversation import Conversation, LastMessage
 from ..models.message import Message
+from ..models.user import User
 from ..websocket import manager
-from ..schemas.message_schema import ConversationPublic, LastMessagePublic, MessagePublic
+from ..schemas.message_schema import ConversationPublic, LastMessagePublic, MessagePublic, SimpleMessagePublic
 from datetime import datetime
+from .user_service import UserService
 
 # Các hàm trợ giúp để chuyển đổi các đối tượng mô hình thành từ điển để phát sóng
 def map_conversation_to_public_dict(convo: Conversation) -> dict:
@@ -111,12 +113,33 @@ class MessageService:
             raise PermissionError("Bạn không được phép xem cuộc trò chuyện này.")
 
         # Lấy các tin nhắn cho cuộc trò chuyện, được sắp xếp theo mới nhất trước tiên
-        return await Message.find(
+        messages = await Message.find(
             Message.conversationId == conversation_id, 
             sort="-createdAt", 
             skip=skip, 
             limit=limit
         ).to_list()
+
+        # Lấy ID người gửi duy nhất từ các tin nhắn
+        sender_ids = list(set(msg.senderId for msg in messages))
+        senders = await UserService.get_users_by_ids(sender_ids)
+        senders_map = {str(s.id): s for s in senders}
+
+        # Tạo các đối tượng tin nhắn đơn giản
+        simple_messages = []
+        for msg in messages:
+            sender = senders_map.get(msg.senderId)
+            if sender:
+                simple_messages.append(
+                    SimpleMessagePublic(
+                        senderId=msg.senderId,
+                        avatarUrl=sender.avatarUrl,
+                        content=msg.content,
+                        createdAt=msg.createdAt
+                    )
+                )
+
+        return simple_messages
 
     @staticmethod
     async def get_conversations_for_user(user_id: str, limit: int = 30, skip: int = 0):

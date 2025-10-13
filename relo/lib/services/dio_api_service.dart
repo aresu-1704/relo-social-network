@@ -28,8 +28,8 @@ class DioApiService {
         return handler.next(options); // Continue with the request
       },
       onError: (DioException e, handler) async {
-        // Check if the error is 401 Unauthorized
-        if (e.response?.statusCode == 401) {
+        // Check if the error is 401 Unauthorized or 403 Forbidden
+        if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
           try {
             // Get the refresh token
             final refreshToken = await _storageService.getRefreshToken();
@@ -44,7 +44,7 @@ class DioApiService {
             // Create a new Dio instance to avoid interceptor loop
             final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
             final response = await refreshDio.post(
-              '/api/auth/refresh',
+              'auth/refresh',
               data: {'refresh_token': refreshToken},
             );
 

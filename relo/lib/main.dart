@@ -15,16 +15,25 @@ void main() async {
   // Initialize all services
   ServiceLocator.init();
 
-  // Check for an existing session via the refresh token
   final storage = const SecureStorageService();
   final refreshToken = await storage.getRefreshToken();
-  final bool isLoggedIn = refreshToken != null;
+  bool isLoggedIn = refreshToken != null;
 
-  // If logged in, connect the WebSocket
   if (isLoggedIn) {
-    final accessToken = await storage.getAccessToken();
-    if (accessToken != null) {
-      webSocketService.connect(accessToken);
+    // Attempt to fetch user data to validate and refresh the token if necessary.
+    final userService = ServiceLocator.userService;
+    final user = await userService.getMe();
+
+    if (user != null) {
+      // Session is valid, get the fresh token for the WebSocket connection.
+      final accessToken = await storage.getAccessToken();
+      if (accessToken != null) {
+        webSocketService.connect(accessToken);
+      }
+    } else {
+      // Could not validate session (e.g., offline), treat as logged out for now.
+      // The connectivity service will show an offline banner.
+      isLoggedIn = false;
     }
   }
 
