@@ -17,7 +17,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   late Future<List<User>> _friendsFuture;
   final UserService _userService = ServiceLocator.userService;
   final MessageService _messageService = ServiceLocator.messageService;
-
+  
   int requestCount = 0; // Số lượng lời mời kết bạn chưa xử lý
 
   @override

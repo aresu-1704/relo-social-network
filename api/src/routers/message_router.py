@@ -87,7 +87,6 @@ async def get_user_conversations(
         
     return result
 
-
 @router.post("/conversations/{conversation_id}/messages", response_model=MessagePublic, status_code=201)
 async def send_message(
     conversation_id: str,
@@ -123,6 +122,7 @@ async def get_conversation_messages(
             limit=limit
         )
         return messages
+    
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     
@@ -139,5 +139,3 @@ async def mark_conversation_as_seen(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))

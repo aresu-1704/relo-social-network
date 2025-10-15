@@ -4,9 +4,11 @@
 
 /api/.env
 
+
 api/src/models/__pycache__/
 api/src/services/__pycache__/
 api/src/routers/__pycache__/
 api/src/schemas/__pycache__/
 api/src/__pycache__/
+
 *.pyc

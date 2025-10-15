@@ -1,5 +1,8 @@
 // Màn hình chính với AppBar có thanh tìm kiếm và Bottom Bar được tùy chỉnh
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:relo/services/connectivity_service.dart';
+import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/screen/default_screen.dart';
@@ -27,6 +30,7 @@ class MainScreen extends StatefulWidget {
 class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
+
   final _authService = ServiceLocator.authService;
   // Màu tím chủ đạo
   final Color primaryColor = Color(0xFF7C3AED);
@@ -118,7 +122,26 @@ class MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
-      body: currentScreens[_selectedIndex],
+      body: Stack(
+        children: [
+          currentScreens[_selectedIndex],
+          // Connectivity Banner
+          AnimatedOpacity(
+            opacity: _showNotification ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: _notificationColor.withOpacity(0.9),
+              child: Text(
+                _notificationText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.grey[100], // Màu nền xám

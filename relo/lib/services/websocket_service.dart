@@ -88,6 +88,7 @@ class WebSocketService {
           _streamController.add(data);
         },
         onDone: () async {
+<<<<<<< HEAD
           print('WebSocket connection done.');
           await _handleDisconnect();
         },
@@ -115,6 +116,7 @@ class WebSocketService {
 
   void disconnect() {
     _isManualDisconnect = true;
+    _refreshTimer?.cancel();
     _channel?.sink.close(status.goingAway);
     _channel = null;
     print('WebSocket disconnected manually.');
@@ -123,4 +125,8 @@ class WebSocketService {
   bool get isConnected => _channel != null && _channel!.closeCode == null;
 }
 
+<<<<<<< HEAD
+=======
+// Sử dụng toàn app
+>>>>>>> origin/main
 final webSocketService = WebSocketService();

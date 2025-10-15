@@ -15,6 +15,7 @@ class MessageService {
     } on DioException catch (e) {
       throw Exception('Failed to fetch conversations: $e');
     } catch (e) {
+<<<<<<< HEAD
       throw Exception('An unknown error occurred: $e');
     }
   }
@@ -121,6 +122,95 @@ class MessageService {
       throw Exception('Failed to mark as seen: $e');
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
+    }
+  }
+
+  Future<List<Message>> getMessages(
+    String conversationId, {
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _dio.get(
+        'messages/conversations/$conversationId/messages',
+        queryParameters: {'offset': offset, 'limit': limit},
+      );
+
+      if (response.data is List) {
+        return (response.data as List)
+            .map((json) => Message.fromServerJson(json))
+            .toList();
+      }
+
+      return [];
+    } on DioException catch (e) {
+      throw Exception('Failed to fetch messages: $e');
+    } catch (e) {
+      throw Exception('An unknown error occurred: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getOrCreateConversation(
+    List<String> participantIds,
+  ) async {
+    try {
+      final response = await _dio.post(
+        'messages/conversations',
+        data: {'participant_ids': participantIds},
+      );
+      return response.data;
+    } on DioException catch (e) {
+      throw Exception(
+        'Failed to get or create conversation: ${e.response?.data ?? e.message}',
+      );
+    } catch (e) {
+      throw Exception('An unknown error occurred: $e');
+    }
+  }
+
+  Future<Message> sendMessage(
+    String conversationId,
+    String content,
+    String senderId,
+  ) async {
+    // 1️⃣ Tạo message local với trạng thái pending
+    final tempMessage = Message(
+      id: DateTime.now().millisecondsSinceEpoch.toString(), // ID tạm thời
+      content: content,
+      senderId: senderId, // current user
+      conversationId: conversationId,
+      timestamp: DateTime.now(),
+      status: 'pending',
+    );
+
+    // Lưu ngay vào SQLite
+    await MessageDatabase.instance.create(tempMessage);
+
+    try {
+      // 2️⃣ Gửi lên server
+      final response = await _dio.post(
+        'messages/conversations/$conversationId/messages',
+        data: {
+          'content': {'text': content},
+        },
+      );
+
+      // 3️⃣ Cập nhật trạng thái thành sent
+      final sentMessage = Message.fromJson(response.data);
+      final updatedMessage = tempMessage.copyWith(
+        id: sentMessage.id,
+        timestamp: sentMessage.timestamp,
+        status: 'sent',
+      );
+
+      await MessageDatabase.instance.update(updatedMessage);
+
+      return updatedMessage;
+    } catch (e) {
+      // 3️⃣ Gửi thất bại → status = failed
+      final failedMessage = tempMessage.copyWith(status: 'failed');
+      await MessageDatabase.instance.update(failedMessage);
+      return failedMessage;
     }
   }
 }

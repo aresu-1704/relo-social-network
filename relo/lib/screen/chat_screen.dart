@@ -457,6 +457,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             InkWell(
               onTap: () {},
+
               child: const Icon(
                 Icons.emoji_emotions_outlined,
                 color: Color(0xFF7C3AED),

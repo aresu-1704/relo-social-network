@@ -6,6 +6,7 @@ import 'package:relo/screen/main_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
+import 'package:relo/services/user_service.dart';
 import 'package:relo/services/websocket_service.dart';
 
 void main() async {

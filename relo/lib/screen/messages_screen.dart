@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:relo/models/user.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/screen/main_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
