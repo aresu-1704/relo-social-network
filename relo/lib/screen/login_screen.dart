@@ -49,14 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
           deviceToken: deviceToken,
         );
 
-        // Sau khi đăng nhập thành công, lấy token để kết nối WebSocket
-        final accessToken = await _secureStorageService.getAccessToken();
-        if (accessToken != null) {
-          webSocketService.connect(accessToken);
-        } else {
-          // This should not happen if login was successful, but handle it just in case
-          throw Exception("Không thể lấy token sau khi đăng nhập.");
-        }
+        // After successful login, connect to the WebSocket service.
+        // The service will handle token retrieval internally.
+        await webSocketService.connect();
 
         // Nếu đăng nhập thành công, chuyển đến màn hình chính
         if (mounted) {

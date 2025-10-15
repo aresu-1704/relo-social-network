@@ -15,6 +15,15 @@ void main() async {
   // Initialize all services
   ServiceLocator.init();
 
+  // Set up WebSocket auth error handler
+  webSocketService.setAuthErrorHandler(() {
+    // Navigate to login screen on auth failure
+    ServiceLocator.navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const DefaultScreen()),
+      (route) => false,
+    );
+  });
+
   final storage = const SecureStorageService();
   final refreshToken = await storage.getRefreshToken();
   bool isLoggedIn = refreshToken != null;
@@ -25,11 +34,9 @@ void main() async {
     final user = await userService.getMe();
 
     if (user != null) {
-      // Session is valid, get the fresh token for the WebSocket connection.
-      final accessToken = await storage.getAccessToken();
-      if (accessToken != null) {
-        webSocketService.connect(accessToken);
-      }
+      // Session is valid, connect the WebSocket.
+      // The service will handle getting the token internally.
+      webSocketService.connect();
     } else {
       // Could not validate session (e.g., offline), treat as logged out for now.
       // The connectivity service will show an offline banner.

@@ -1,7 +1,11 @@
 # api/src/websocket.py
 from typing import Dict, List, Any
-from fastapi import WebSocket
+from fastapi import APIRouter, WebSocket, Depends, WebSocketDisconnect
 from datetime import datetime
+from .models import User
+from .security import get_current_user_ws
+
+router = APIRouter()
 
 class ConnectionManager:
     def __init__(self):
@@ -41,3 +45,18 @@ class ConnectionManager:
 
 # Tạo một instance duy nhất dùng toàn app
 manager = ConnectionManager()
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, user: User = Depends(get_current_user_ws)):
+    user_id = str(user.id)
+    await manager.connect(user_id, websocket)
+    try:
+        while True:
+            # Chờ tin nhắn từ client
+            data = await websocket.receive_text()
+            # For now, just print it. In the future, this would handle incoming messages.
+            print(f"Message from {user_id}: {data}")
+    except WebSocketDisconnect:
+        print(f"Client {user_id} disconnected")
+    finally:
+        manager.disconnect(user_id, websocket)

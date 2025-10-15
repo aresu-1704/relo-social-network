@@ -46,6 +46,7 @@ class ConversationPublic(BaseModel):
     participantIds: List[str]
     lastMessage: Optional[LastMessagePublic]
     updatedAt: datetime
+    seenIds: List[str] = []
 
     class Config:
         orm_mode = True
@@ -58,6 +59,7 @@ class ConversationWithParticipants(BaseModel):
     participants: List[UserPublic]
     lastMessage: Optional[LastMessagePublic]
     updatedAt: datetime
+    seenIds: List[str] = []
 
     class Config:
         orm_mode = True

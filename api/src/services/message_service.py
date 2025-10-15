@@ -14,7 +14,8 @@ def map_conversation_to_public_dict(convo: Conversation) -> dict:
         id=str(convo.id),
         participantIds=convo.participantIds,
         lastMessage=LastMessagePublic(**convo.lastMessage.model_dump()) if convo.lastMessage else None,
-        updatedAt=convo.updatedAt
+        updatedAt=convo.updatedAt,
+        seenIds=convo.seenIds
     )
     return public_convo.model_dump()
 
@@ -142,7 +143,7 @@ class MessageService:
         return simple_messages
 
     @staticmethod
-    async def get_conversations_for_user(user_id: str, limit: int = 30, skip: int = 0):
+    async def get_conversations_for_user(user_id: str):
         """
         Lấy tất cả các cuộc trò chuyện cho một người dùng cụ thể.
         """
@@ -150,6 +151,19 @@ class MessageService:
         return await Conversation.find(
             Conversation.participantIds == user_id, 
             sort="-updatedAt", 
-            skip=skip, 
-            limit=limit
         ).to_list()
+    
+    @staticmethod
+    async def mark_conversation_as_seen(conversation_id: str, user_id: str):
+        """
+        Đánh dấu một cuộc trò chuyện là đã xem bởi người dùng cụ thể.
+        """
+        conversation = await Conversation.get(conversation_id)
+        if not conversation or user_id not in conversation.participantIds:
+            raise PermissionError("Bạn không được phép xem cuộc trò chuyện này.")
+
+        if user_id not in conversation.seenIds:
+            conversation.seenIds.append(user_id)
+            await conversation.save()
+
+        return conversation

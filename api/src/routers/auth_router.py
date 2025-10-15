@@ -7,7 +7,7 @@ from ..services.jwt_service import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(tags=["Auth"])
 
-@router.post("/api/auth/register", response_model=UserPublic, status_code=201)
+@router.post("/register", response_model=UserPublic, status_code=201)
 async def register_user(user_data: UserCreate):
     """
     Endpoint để đăng ký người dùng mới.
@@ -35,7 +35,7 @@ async def register_user(user_data: UserCreate):
         # Nếu có lỗi giá trị (ví dụ: người dùng đã tồn tại), trả về lỗi 400
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/api/auth/login")
+@router.post("/login")
 async def login_for_access_token(login_data: UserLogin):
     """
     Endpoint để đăng nhập và nhận token truy cập.
@@ -77,7 +77,7 @@ async def login_for_access_token(login_data: UserLogin):
         "token_type": "bearer"
     }
 
-@router.post("/api/auth/refresh")
+@router.post("/refresh")
 async def refresh_access_token(payload: RefreshTokenRequest):
     """
     Nhận một refresh token và trả về một access token mới.

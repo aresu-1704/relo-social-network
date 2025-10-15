@@ -6,6 +6,11 @@ class AuthService {
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
   final SecureStorageService _storageService = const SecureStorageService();
 
+  // Add a flag to prevent multiple refresh calls
+  static bool _isRefreshing = false;
+
+  Future<String?> get accessToken => _storageService.getAccessToken();
+
   /// Đăng nhập người dùng và lưu tokens nếu thành công.
   Future<void> login(
     String username,
@@ -77,5 +82,43 @@ class AuthService {
   /// Đăng xuất người dùng (xóa tokens ở phía client).
   Future<void> logout() async {
     await _storageService.deleteTokens();
+  }
+
+  // Lấy access token mới bằng refresh token.
+  Future<String?> refreshToken() async {
+    // Prevent multiple refresh calls at the same time
+    if (_isRefreshing) {
+      return null;
+    }
+    _isRefreshing = true;
+
+    try {
+      final refreshToken = await _storageService.getRefreshToken();
+      if (refreshToken == null) {
+        throw Exception('No refresh token available.');
+      }
+
+      final response = await _dio.post(
+        'auth/refresh',
+        data: {'refresh_token': refreshToken},
+      );
+
+      if (response.statusCode == 200) {
+        final newAccessToken = response.data['access_token'];
+        await _storageService.saveTokens(
+          accessToken: newAccessToken,
+          refreshToken: refreshToken,
+        );
+        return newAccessToken;
+      } else {
+        throw Exception('Failed to refresh token.');
+      }
+    } catch (e) {
+      // If refresh fails, logout the user
+      await logout();
+      return null;
+    } finally {
+      _isRefreshing = false;
+    }
   }
 }

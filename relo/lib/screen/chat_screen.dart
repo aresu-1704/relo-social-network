@@ -269,13 +269,13 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.call, color: Colors.white),
+            icon: const Icon(Icons.call_outlined, color: Colors.white),
             onPressed: () {
               // TODO: Thực hiện cuộc gọi thoại
             },
           ),
           IconButton(
-            icon: const Icon(Icons.videocam, color: Colors.white),
+            icon: const Icon(Icons.videocam_outlined, color: Colors.white),
             onPressed: () {
               // TODO: Thực hiện cuộc gọi video
             },
@@ -457,12 +457,15 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             InkWell(
               onTap: () {},
-              child: const Icon(Icons.emoji_emotions, color: Color(0xFF7C3AED)),
+              child: const Icon(
+                Icons.emoji_emotions_outlined,
+                color: Color(0xFF7C3AED),
+              ),
             ),
             SizedBox(width: 8),
             InkWell(
               onTap: () {},
-              child: const Icon(Icons.photo, color: Color(0xFF7C3AED)),
+              child: const Icon(Icons.photo_outlined, color: Color(0xFF7C3AED)),
             ),
             SizedBox(width: 8),
             Expanded(

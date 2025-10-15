@@ -7,7 +7,7 @@ from ..security import get_current_user
 
 router = APIRouter(tags=["Post"])
 
-@router.post("/api/posts", response_model=PostPublic, status_code=201)
+@router.post("/posts", response_model=PostPublic, status_code=201)
 async def create_post(
     post_data: PostCreate,
     current_user: User = Depends(get_current_user)
@@ -34,7 +34,7 @@ async def create_post(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/api/posts/feed", response_model=List[PostPublic])
+@router.get("/posts/feed", response_model=List[PostPublic])
 async def get_post_feed(skip: int = 0, limit: int = 20):
     """Lấy một nguồn cấp dữ liệu (feed) các bài đăng, không yêu cầu xác thực."""
     # Lấy danh sách bài đăng một cách bất đồng bộ
@@ -53,7 +53,7 @@ async def get_post_feed(skip: int = 0, limit: int = 20):
         ) for post in posts
     ]
 
-@router.post("/api/posts/{post_id}/react", response_model=PostPublic)
+@router.post("/posts/{post_id}/react", response_model=PostPublic)
 async def react_to_post(
     post_id: str,
     reaction_data: ReactionCreate,
@@ -81,7 +81,7 @@ async def react_to_post(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-@router.delete("/api/posts/{post_id}", status_code=200)
+@router.delete("/posts/{post_id}", status_code=200)
 async def delete_post(
     post_id: str,
     current_user: User = Depends(get_current_user)

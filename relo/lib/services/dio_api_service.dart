@@ -1,17 +1,20 @@
 import 'package:dio/dio.dart';
+import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/constants.dart';
 
 class DioApiService {
   final Dio _dio;
   final SecureStorageService _storageService;
+  final AuthService _authService;
 
   // Callback to navigate to login screen on session expiration
   final Function() onSessionExpired;
 
   DioApiService({required this.onSessionExpired})
       : _dio = Dio(BaseOptions(baseUrl: baseUrl)),
-        _storageService = const SecureStorageService() {
+        _storageService = const SecureStorageService(),
+        _authService = AuthService() {
     _dio.interceptors.add(_createDioInterceptor());
   }
 
@@ -31,32 +34,9 @@ class DioApiService {
         // Check if the error is 401 Unauthorized or 403 Forbidden
         if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
           try {
-            // Get the refresh token
-            final refreshToken = await _storageService.getRefreshToken();
+            final newAccessToken = await _authService.refreshToken();
 
-            if (refreshToken == null) {
-              // If no refresh token, session is expired
-              _handleSessionExpired();
-              return handler.reject(e); // Reject the original request
-            }
-
-            // --- Refresh the token ---
-            // Create a new Dio instance to avoid interceptor loop
-            final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
-            final response = await refreshDio.post(
-              'auth/refresh',
-              data: {'refresh_token': refreshToken},
-            );
-
-            if (response.statusCode == 200) {
-              // New token received, save it
-              final newAccessToken = response.data['access_token'];
-              await _storageService.saveTokens(
-                accessToken: newAccessToken,
-                refreshToken:
-                    refreshToken, // Refresh token might also be rotated in a more advanced setup
-              );
-
+            if (newAccessToken != null) {
               // --- Retry the original request with the new token ---
               e.requestOptions.headers['Authorization'] =
                   'Bearer $newAccessToken';
@@ -64,6 +44,9 @@ class DioApiService {
               return handler.resolve(
                 retriedResponse,
               ); // Resolve with the retried response
+            } else {
+              _handleSessionExpired();
+              return handler.reject(e);
             }
           } catch (_) {
             // Any error during refresh token flow means session is expired

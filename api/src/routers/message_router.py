@@ -20,7 +20,8 @@ def map_conversation_to_public(convo: Conversation) -> ConversationPublic:
         id=str(convo.id),
         participantIds=convo.participantIds,
         lastMessage=LastMessagePublic(**convo.lastMessage.model_dump()) if convo.lastMessage else None,
-        updatedAt=convo.updatedAt
+        updatedAt=convo.updatedAt,
+        seenIds=convo.seenIds
     )
 
 def map_message_to_public(msg: Message) -> MessagePublic:
@@ -34,35 +35,7 @@ def map_message_to_public(msg: Message) -> MessagePublic:
 
 router = APIRouter(tags=["Chat"])
 
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
-    """Điểm cuối WebSocket để quản lý kết nối thời gian thực của người dùng."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    try:
-        user = await get_user_from_token(token)
-        logger.info(f"✅ WebSocket: User {user.id} connected")
-    except HTTPException as e:
-        logger.error(f"❌ WebSocket auth failed: {e.detail}")
-        await websocket.close(code=1008)
-        return
-    except Exception as e:
-        logger.error(f"❌ WebSocket unexpected error: {e}")
-        await websocket.close(code=1011)
-        return
-
-    user_id = str(user.id)
-    await manager.connect(user_id, websocket)
-    
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        logger.info(f"🔌 User {user_id} disconnected")
-        manager.disconnect(user_id, websocket)
-
-@router.post("/api/messages/conversations", response_model=ConversationPublic, status_code=201)
+@router.post("/conversations", response_model=ConversationPublic, status_code=201)
 async def get_or_create_conversation(
     convo_data: ConversationCreate,
     current_user: User = Depends(get_current_user)
@@ -77,17 +50,13 @@ async def get_or_create_conversation(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/api/messages/conversations", response_model=List[ConversationWithParticipants])
+@router.get("/conversations", response_model=List[ConversationWithParticipants])
 async def get_user_conversations(
     current_user: User = Depends(get_current_user),
-    skip: int = 0,
-    limit: int = 30
 ):
     """Lấy danh sách các cuộc trò chuyện của người dùng đã được xác thực."""
     convos = await MessageService.get_conversations_for_user(
         user_id=str(current_user.id),
-        skip=skip,
-        limit=limit
     )
     
     result = []
@@ -111,14 +80,15 @@ async def get_user_conversations(
             id=str(convo.id),
             participants=participant_publics,  # ✅ Dùng list đã convert
             lastMessage=LastMessagePublic(**convo.lastMessage.model_dump()) if convo.lastMessage else None,
-            updatedAt=convo.updatedAt
+            updatedAt=convo.updatedAt,
+            seenIds=convo.seenIds
         )
         result.append(convo_with_participants)
         
     return result
 
 
-@router.post("/api/messages/conversations/{conversation_id}/messages", response_model=MessagePublic, status_code=201)
+@router.post("/conversations/{conversation_id}/messages", response_model=MessagePublic, status_code=201)
 async def send_message(
     conversation_id: str,
     message_data: MessageCreate,
@@ -137,7 +107,7 @@ async def send_message(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
-@router.get("/api/messages/conversations/{conversation_id}/messages", response_model=List[SimpleMessagePublic])
+@router.get("/conversations/{conversation_id}/messages", response_model=List[SimpleMessagePublic])
 async def get_conversation_messages(
     conversation_id: str,
     current_user: User = Depends(get_current_user),
@@ -153,5 +123,21 @@ async def get_conversation_messages(
             limit=limit
         )
         return messages
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    
+@router.post("/conversations/{conversation_id}/seen", status_code=204)
+async def mark_conversation_as_seen(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Đánh dấu cuộc trò chuyện là đã xem bởi người dùng hiện tại."""
+    try:
+        await MessageService.mark_conversation_as_seen(
+            conversation_id=conversation_id,
+            user_id=str(current_user.id)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))

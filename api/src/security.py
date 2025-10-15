@@ -1,5 +1,5 @@
 from bson import ObjectId
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, WebSocket
 from fastapi.security import OAuth2PasswordBearer
 from .services import jwt_service
 from .models import User
@@ -44,3 +44,19 @@ async def get_user_from_token(token: str) -> User:
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     return await get_user_from_token(token)
+
+async def get_current_user_ws(websocket: WebSocket) -> User:
+
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        # The line above closes the connection, but we need to raise an exception
+        # to stop further execution in the dependency chain.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token is missing")
+
+    try:
+        user = await get_user_from_token(token)
+        return user
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        raise

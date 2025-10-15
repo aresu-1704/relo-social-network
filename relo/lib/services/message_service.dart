@@ -19,6 +19,7 @@ class MessageService {
     }
   }
 
+  //Lấy danh sách tin nhắn trong một cuộc trò chuyện
   Future<List<Message>> getMessages(
     String conversationId, {
     int offset = 0,
@@ -44,6 +45,7 @@ class MessageService {
     }
   }
 
+  //Thêm hoặc tao cuộc trò chuyện
   Future<Map<String, dynamic>> getOrCreateConversation(
     List<String> participantIds,
   ) async {
@@ -62,6 +64,7 @@ class MessageService {
     }
   }
 
+  //Gửi tin nhắn
   Future<Message> sendMessage(
     String conversationId,
     String content,
@@ -105,6 +108,19 @@ class MessageService {
       final failedMessage = tempMessage.copyWith(status: 'failed');
       await MessageDatabase.instance.update(failedMessage);
       return failedMessage;
+    }
+  }
+
+  //Đánh dấu đã xem
+  Future<void> markAsSeen(String conversationId, String userId) async {
+    try {
+      await _dio.post(
+        'messages/conversations/$conversationId/seen',
+      );
+    } on DioException catch (e) {
+      throw Exception('Failed to mark as seen: $e');
+    } catch (e) {
+      throw Exception('An unknown error occurred: $e');
     }
   }
 }

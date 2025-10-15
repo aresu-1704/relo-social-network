@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from src.routers import auth_router, user_router, post_router, message_router
+from src import websocket
 from src.models import init_db
 
 # Khởi tạo app FastAPI với thông tin Swagger UI
@@ -17,10 +18,11 @@ async def startup_db_client():
     await init_db()
 
 # Gắn các router
-app.include_router(auth_router.router)
-app.include_router(user_router.router)
-app.include_router(post_router.router)
-app.include_router(message_router.router)
+app.include_router(auth_router.router, prefix="/api/auth", tags=["Xác thực"])
+app.include_router(user_router.router, prefix="/api/users", tags=["Người dùng"])
+app.include_router(post_router.router, prefix="/api/posts", tags=["Bài viết"])
+app.include_router(message_router.router, prefix="/api/messages", tags=["Tin nhắn"])
+app.include_router(websocket.router, prefix="/websocket", tags=["Connect real-time"])
 
 @app.get("/")
 def read_root():

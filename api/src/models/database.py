@@ -16,28 +16,30 @@ from .friend_request import FriendRequest
 # Thêm tất cả các model của bạn vào đây
 DOCUMENT_MODELS: list[Type] = [User, Conversation, Message, Post, FriendRequest]
 
+client = None  # 🔹 client global, dùng 1 lần suốt vòng đời app
+
 async def init_db():
     """
     Khởi tạo kết nối cơ sở dữ liệu và Beanie ODM.
-    Hàm này nên được gọi khi FastAPI khởi động.
+    Đảm bảo chỉ tạo một client duy nhất.
     """
-    # Tải các biến môi trường từ file .env
+    global client
+
+    # Nếu đã có client, bỏ qua
+    if client is not None:
+        return client
+
     load_dotenv()
-    # Lấy chuỗi kết nối MongoDB từ biến môi trường
     mongo_uri = os.getenv("MONGO_URI")
-    # Nếu không tìm thấy chuỗi kết nối, báo lỗi
     if not mongo_uri:
         raise ValueError("Không tìm thấy MONGO_URI trong các biến môi trường.")
 
-    # Tạo một client kết nối đến MongoDB
+    # Tạo client duy nhất
     client = AsyncIOMotorClient(mongo_uri)
-    # Lấy cơ sở dữ liệu có tên "relo-social-network" (hoặc có thể lấy từ biến môi trường)
     database = client.get_database("relo-social-network")
 
-    # Khởi tạo Beanie với cơ sở dữ liệu và các model đã định nghĩa
-    await init_beanie(
-        database=database,
-        document_models=DOCUMENT_MODELS
-    )
-    # In thông báo khi kết nối và khởi tạo thành công
-    print("Kết nối thành công đến MongoDB và khởi tạo Beanie!")
+    await init_beanie(database=database, document_models=DOCUMENT_MODELS)
+    print("✅ Đã kết nối MongoDB và khởi tạo Beanie (singleton).")
+
+    return client
+

@@ -18,6 +18,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
   final UserService _userService = ServiceLocator.userService;
   final MessageService _messageService = ServiceLocator.messageService;
 
+  int requestCount = 0; // Số lượng lời mời kết bạn chưa xử lý
+
   @override
   void initState() {
     super.initState();
@@ -49,72 +51,143 @@ class _FriendsScreenState extends State<FriendsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(120), // Tăng chiều cao AppBar
+        child: AppBar(
+          automaticallyImplyLeading: false, // bỏ nút back mặc định nếu có
+          backgroundColor: Colors.white,
+          elevation: 1,
+          flexibleSpace: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  const Text(
+                    '   Bạn bè',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  InkWell(
+                    onTap: () {
+                      // TODO: Điều hướng đến màn hình quản lý lời mời kết bạn
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Color(0xFFEDE7F6),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.group,
+                              color: Color(0xFF7A2FC0),
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Lời mời kết bạn',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (requestCount > 0)
+                                  Text(
+                                    '($requestCount)',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() {
             _friendsFuture = _userService.getFriends();
           });
         },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(),
-            FutureBuilder<List<User>>(
-              future: _friendsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      snapshot.error.toString().replaceFirst('Exception: ', ''),
+        child: FutureBuilder<List<User>>(
+          future: _friendsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  snapshot.error.toString().replaceFirst('Exception: ', ''),
+                ),
+              );
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('Bạn chưa có người bạn nào.'));
+            }
+
+            final friends = snapshot.data!;
+            final groupedFriends = _groupFriends(friends);
+            final sortedKeys = groupedFriends.keys.toList()..sort();
+
+            return ListView.builder(
+              itemCount: sortedKeys.length,
+              itemBuilder: (context, index) {
+                final letter = sortedKeys[index];
+                final friendsInGroup = groupedFriends[letter]!;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      child: Text(
+                        letter,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
                     ),
-                  );
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
-                    child: Text('Bạn chưa có người bạn nào.'),
-                  );
-                }
-
-                final friends = snapshot.data!;
-                final groupedFriends = _groupFriends(friends);
-                final sortedKeys = groupedFriends.keys.toList()..sort();
-
-                return ListView.builder(
-                  itemCount: sortedKeys.length,
-                  itemBuilder: (context, index) {
-                    final letter = sortedKeys[index];
-                    final friendsInGroup = groupedFriends[letter]!;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 8.0,
-                          ),
-                          child: Text(
-                            letter,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                        ...friendsInGroup.map(
-                          (friend) => _buildFriendTile(friend),
-                        ),
-                      ],
-                    );
-                  },
+                    ...friendsInGroup.map((friend) => _buildFriendTile(friend)),
+                  ],
                 );
               },
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
