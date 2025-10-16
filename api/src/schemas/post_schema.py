@@ -3,7 +3,7 @@ from typing import List, Optional
 
 class PostCreate(BaseModel):
     content: str
-    media_urls: Optional[List[str]] = []
+    mediaBase64: Optional[List[str]] = []
 
 class PostPublic(BaseModel):
     id: str
@@ -16,7 +16,7 @@ class PostPublic(BaseModel):
     createdAt: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         json_encoders = {
             'id': lambda v: str(v),
             'authorId': lambda v: str(v),

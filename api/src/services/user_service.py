@@ -1,8 +1,12 @@
 import asyncio
-from ..models.user import User
-from ..models.friend_request import FriendRequest
+from ..models import User
+from ..models import FriendRequest
+from ..schemas import UserUpdate
 from ..websocket import manager
 from bson import ObjectId
+import base64
+import tempfile
+from cloudinary.uploader import upload as cloudinary_upload, destroy
 
 class UserService:
 
@@ -239,3 +243,45 @@ class UserService:
         # Tìm tất cả người dùng có ID trong danh sách
         users = await User.find({"_id": {"$in": object_ids}}).to_list()
         return users
+
+    @staticmethod
+    async def update_user(user_id: str, user_update: UserUpdate):
+        """
+        Cập nhật thông tin người dùng, bao gồm cả upload avatar lên Cloudinary.
+        """
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+
+        update_data = user_update.dict(exclude_unset=True)
+
+        # 1️⃣ Nếu client gửi ảnh base64 → upload Cloudinary
+        if "avatarBase64" in update_data and update_data["avatarBase64"]:
+            try:
+                header, data = update_data["avatarBase64"].split(",") if "," in update_data["avatarBase64"] else (None, update_data["avatarBase64"])
+                image_bytes = base64.b64decode(data)
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+                    tmp.write(image_bytes)
+                    tmp_path = tmp.name
+
+                # Xóa ảnh cũ nếu có (tùy chọn)
+                if getattr(user, "avatarPublicId", None):
+                    destroy(user.avatarPublicId)
+
+                result = cloudinary_upload(tmp_path, folder="avatars")
+                user.avatarUrl = result["secure_url"]
+                user.avatarPublicId = result["public_id"]
+
+            except Exception as e:
+                raise ValueError(f"Lỗi xử lý ảnh: {e}")
+
+        # 2️⃣ Cập nhật các trường text
+        if "displayName" in update_data:
+            user.displayName = update_data["displayName"]
+        if "bio" in update_data:
+            user.bio = update_data["bio"]
+
+        # 3️⃣ Lưu lại
+        await user.save()
+        return user

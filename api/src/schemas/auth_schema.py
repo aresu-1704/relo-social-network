@@ -19,7 +19,7 @@ class UserPublic(BaseModel):
     displayName: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         # This is to help pydantic convert non-dict objects into pydantic models
         # We need a custom json_encoders for ObjectId
         json_encoders = {

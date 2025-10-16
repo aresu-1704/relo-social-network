@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:relo/models/message.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
+import 'package:relo/services/websocket_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -32,6 +35,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
 
+  StreamSubscription? _webSocketSubscription;
+
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _conversationId;
@@ -47,6 +52,56 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _loadInitialData();
     _scrollController.addListener(_onScroll);
+    _listenToWebSocket();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _textController.dispose();
+    _webSocketSubscription?.cancel();
+    super.dispose();
+  }
+
+  //Lắng nghe WebSocket để nhận tin nhắn mới
+  void _listenToWebSocket() {
+    _webSocketSubscription = webSocketService.stream.listen(
+      (message) {
+        final data = jsonDecode(message);
+
+        // Assuming the server sends an event type
+        if (data['type'] == 'new_message') {
+          final msgData = data['payload']?['message'];
+          if (msgData == null) return;
+
+          // Bỏ qua tin nhắn chính mình gửi ra
+          if (msgData['senderId'] == _currentUserId) return;
+
+          // Không cùng cuộc trò chuyện hiện tại → bỏ qua
+          if (msgData['conversationId'] != _conversationId) return;
+
+          final newMsg = Message(
+            id: msgData['id'] ?? '',
+            conversationId: msgData['conversationId'],
+            senderId: msgData['senderId'],
+            content: msgData['content'] ?? '',
+            timestamp:
+                DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
+            status: 'sent',
+          );
+
+          if (mounted) {
+            setState(() {
+              // vì reverse: true nên chèn ở đầu danh sách
+              _messages.insert(0, newMsg);
+            });
+          }
+        }
+      },
+      onError: (error) {
+        print("WebSocket Error: $error");
+      },
+    );
   }
 
   Future<void> _loadInitialData() async {
@@ -243,13 +298,6 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _textController.dispose();
-    super.dispose();
   }
 
   @override

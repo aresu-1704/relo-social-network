@@ -21,7 +21,12 @@ class FriendRequestPublic(BaseModel):
     createdAt: datetime
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat()
         }
+
+class UserUpdate(BaseModel):
+    displayName: str | None = None
+    avatarBase64: str | None = None
+    bio: str | None = None

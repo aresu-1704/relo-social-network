@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from src.routers import auth_router, user_router, post_router, message_router
 from src import websocket
 from src.models import init_db
+from src.configs import init_cloudinary
+
+#Khởi tạo kết nối đến Cloudinary
+init_cloudinary()
 
 # Khởi tạo app FastAPI với thông tin Swagger UI
 app = FastAPI(
@@ -9,7 +13,7 @@ app = FastAPI(
     description="Backend mạng xã hội nhắn tin trực tuyến **Relo**.\n\n"
                 "Hệ thống hỗ trợ đăng ký, đăng nhập, kết bạn, nhắn tin thời gian thực "
                 "và quản lý bài viết cá nhân.",
-    version="1.0.121025"
+    version="1.0.161025"
 )
 
 # Kết nối với cơ sở dữ liệu khi khởi động

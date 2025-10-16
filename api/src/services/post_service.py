@@ -1,57 +1,88 @@
 import asyncio
-from ..models.post import Post, AuthorInfo, Reaction
-from ..models.user import User
+import base64
+import tempfile
+from cloudinary.uploader import upload as cloudinary_upload, destroy as cloudinary_destroy
+from ..models import Post, AuthorInfo, Reaction
+from ..models import User
 from ..websocket import manager
 
 class PostService:
 
     @staticmethod
-    async def create_post(author_id: str, content: str, media_urls: list = None):
+    async def create_post(author_id: str, content: str, media_base_64: list = None):
         """
         Tạo một bài đăng mới.
-        Nó tìm nạp thông tin của tác giả để khử chuẩn hóa nó vào tài liệu bài đăng.
+        Upload ảnh (nếu có) lên Cloudinary, lưu URL và public_id.
         """
-        # Lấy thông tin tác giả một cách bất đồng bộ
         author = await User.get(author_id)
         if not author:
             raise ValueError("Không tìm thấy tác giả.")
 
-        # Tạo một đối tượng thông tin tác giả được nhúng
         author_info = AuthorInfo(
             displayName=author.displayName,
             avatarUrl=author.avatarUrl
         )
 
-        # Tạo thực thể bài đăng mới
-        new_post = Post(
-            authorId=author_id,
-            authorInfo=author_info,
-            content=content,
-            mediaUrls=media_urls if media_urls else []
-        )
-        
-        # Lưu bài đăng vào cơ sở dữ liệu
-        await new_post.save()
+        uploaded_media = []  # Danh sách các MediaItem đã upload
+        try:
+            if media_base_64:
+                for b64_str in media_base_64:
+                    if not b64_str:
+                        continue
 
-        # Gửi thông báo real-time đến bạn bè của tác giả
-        notification_payload = {
-            "type": "new_post",
-            "payload": {
-                "authorId": str(author.id),
-                "authorName": author.displayName,
-                "postId": str(new_post.id)
+                    # Giải mã base64
+                    header, data = b64_str.split(",") if "," in b64_str else (None, b64_str)
+                    image_bytes = base64.b64decode(data)
+
+                    # Lưu tạm file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+                        tmp.write(image_bytes)
+                        tmp_path = tmp.name
+
+                    # Upload lên Cloudinary
+                    result = cloudinary_upload(tmp_path, folder="posts")
+                    uploaded_media.append(
+                        MediaItem(
+                            url=result["secure_url"],
+                            publicId=result["public_id"],
+                            type=result.get("resource_type", "image")
+                        )
+                    )
+
+            # Tạo bài đăng mới
+            new_post = Post(
+                authorId=author_id,
+                authorInfo=author_info,
+                content=content,
+                media=uploaded_media,
+            )
+            await new_post.save()
+
+            # Gửi thông báo real-time
+            notification_payload = {
+                "type": "new_post",
+                "payload": {
+                    "authorId": str(author.id),
+                    "authorName": author.displayName,
+                    "postId": str(new_post.id)
+                }
             }
-        }
-        
-        broadcast_tasks = []
-        for friend_id in author.friendIds:
-            task = manager.broadcast_to_user(friend_id, notification_payload)
-            broadcast_tasks.append(task)
-        
-        if broadcast_tasks:
-            asyncio.gather(*broadcast_tasks)
 
-        return new_post
+            broadcast_tasks = [
+                manager.broadcast_to_user(fid, notification_payload)
+                for fid in author.friendIds
+            ]
+            if broadcast_tasks:
+                asyncio.create_task(asyncio.gather(*broadcast_tasks))
+
+            return new_post
+
+        except Exception as e:
+            # Rollback: xóa media đã upload nếu có lỗi
+            for media in uploaded_media:
+                if media.publicId:
+                    cloudinary_destroy(media.publicId)
+            raise ValueError(f"Lỗi khi tạo bài đăng: {e}")
 
     @staticmethod
     async def get_post_feed(limit: int = 20, skip: int = 0):

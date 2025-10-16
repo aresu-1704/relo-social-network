@@ -18,7 +18,7 @@ async def create_post(
         new_post = await PostService.create_post(
             author_id=str(current_user.id), # Sử dụng str(current_user.id) thay vì _id
             content=post_data.content,
-            media_urls=post_data.media_urls
+            media_base_64=post_data.mediaBase64
         )
         # Ánh xạ kết quả trả về sang schema PostPublic
         return PostPublic(

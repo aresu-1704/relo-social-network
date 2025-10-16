@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from ..services import UserService
-from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic
+from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate
 from ..schemas.block_schema import BlockUserRequest
 from ..schemas import FriendRequestPublic
 from ..models import User
@@ -21,6 +21,29 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         displayName=current_user.displayName
     )
+
+# Cập nhật hồ sơ của người dùng hiện tại
+@router.put("/me", response_model=UserPublic)
+async def update_user_me(
+    user_update: UserUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Cập nhật hồ sơ của người dùng hiện tại.
+    """
+    try:
+        updated_user = await UserService.update_user(
+            user_id=str(current_user.id),
+            user_update=user_update
+        )
+        return UserPublic(
+            id=str(updated_user.id),
+            username=updated_user.username,
+            email=updated_user.email,
+            displayName=updated_user.displayName
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Gửi yêu cầu kết bạn
 @router.post("/friend-request", status_code=201)

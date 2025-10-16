@@ -18,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final AuthService _authService = AuthService();
   final NotificationService _notificationService = NotificationService();
-  final SecureStorageService _secureStorageService = const SecureStorageService();
 
   bool _isLoading = false;
   final TextEditingController _usernameController = TextEditingController();

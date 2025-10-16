@@ -1,5 +1,5 @@
 from .user import User
-from .post import Post
+from .post import Post, AuthorInfo, Reaction
 from .message import Message
 from .conversation import Conversation
 from .friend_request import FriendRequest
@@ -11,5 +11,7 @@ __all__ = [
     "Message",
     "Conversation",
     "FriendRequest",
-    "init_db"
+    "init_db",
+    "AuthorInfo",
+    "Reaction"
 ]

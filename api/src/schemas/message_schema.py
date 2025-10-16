@@ -25,7 +25,7 @@ class MessagePublic(BaseModel):
     createdAt: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat()
         }
@@ -36,7 +36,7 @@ class LastMessagePublic(BaseModel):
     timestamp: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat()
         }
@@ -49,7 +49,7 @@ class ConversationPublic(BaseModel):
     seenIds: List[str] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat()
         }
@@ -62,7 +62,7 @@ class ConversationWithParticipants(BaseModel):
     seenIds: List[str] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat()
         }
