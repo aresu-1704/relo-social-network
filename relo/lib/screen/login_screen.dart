@@ -4,7 +4,6 @@ import 'package:relo/screen/register_screen.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/notification_service.dart';
 import 'package:relo/screen/main_screen.dart';
-import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/websocket_service.dart';
 
 class LoginScreen extends StatefulWidget {
