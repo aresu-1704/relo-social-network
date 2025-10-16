@@ -40,18 +40,7 @@ async def get_post_feed(skip: int = 0, limit: int = 20):
     # Lấy danh sách bài đăng một cách bất đồng bộ
     posts = await PostService.get_post_feed(limit=limit, skip=skip)
     # Ánh xạ danh sách kết quả sang schema PostPublic
-    return [
-        PostPublic(
-            id=str(post.id),
-            authorId=str(post.authorId),
-            authorInfo=post.authorInfo,
-            content=post.content,
-            mediaUrls=post.mediaUrls,
-            reactionCounts=post.reactionCounts,
-            commentCount=post.commentCount,
-            createdAt=post.createdAt.isoformat()
-        ) for post in posts
-    ]
+    return posts
 
 @router.post("/posts/{post_id}/react", response_model=PostPublic)
 async def react_to_post(

@@ -5,6 +5,7 @@ from cloudinary.uploader import upload as cloudinary_upload, destroy as cloudina
 from ..models import Post, AuthorInfo, Reaction
 from ..models import User
 from ..websocket import manager
+from ..schemas import PostPublic, MediaItem
 
 class PostService:
 
@@ -91,7 +92,19 @@ class PostService:
         """
         # Truy vấn các bài đăng gần đây nhất, được sắp xếp theo ngày tạo
         posts = await Post.find_all(sort="-createdAt", skip=skip, limit=limit).to_list()
-        return posts
+
+        return [ 
+            PostPublic(
+                id=str(post.id),
+                authorId=str(post.authorId),
+                authorInfo=post.authorInfo,
+                content=post.content,
+                mediaUrls=post.mediaUrls,
+                reactionCounts=post.reactionCounts,
+                commentCount=post.commentCount,
+                createdAt=post.createdAt.isoformat()
+            ) for post in posts 
+        ]
 
     @staticmethod
     async def react_to_post(user_id: str, post_id: str, reaction_type: str):

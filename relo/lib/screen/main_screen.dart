@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/screen/default_screen.dart';
+import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 
@@ -93,10 +94,10 @@ class MainScreenState extends State<MainScreen> {
               child: Container(
                 height: 31,
                 child: GestureDetector(
-                  onTap: () => {
+                  onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => DefaultScreen()),
-                    ), //TODO: Làm màn hình tìm kiếm
+                      MaterialPageRoute(builder: (_) => const SearchScreen()),
+                    );
                   },
                   child: Row(
                     children: [

@@ -1,5 +1,10 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Literal
+
+class MediaItem(BaseModel):
+    url: str
+    publicId: str
+    type: Literal["image", "video", "audio", "file"] = "image"
 
 class PostCreate(BaseModel):
     content: str

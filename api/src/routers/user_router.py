@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from ..services import UserService
-from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate
+from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate, UserSearchResult
 from ..schemas.block_schema import BlockUserRequest
 from ..schemas import FriendRequestPublic
 from ..models import User
@@ -19,7 +19,9 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         id=str(current_user.id),
         username=current_user.username,
         email=current_user.email,
-        displayName=current_user.displayName
+        displayName=current_user.displayName,
+        avatarUrl=current_user.avatarUrl,
+        bio=current_user.bio
     )
 
 # Cập nhật hồ sơ của người dùng hiện tại
@@ -40,7 +42,9 @@ async def update_user_me(
             id=str(updated_user.id),
             username=updated_user.username,
             email=updated_user.email,
-            displayName=updated_user.displayName
+            displayName=updated_user.displayName,
+            avatarUrl=updated_user.avatarUrl,
+            bio=updated_user.bio
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -109,7 +113,8 @@ async def get_friends(current_user: User = Depends(get_current_user)):
                 id=str(friend.id),
                 username=friend.username,
                 email=friend.email,
-                displayName=friend.displayName
+                displayName=friend.displayName,
+                avatarUrl=friend.avatarUrl,
             ) for friend in friends
         ]
     except ValueError as e:
@@ -127,7 +132,9 @@ async def get_user_profile(user_id: str, current_user: User = Depends(get_curren
             id=str(user.id),
             username=user.username,
             email=user.email,
-            displayName=user.displayName
+            displayName=user.displayName,
+            avatarUrl=user.avatarUrl,
+            bio=user.bio
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -159,10 +166,10 @@ async def search_users(query: str = Query(..., min_length=1), current_user: User
     try:
         users = await UserService.search_users(query, str(current_user.id))
         return [
-            UserPublic(
+            UserSearchResult(
                 id=str(user.id),
                 username=user.username,
-                email=user.email,
+                avatarUrl=user.avatarUrl,
                 displayName=user.displayName
             ) for user in users
         ]

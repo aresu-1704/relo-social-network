@@ -12,6 +12,8 @@ class UserPublic(BaseModel):
     username: str
     email: EmailStr
     displayName: str
+    avatarUrl: str | None = None
+    bio: str | None = None
 
 class FriendRequestPublic(BaseModel):
     id: str
@@ -30,3 +32,10 @@ class UserUpdate(BaseModel):
     displayName: str | None = None
     avatarBase64: str | None = None
     bio: str | None = None
+
+
+class UserSearchResult(BaseModel):
+    id: str | None = None
+    displayName: str | None = None
+    username: str | None = None
+    avatarUrl: str | None = None

@@ -8,28 +8,6 @@ from .message_schema import (
     SimpleMessagePublic,
     ConversationWithParticipants
 )
-from .post_schema import PostCreate, PostPublic, ReactionCreate
-from .user_schema import FriendRequestCreate, FriendRequestResponse, FriendRequestPublic, UserUpdate
+from .post_schema import PostCreate, PostPublic, ReactionCreate, MediaItem
+from .user_schema import FriendRequestCreate, FriendRequestResponse, FriendRequestPublic, UserUpdate, UserSearchResult
 from .block_schema import BlockUserRequest
-
-__all__ = [
-    "UserCreate",
-    "UserLogin",
-    "UserPublic",
-    "ConversationCreate",
-    "MessageCreate",
-    "ConversationPublic",
-    "MessagePublic",
-    "LastMessagePublic",
-    "PostCreate",
-    "PostPublic",
-    "ReactionCreate",
-    "FriendRequestCreate",
-    "FriendRequestResponse",
-    "BlockUserRequest",
-    "RefreshTokenRequest",
-    "SimpleMessagePublic",
-    "ConversationWithParticipants",
-    "FriendRequestPublic",
-    "UserUpdate"
-]
