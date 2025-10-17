@@ -76,9 +76,9 @@ class MessageService:
 
         # Cập nhật tin nhắn cuối cùng và dấu thời gian của cuộc trò chuyện
         conversation.lastMessage = LastMessage(
-            text=content.get("text", ""), 
-            senderId=sender_id, 
-            timestamp=datetime.utcnow()
+            content=message.content, 
+            senderId=message.senderId, 
+            createdAt=message.createdAt
         )
         conversation.updatedAt = datetime.utcnow()
         await conversation.save()

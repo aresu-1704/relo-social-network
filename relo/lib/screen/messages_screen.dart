@@ -164,10 +164,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         if (_currentUserId != null &&
             _currentUserId == conversation['lastMessage']?['senderId']) {
-          lastMessage = 'Bạn: ' + conversation['lastMessage']?['text'];
+          lastMessage =
+              'Bạn: ' + conversation['lastMessage']?['content']['content'] ?? 'Chưa có tin nhắn'; //TODO: Chưa xử lý Media
         } else {
           lastMessage =
-              conversation['lastMessage']?['text'] ?? 'Chưa có tin nhắn';
+              conversation['lastMessage']?['content']['content'] ??
+              'Chưa có tin nhắn';
         }
 
         final updatedAt = conversation['updatedAt'];

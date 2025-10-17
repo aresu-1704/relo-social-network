@@ -87,9 +87,7 @@ class MessageService {
       // 2️⃣ Gửi lên server
       final response = await _dio.post(
         'messages/conversations/$conversationId/messages',
-        data: {
-          'content': {'text': content},
-        },
+        data: {'content': content},
       );
 
       // 3️⃣ Cập nhật trạng thái thành sent
@@ -114,9 +112,7 @@ class MessageService {
   //Đánh dấu đã xem
   Future<void> markAsSeen(String conversationId, String userId) async {
     try {
-      await _dio.post(
-        'messages/conversations/$conversationId/seen',
-      );
+      await _dio.post('messages/conversations/$conversationId/seen');
     } on DioException catch (e) {
       throw Exception('Failed to mark as seen: $e');
     } catch (e) {

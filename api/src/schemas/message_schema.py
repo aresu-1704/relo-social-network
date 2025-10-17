@@ -8,7 +8,7 @@ class ConversationCreate(BaseModel):
     participant_ids: List[str]
 
 class MessageCreate(BaseModel):
-    content: dict # e.g. {"type": "text", "text": "Hello"}
+    content: dict
 
 # Schema for simplified message response
 class SimpleMessagePublic(BaseModel):
@@ -21,7 +21,7 @@ class MessagePublic(BaseModel):
     id: str
     conversationId: str
     senderId: str
-    content: Dict
+    content: dict
     createdAt: datetime
 
     class Config:
@@ -31,9 +31,9 @@ class MessagePublic(BaseModel):
         }
 
 class LastMessagePublic(BaseModel):
-    content: Dict # {"type": "text", "text": "..."} or {"type": "image", "fileName": "..."}
+    content: dict
     senderId: str
-    timestamp: datetime
+    createdAt: datetime
 
     class Config:
         from_attributes = True
