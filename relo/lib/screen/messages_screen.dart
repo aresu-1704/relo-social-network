@@ -21,7 +21,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   final SecureStorageService _secureStorage = const SecureStorageService();
   StreamSubscription? _webSocketSubscription;
   String? _currentUserId;
-
+  
   bool _isLoading = true;
   List<dynamic> conversations = [];
 
@@ -32,8 +32,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   Future<void> _initialize() async {
-    await fetchConversations();
     await _getCurrentUserId();
+    await fetchConversations();
     _listenToWebSocket();
   }
 
@@ -165,7 +165,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
         if (_currentUserId != null &&
             _currentUserId == conversation['lastMessage']?['senderId']) {
           lastMessage =
-              'Bạn: ' + conversation['lastMessage']?['content']['content'] ?? 'Chưa có tin nhắn'; //TODO: Chưa xử lý Media
+              'Bạn: ' + conversation['lastMessage']?['content']['content'] ??
+              'Chưa có tin nhắn'; //TODO: Chưa xử lý Media
         } else {
           lastMessage =
               conversation['lastMessage']?['content']['content'] ??
@@ -181,24 +182,47 @@ class _MessagesScreenState extends State<MessagesScreen> {
               leading: CircleAvatar(backgroundImage: avatar),
               title: Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight:
+                      (
+                      // Nếu tin nhắn cuối cùng do mình gửi → không cần in đậm
+                      conversation['lastMessage']?['senderId'] ==
+                              _currentUserId ||
+                          // Hoặc nếu mình đã xem rồi → không cần in đậm
+                          (conversation['seenIds'] != null &&
+                              (conversation['seenIds'] as List).contains(
+                                _currentUserId,
+                              )))
+                      ? FontWeight
+                            .normal // đã đọc
+                      : FontWeight.bold, // chưa đọc),
+                ),
               ),
               subtitle: Text(
                 lastMessage,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight:
-                      (conversation['seenIds'] != null &&
-                          (conversation['seenIds'] as List).contains(
-                            _currentUserId,
-                          ) &&
-                          conversation['lastMessage']?['senderId'] !=
-                              _currentUserId)
-                      ? FontWeight
-                            .normal // đã đọc
-                      : FontWeight.bold, // chưa đọc
-                ),
+                style:
+                    (
+                    // Nếu tin nhắn cuối cùng do mình gửi → không cần in đậm
+                    conversation['lastMessage']?['senderId'] ==
+                            _currentUserId ||
+                        // Hoặc nếu mình đã xem rồi → không cần in đậm
+                        (conversation['seenIds'] != null &&
+                            (conversation['seenIds'] as List).contains(
+                              _currentUserId,
+                            )))
+                    ? TextStyle(
+                        fontWeight: FontWeight.normal, // đã đọc
+                        fontSize: 14,
+                        color: Colors.grey,
+                      )
+                    : TextStyle(
+                        fontWeight: FontWeight.bold, // chưa đọc
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
               ),
               trailing: updatedAt != null
                   ? Text(

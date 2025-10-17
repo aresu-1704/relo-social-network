@@ -81,6 +81,7 @@ class MessageService:
             createdAt=message.createdAt
         )
         conversation.updatedAt = datetime.utcnow()
+        conversation.seenIds = [sender_id]  # Chỉ người gửi đã xem tin nhắn mới
         await conversation.save()
 
         # Chuẩn bị dữ liệu để phát sóng

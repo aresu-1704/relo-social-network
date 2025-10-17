@@ -16,8 +16,6 @@ class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
 
-  final Color primaryColor = Color(0xFF7C3AED);
-
   @override
   void initState() {
     super.initState();
@@ -94,7 +92,7 @@ class MainScreenState extends State<MainScreen> {
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          selectedItemColor: primaryColor,
+          selectedItemColor: Color(0xFF7A2FC0),
           unselectedItemColor: Colors.grey, // Màu icon chưa chọn là xám
           backgroundColor: Colors
               .transparent, // Nền trong suốt để màu của container hiển thị

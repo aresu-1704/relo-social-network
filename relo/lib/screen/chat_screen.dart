@@ -47,8 +47,6 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _hasMore = true; // true: còn tin nhắn cũ, false: hết
   bool _showReachedTopNotification = false;
 
-  bool _isSendMedia = false;
-
   @override
   void initState() {
     super.initState();
@@ -309,7 +307,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF7C3AED),
+        backgroundColor: const Color(0xFF7A2FC0),
         title: Text(
           widget.friendName ?? 'Chat',
           style: const TextStyle(color: Colors.white),
@@ -410,11 +408,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
     final bubbleColor = isMe
         ? (message.status == 'pending'
-              ? const Color.fromARGB(255, 156, 156, 156)
+              ? const Color.fromARGB(255, 255, 255, 255)
               : message.status == 'failed'
               ? Colors.redAccent
-              : const Color.fromARGB(255, 155, 121, 214))
-        : const Color(0xFFE5E7EB);
+              : const Color(0xFF7A2FC0))
+        : const Color.fromARGB(255, 255, 255, 255);
     final textColor = isMe ? Colors.white : Colors.black87;
 
     final timeString =
