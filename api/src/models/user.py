@@ -15,6 +15,9 @@ class User(Document):
 
     avatarUrl: Optional[str] = Field(default="", description="URL ảnh đại diện của người dùng.")
     avatarPublicId: Optional[str] = Field(default=None, description="ID công khai của ảnh trên Cloudinary (để xóa hoặc cập nhật ảnh).")
+    
+    backgroundUrl: Optional[str] = Field(default="", description="URL ảnh bìa của người dùng.")
+    backgroundPublicId: Optional[str] = Field(default=None, description="ID công khai của ảnh trên Cloudinary (để xóa hoặc cập nhật ảnh).")
 
     bio: Optional[str] = Field(default="", description="Tiểu sử ngắn của người dùng.")
     friendIds: List[str] = Field(default_factory=list, description="Danh sách ID của bạn bè.")

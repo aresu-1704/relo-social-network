@@ -2,15 +2,26 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'message.g.dart';
 
+enum MessageType {
+  text,
+  image,
+  video,
+  audio,
+  unsupported,
+}
+
 @JsonSerializable()
 class Message {
   final String id;
-  final String content;
+  final Map<String, dynamic> content;
   final String senderId;
   final String conversationId;
   final DateTime timestamp;
   final String status; // pending, sent, failed
   final String? avatarUrl;
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  final MessageType type;
 
   Message({
     required this.id,
@@ -20,16 +31,46 @@ class Message {
     required this.timestamp,
     required this.status,
     this.avatarUrl,
-  });
+  }) : type = _mapContentType(content);
+
+  static MessageType _mapContentType(Map<String, dynamic> content) {
+    switch (content['type']) {
+      case 'text':
+        return MessageType.text;
+      case 'image':
+        return MessageType.image;
+      case 'video':
+        return MessageType.video;
+      case 'audio':
+        return MessageType.audio;
+      default:
+        return MessageType.unsupported;
+    }
+  }
+
+  String get textContent =>
+      type == MessageType.text ? content['text'] ?? '' : '';
+
+  String get url => content['url'] ?? '';
+  String get fileName => content['fileName'] ?? '';
+
 
   /// ✅ Dành cho dữ liệu từ SQLite hoặc file JSON local
   factory Message.fromJson(Map<String, dynamic> json) {
     final rawContent = json['content'];
+    Map<String, dynamic> parsedContent;
+    if (rawContent is String) {
+      // For backward compatibility with old text-only messages
+      parsedContent = {'type': 'text', 'text': rawContent};
+    } else if (rawContent is Map<String, dynamic>) {
+      parsedContent = rawContent;
+    } else {
+      parsedContent = {'type': 'unsupported'};
+    }
+
     return Message(
       id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
-      content: rawContent is Map
-          ? rawContent['text'] ?? ''
-          : rawContent?.toString() ?? '',
+      content: parsedContent,
       senderId: json['senderId']?.toString() ?? '',
       conversationId: json['conversationId']?.toString() ?? '',
       timestamp:
@@ -44,9 +85,20 @@ class Message {
   /// ✅ Dành riêng cho dữ liệu từ backend API
   factory Message.fromServerJson(Map<String, dynamic> json) {
     final rawContent = json['content'];
+     Map<String, dynamic> parsedContent;
+    if (rawContent is Map<String, dynamic>) {
+      parsedContent = rawContent;
+    } else if (rawContent is String) {
+       // Should not happen with new backend, but for safety
+      parsedContent = {'type': 'text', 'text': rawContent};
+    }
+    else {
+      parsedContent = {'type': 'unsupported'};
+    }
+
     return Message(
       id: json['_id']?.toString() ?? '',
-      content: rawContent is Map ? rawContent['text'] ?? '' : rawContent ?? '',
+      content: parsedContent,
       senderId: json['senderId'] ?? '',
       conversationId: json['conversationId'] ?? '',
       timestamp: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
@@ -59,7 +111,7 @@ class Message {
 
   Message copyWith({
     String? id,
-    String? content,
+    Map<String, dynamic>? content,
     String? senderId,
     String? conversationId,
     DateTime? timestamp,

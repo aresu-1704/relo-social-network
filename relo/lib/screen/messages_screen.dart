@@ -172,66 +172,76 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         final updatedAt = conversation['updatedAt'];
 
-        return ListTile(
-          leading: CircleAvatar(backgroundImage: avatar),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Text(
-            lastMessage,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontWeight:
-                  (conversation['seenIds'] != null &&
-                      (conversation['seenIds'] as List).contains(
-                        _currentUserId,
-                      ) &&
-                      conversation['lastMessage']?['senderId'] !=
-                          _currentUserId)
-                  ? FontWeight
-                        .normal // đã đọc
-                  : FontWeight.bold, // chưa đọc
-            ),
-          ),
-          trailing: updatedAt != null
-              ? Text(
-                  _formatZaloTime(updatedAt),
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                    fontWeight:
-                        (conversation['seenIds'] != null &&
-                            (conversation['seenIds'] as List).contains(
-                              _currentUserId,
-                            ) &&
-                            conversation['lastMessage']?['senderId'] !=
-                                _currentUserId)
-                        ? FontWeight
-                              .normal // đã đọc
-                        : FontWeight.bold, // chưa đọc
-                  ),
-                )
-              : null,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(
-                  conversationId: conversation['id'],
-                  isGroup: isGroupChat,
-                  friendName: title,
-                  memberIds: participants
-                      .map((p) => p['id']?.toString() ?? '')
-                      .where((id) => id.isNotEmpty)
-                      .toList(),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: CircleAvatar(backgroundImage: avatar),
+              title: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                lastMessage,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight:
+                      (conversation['seenIds'] != null &&
+                          (conversation['seenIds'] as List).contains(
+                            _currentUserId,
+                          ) &&
+                          conversation['lastMessage']?['senderId'] !=
+                              _currentUserId)
+                      ? FontWeight
+                            .normal // đã đọc
+                      : FontWeight.bold, // chưa đọc
                 ),
               ),
-            );
-            // Đánh dấu cuộc trò chuyện là đã xem
-            messageService.markAsSeen(conversation['id'], _currentUserId!);
-          },
+              trailing: updatedAt != null
+                  ? Text(
+                      _formatZaloTime(updatedAt),
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                        fontWeight:
+                            (conversation['seenIds'] != null &&
+                                (conversation['seenIds'] as List).contains(
+                                  _currentUserId,
+                                ) &&
+                                conversation['lastMessage']?['senderId'] !=
+                                    _currentUserId)
+                            ? FontWeight
+                                  .normal // đã đọc
+                            : FontWeight.bold, // chưa đọc
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      conversationId: conversation['id'],
+                      isGroup: isGroupChat,
+                      friendName: title,
+                      memberIds: participants
+                          .map((p) => p['id']?.toString() ?? '')
+                          .where((id) => id.isNotEmpty)
+                          .toList(),
+                    ),
+                  ),
+                );
+                // Đánh dấu cuộc trò chuyện là đã xem
+                messageService.markAsSeen(conversation['id'], _currentUserId!);
+              },
+            ),
+            const Divider(
+              color: Color.fromARGB(255, 207, 205, 205),
+              thickness: 1,
+              indent: 70,
+            ),
+          ],
         );
       },
     );

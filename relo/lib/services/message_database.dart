@@ -68,7 +68,7 @@ CREATE TABLE messages (
     return result.map((json) {
       return Message(
         id: json['id'] as String,
-        content: json['content'] as String,
+        content: json['content'] as Map<String, dynamic>,
         senderId: json['senderId'] as String,
         conversationId: json['conversationId'] as String,
         timestamp: DateTime.parse(json['timestamp'] as String),

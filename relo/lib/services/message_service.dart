@@ -67,7 +67,7 @@ class MessageService {
   //Gửi tin nhắn
   Future<Message> sendMessage(
     String conversationId,
-    String content,
+    Map<String, dynamic> content,
     String senderId,
   ) async {
     // 1️⃣ Tạo message local với trạng thái pending

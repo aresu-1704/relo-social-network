@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/constants.dart';
+import 'package:relo/services/websocket_service.dart';
+
 
 class AuthService {
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
@@ -82,6 +84,7 @@ class AuthService {
   /// Đăng xuất người dùng (xóa tokens ở phía client).
   Future<void> logout() async {
     await _storageService.deleteTokens();
+    webSocketService.disconnect();
   }
 
   // Lấy access token mới bằng refresh token.

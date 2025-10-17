@@ -8,7 +8,7 @@ class ConversationCreate(BaseModel):
     participant_ids: List[str]
 
 class MessageCreate(BaseModel):
-    content: dict # e.g. {"text": "Hello"}
+    content: dict # e.g. {"type": "text", "text": "Hello"}
 
 # Schema for simplified message response
 class SimpleMessagePublic(BaseModel):
@@ -31,7 +31,7 @@ class MessagePublic(BaseModel):
         }
 
 class LastMessagePublic(BaseModel):
-    text: str
+    content: Dict # {"type": "text", "text": "..."} or {"type": "image", "fileName": "..."}
     senderId: str
     timestamp: datetime
 
