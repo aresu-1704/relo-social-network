@@ -1,22 +1,9 @@
 // Màn hình chính với AppBar có thanh tìm kiếm và Bottom Bar được tùy chỉnh
 import 'package:flutter/material.dart';
-import 'package:relo/services/websocket_service.dart';
-import 'package:relo/services/service_locator.dart';
-import 'package:relo/screen/default_screen.dart';
 import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
-
-// TODO: Thêm các màn hình con vào list này
-final List<Widget> screens = [
-  MessagesScreen(),
-  Center(child: Text('TODO: Tường nhà')), // Placeholder for Home Screen
-  const FriendsScreen(), // Placeholder for Friends Screen
-  Center(
-    child: Text('TODO: Thông báo'),
-  ), // Placeholder for Notifications Screen
-  Center(child: Text('TODO: Cá nhân')), // Placeholder for Profile Screen
-];
+import 'profile_setting_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -28,8 +15,7 @@ class MainScreen extends StatefulWidget {
 class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
-  final _authService = ServiceLocator.authService;
-  // Màu tím chủ đạo
+
   final Color primaryColor = Color(0xFF7C3AED);
 
   @override
@@ -48,30 +34,6 @@ class MainScreenState extends State<MainScreen> {
     });
   }
 
-  // Màn hình cá nhân với nút logout
-  Widget _buildProfileScreen() {
-    return Center(
-      child: ElevatedButton(
-        onPressed: () async {
-          // Ngắt kết nối WebSocket
-          webSocketService.disconnect();
-
-          // Gọi hàm logout của AuthService để xóa tokens an toàn
-          await _authService.logout();
-
-          // Chuyển về màn hình đăng nhập
-          if (mounted) {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const DefaultScreen()),
-              (route) => false,
-            );
-          }
-        },
-        child: Text('Đăng xuất'),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Cập nhật lại body để sử dụng _buildProfileScreen cho tab cá nhân
@@ -80,7 +42,7 @@ class MainScreenState extends State<MainScreen> {
       Center(child: Text('TODO: Tường nhà')),
       const FriendsScreen(),
       Center(child: Text('TODO: Thông báo')),
-      _buildProfileScreen(), // Sử dụng widget profile ở đây
+      ProfileSettingScreen(),
     ];
 
     return Scaffold(

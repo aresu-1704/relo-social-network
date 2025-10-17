@@ -25,6 +25,15 @@ class WebSocketService {
     _isManualDisconnect = false;
     _reconnectAttempts = 0;
     await _connect();
+
+    Connectivity().onConnectivityChanged.listen((status) {
+      if (status != ConnectivityResult.none &&
+          !isConnected &&
+          !_isManualDisconnect) {
+        print('📶 Network restored, reconnecting WebSocket...');
+        _reconnect();
+      }
+    });
   }
 
   Future<void> _handleDisconnect() async {
@@ -117,6 +126,9 @@ class WebSocketService {
     _isManualDisconnect = true;
     _channel?.sink.close(status.goingAway);
     _channel = null;
+    if (!_streamController.isClosed) {
+      _streamController.close();
+    }
     print('WebSocket disconnected manually.');
   }
 
