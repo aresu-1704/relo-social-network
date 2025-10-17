@@ -9,7 +9,7 @@ class Message(Document):
     """
     conversationId: str = Field(..., description="ID của cuộc trò chuyện chứa tin nhắn này.")
     senderId: str = Field(..., description="ID của người gửi tin nhắn.")
-    content: Dict = Field(..., description="Nội dung của tin nhắn, ví dụ: {'type': 'text', 'text': 'Xin chào'}.")
+    content: dict = Field(..., description="Nội dung của tin nhắn, ví dụ: {'type': 'text', 'text': 'Xin chào'}.")
     createdAt: datetime = Field(default_factory=datetime.utcnow, description="Thời điểm tin nhắn được gửi.")
 
     class Settings:

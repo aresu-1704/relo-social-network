@@ -5,9 +5,9 @@ from datetime import datetime
 
 class LastMessage(BaseModel):
     """Lưu trữ thông tin xem trước của tin nhắn cuối cùng trong cuộc trò chuyện."""
-    text: str
+    content: dict
     senderId: str
-    timestamp: datetime
+    createdAt: datetime
 
 class Conversation(Document):
     """
