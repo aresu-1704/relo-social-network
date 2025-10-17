@@ -38,14 +38,7 @@ async def update_user_me(
             user_id=str(current_user.id),
             user_update=user_update
         )
-        return UserPublic(
-            id=str(updated_user.id),
-            username=updated_user.username,
-            email=updated_user.email,
-            displayName=updated_user.displayName,
-            avatarUrl=updated_user.avatarUrl,
-            bio=updated_user.bio
-        )
+        return {"message": "Cập nhật thành công."}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -134,6 +127,7 @@ async def get_user_profile(user_id: str, current_user: User = Depends(get_curren
             email=user.email,
             displayName=user.displayName,
             avatarUrl=user.avatarUrl,
+            backgroundUrl=user.backgroundUrl,
             bio=user.bio
         )
     except ValueError as e:

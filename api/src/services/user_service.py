@@ -255,10 +255,10 @@ class UserService:
 
         update_data = user_update.dict(exclude_unset=True)
 
-        # 1️⃣ Nếu client gửi ảnh base64 → upload Cloudinary
+        # Ảnh đại diện
         if "avatarBase64" in update_data and update_data["avatarBase64"]:
             try:
-                header, data = update_data["avatarBase64"].split(",") if "," in update_data["avatarBase64"] else (None, update_data["avatarBase64"])
+                data = update_data["avatarBase64"].split(",") if "," in update_data["avatarBase64"] else (None, update_data["avatarBase64"])
                 image_bytes = base64.b64decode(data)
 
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -272,6 +272,27 @@ class UserService:
                 result = cloudinary_upload(tmp_path, folder="avatars")
                 user.avatarUrl = result["secure_url"]
                 user.avatarPublicId = result["public_id"]
+
+            except Exception as e:
+                raise ValueError(f"Lỗi xử lý ảnh: {e}")
+            
+        # Ảnh bìa
+        if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
+            try:
+                data = update_data["backgroundBase64"].split(",") if "," in update_data["backgroundBase64"] else (None, update_data["backgroundBase64"])
+                image_bytes = base64.b64decode(data)
+
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+                    tmp.write(image_bytes)
+                    tmp_path = tmp.name
+
+                # Xóa ảnh cũ nếu có (tùy chọn)
+                if getattr(user, "backgroundPublicId", None):
+                    destroy(user.backgroundPublicId)
+
+                result = cloudinary_upload(tmp_path, folder="backgrounds")
+                user.backgroundUrl = result["secure_url"]
+                user.backgroundPublicId = result["public_id"]
 
             except Exception as e:
                 raise ValueError(f"Lỗi xử lý ảnh: {e}")

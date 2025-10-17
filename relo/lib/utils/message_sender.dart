@@ -13,7 +13,7 @@ class MessageSender {
   /// Gửi tin nhắn lần đầu
   Future<Message> sendMessage(
     String conversationId,
-    String content,
+    Map<String, dynamic> content,
     String senderId,
   ) async {
     // Tạo message pending và lưu local

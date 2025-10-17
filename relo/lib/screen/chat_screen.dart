@@ -47,6 +47,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _hasMore = true; // true: còn tin nhắn cũ, false: hết
   bool _showReachedTopNotification = false;
 
+  bool _isSendMedia = false;
+
   @override
   void initState() {
     super.initState();
@@ -253,7 +255,10 @@ class _ChatScreenState extends State<ChatScreen> {
   void _sendMessage() async {
     if (_textController.text.trim().isEmpty || _conversationId == null) return;
 
-    final content = _textController.text.trim();
+    final content = {
+      'type': 'text',
+      'content': _textController.text.trim(),
+    }; //TODO: Chưa xử lý media
     _textController.clear();
 
     // 1️⃣ Tạo message tạm thời với status pending
@@ -454,7 +459,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    message.content,
+                    message.content['content'] ?? '', //TODO: Chưa xử lý media
                     style: TextStyle(color: textColor, fontSize: 15),
                   ),
                   const SizedBox(height: 4),

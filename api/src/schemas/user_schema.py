@@ -13,6 +13,7 @@ class UserPublic(BaseModel):
     email: EmailStr
     displayName: str
     avatarUrl: str | None = None
+    backgroundUrl: str | None = None
     bio: str | None = None
 
 class FriendRequestPublic(BaseModel):
@@ -31,6 +32,7 @@ class FriendRequestPublic(BaseModel):
 class UserUpdate(BaseModel):
     displayName: str | None = None
     avatarBase64: str | None = None
+    backgroundBase64: str | None = None
     bio: str | None = None
 
 
