@@ -8,7 +8,10 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:relo/widgets/voice_recorder_widget.dart';
+import 'package:relo/widgets/audio_message_bubble.dart';
+import 'package:relo/widgets/text_message_bubble.dart';
+import 'package:relo/widgets/message_composer.dart';
+import 'package:relo/utils/message_utils.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -38,19 +41,17 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
 
   StreamSubscription? _webSocketSubscription;
-
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _conversationId;
   String? _currentUserId;
-
   int _offset = 0;
-  final int _limit = 50; // Giữ cố định
-  bool _hasMore = true; // true: còn tin nhắn cũ, false: hết
+  final int _limit = 50;
+  bool _hasMore = true;
   bool _showReachedTopNotification = false;
 
-  // Audio recording
   final AudioPlayer _audioPlayer = AudioPlayer();
+  String? _currentlyPlayingUrl; // 👈 Theo dõi audio đang phát
 
   @override
   void initState() {
@@ -69,52 +70,36 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  //Lắng nghe WebSocket để nhận tin nhắn mới
   void _listenToWebSocket() {
-    _webSocketSubscription = webSocketService.stream.listen(
-      (message) {
-        final data = jsonDecode(message);
+    _webSocketSubscription = webSocketService.stream.listen((message) {
+      final data = jsonDecode(message);
+      if (data['type'] == 'new_message') {
+        final msgData = data['payload']?['message'];
+        if (msgData == null) return;
+        if (msgData['senderId'] == _currentUserId) return;
+        if (msgData['conversationId'] != _conversationId) return;
 
-        // Assuming the server sends an event type
-        if (data['type'] == 'new_message') {
-          final msgData = data['payload']?['message'];
-          if (msgData == null) return;
+        final newMsg = Message(
+          id: msgData['id'] ?? '',
+          conversationId: msgData['conversationId'],
+          senderId: msgData['senderId'],
+          content: msgData['content'] ?? '',
+          timestamp:
+              DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
+          status: 'sent',
+        );
 
-          // Bỏ qua tin nhắn chính mình gửi ra
-          if (msgData['senderId'] == _currentUserId) return;
-
-          // Không cùng cuộc trò chuyện hiện tại → bỏ qua
-          if (msgData['conversationId'] != _conversationId) return;
-
-          final newMsg = Message(
-            id: msgData['id'] ?? '',
-            conversationId: msgData['conversationId'],
-            senderId: msgData['senderId'],
-            content: msgData['content'] ?? '',
-            timestamp:
-                DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
-            status: 'sent',
-          );
-
-          if (mounted) {
-            setState(() {
-              // vì reverse: true nên chèn ở đầu danh sách
-              _messages.insert(0, newMsg);
-            });
-          }
+        if (mounted) {
+          setState(() {
+            _messages.insert(0, newMsg);
+          });
         }
-      },
-      onError: (error) {
-        print("WebSocket Error: $error");
-      },
-    );
+      }
+    }, onError: (error) => print("WebSocket Error: $error"));
   }
 
   Future<void> _loadInitialData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final userId = await _secureStorageService.getUserId();
       if (!mounted) return;
@@ -136,11 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -158,10 +139,8 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       if (!mounted) return;
-
       setState(() {
         if (isInitial) _messages.clear();
-
         if (newMessages.isEmpty) {
           _hasMore = false;
         } else {
@@ -183,91 +162,45 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _onScroll() {
     if (_isLoadingMore) return;
-
     final position = _scrollController.position;
-    final threshold = 200.0; // Vùng đệm để trigger load sớm hơn
+    final threshold = 200.0;
 
-    // Load thêm khi scroll gần đến đỉnh
     if (_hasMore && position.pixels >= position.maxScrollExtent - threshold) {
       _loadMessages();
     }
 
-    // Hiển thị thông báo khi đã ở đỉnh
-    // `position.atEdge` is true at both ends. For a reversed list, the top is where `pixels > 0`.
     if (!_hasMore && position.atEdge && position.pixels > 0) {
       if (mounted && !_showReachedTopNotification) {
-        setState(() {
-          _showReachedTopNotification = true;
-        });
-        // Hide the notification after 3 seconds
+        setState(() => _showReachedTopNotification = true);
         Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() {
-              _showReachedTopNotification = false;
-            });
-          }
-        });
-      }
-    }
-  }
-
-  void _sendMessage() async {
-    if (_textController.text.trim().isEmpty || _conversationId == null) return;
-
-    final content = {'type': 'text', 'content': _textController.text.trim()};
-    _textController.clear();
-
-    _performSend(content);
-  }
-
-  void _performSend(Map<String, dynamic> content) async {
-    // 1️⃣ Tạo message tạm thời với status pending
-    final tempMessage = Message(
-      id: _uuid.v4(),
-      conversationId: _conversationId!,
-      senderId: _currentUserId!,
-      content: content,
-      timestamp: DateTime.now(),
-      status: 'pending',
-    );
-
-    setState(() {
-      _messages.insert(0, tempMessage);
-    });
-
-    try {
-      // 2️⃣ Gửi lên server
-      final sentMessage = await _messageService.sendMessage(
-        _conversationId!,
-        content,
-        _currentUserId!,
-      );
-
-      // 3️⃣ Cập nhật trạng thái thành sent
-      if (mounted) {
-        setState(() {
-          final index = _messages.indexWhere((msg) => msg.id == tempMessage.id);
-          if (index != -1) {
-            _messages[index] = sentMessage.copyWith(status: 'sent');
-          }
-        });
-      }
-    } catch (_) {
-      // Nếu gửi thất bại, đánh dấu failed
-      if (mounted) {
-        setState(() {
-          final index = _messages.indexWhere((msg) => msg.id == tempMessage.id);
-          if (index != -1) {
-            _messages[index] = tempMessage.copyWith(status: 'failed');
-          }
+          if (mounted) setState(() => _showReachedTopNotification = false);
         });
       }
     }
   }
 
   void _playAudio(String url) async {
-    await _audioPlayer.stop();
+    // 👇 Nếu đang phát cùng audio thì dừng lại
+    if (_currentlyPlayingUrl == url) {
+      await _audioPlayer.stop();
+      setState(() => _currentlyPlayingUrl = null);
+      return;
+    }
+
+    // 👇 Nếu đang phát cái khác thì dừng trước
+    if (_currentlyPlayingUrl != null) {
+      await _audioPlayer.stop();
+    }
+
+    setState(() => _currentlyPlayingUrl = url);
+
     await _audioPlayer.play(UrlSource(url));
+
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() => _currentlyPlayingUrl = null);
+      }
+    });
   }
 
   @override
@@ -281,31 +214,8 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.call_outlined, color: Colors.white),
-            onPressed: () {
-              // TODO: Thực hiện cuộc gọi thoại
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined, color: Colors.white),
-            onPressed: () {
-              // TODO: Thực hiện cuộc gọi video
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.white),
-            onPressed: () {
-              // TODO: Hiển thị chi tiết cuộc trò chuyện
-            },
-          ),
-          const SizedBox(width: 8), // khoảng cách cuối
-        ],
       ),
       backgroundColor: const Color.fromARGB(255, 232, 233, 235),
       body: Stack(
@@ -342,237 +252,48 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: Center(child: CircularProgressIndicator()),
                             );
                           }
+
                           final message = _messages[index];
                           final isMe = message.senderId == _currentUserId;
-                          return _buildMessage(message, isMe);
+
+                          if (message.content['type'] == 'audio') {
+                            final url = message.content['content'];
+                            final isPlaying = _currentlyPlayingUrl == url;
+
+                            return AudioMessageBubble(
+                              message: message,
+                              isMe: isMe,
+                              isPlaying: isPlaying,
+                              onPlay: () => _playAudio(url),
+                            );
+                          } else {
+                            return TextMessageBubble(
+                              message: message,
+                              isMe: isMe,
+                            );
+                          }
                         },
                       ),
               ),
-              _buildMessageComposer(),
+              MessageComposer(
+                onSend: (content) => MessageUtils.performSend(
+                  context,
+                  _messageService,
+                  _uuid,
+                  _messages,
+                  _conversationId!,
+                  _currentUserId!,
+                  content,
+                  (updatedMessages) => setState(() {
+                    _messages
+                      ..clear()
+                      ..addAll(updatedMessages);
+                  }),
+                ),
+              ),
             ],
           ),
-          // Animated notification widget
-          AnimatedOpacity(
-            opacity: _showReachedTopNotification ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 300),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              color: const Color.fromARGB(255, 8, 235, 57).withOpacity(0.7),
-              child: const Text(
-                'Bạn đã đến đỉnh',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ),
-          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMessage(Message message, bool isMe) {
-    final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
-    final bubbleColor = isMe
-        ? (message.status == 'pending'
-              ? const Color.fromARGB(255, 255, 255, 255)
-              : message.status == 'failed'
-              ? Colors.redAccent
-              : const Color.fromARGB(255, 165, 85, 240))
-        : const Color.fromARGB(255, 255, 255, 255);
-    final textColor = isMe ? Colors.white : Colors.black87;
-
-    final timeString =
-        "${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}";
-
-    Widget messageContent;
-    if (message.content['type'] == 'audio') {
-      messageContent = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: isMe ? Colors.white : Color.fromARGB(255, 165, 85, 240),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: Icon(
-                  Icons.play_arrow,
-                  color: isMe
-                      ? Color.fromARGB(255, 165, 85, 240)
-                      : Colors.white,
-                  size: 18,
-                ),
-                onPressed: () => _playAudio(message.content['content']),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.graphic_eq,
-              color: isMe
-                  ? const Color.fromARGB(255, 196, 191, 196)
-                  : Color.fromARGB(255, 165, 85, 240),
-              size: 20,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                'Tin nhắn thoại',
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      );
-    } else {
-      messageContent = Text(
-        message.content['content'] ?? '',
-        style: TextStyle(color: textColor, fontSize: 15),
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: alignment,
-      children: [
-        if (!isMe)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundImage:
-                  (message.avatarUrl != null && message.avatarUrl!.isNotEmpty)
-                  ? NetworkImage(message.avatarUrl!)
-                  : const NetworkImage(
-                      'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
-                    ),
-            ),
-          ),
-        Flexible(
-          child: IntrinsicWidth(
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: isMe
-                      ? const Radius.circular(16)
-                      : const Radius.circular(4),
-                  bottomRight: isMe
-                      ? const Radius.circular(4)
-                      : const Radius.circular(16),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  messageContent,
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        timeString,
-                        style: TextStyle(
-                          color: isMe ? Colors.white70 : Colors.grey[600],
-                          fontSize: 11,
-                        ),
-                      ),
-                      if (isMe && message.status != 'sent')
-                        Icon(
-                          message.status == 'pending'
-                              ? Icons.schedule
-                              : Icons.error,
-                          size: 14,
-                          color: Colors.white70,
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMessageComposer() {
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(8.0),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          boxShadow: [
-            BoxShadow(
-              offset: const Offset(0, -1),
-              blurRadius: 2,
-              color: Colors.grey.withOpacity(0.1),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: () {},
-              child: const Icon(
-                Icons.emoji_emotions_outlined,
-                color: Color(0xFF7C3AED),
-              ),
-            ),
-            SizedBox(width: 8),
-            InkWell(
-              onTap: () {},
-              child: const Icon(Icons.photo_outlined, color: Color(0xFF7C3AED)),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _textController,
-                decoration: const InputDecoration.collapsed(
-                  hintText: 'Tin nhắn',
-                ),
-                textCapitalization: TextCapitalization.sentences,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.mic, color: Color(0xFF7C3AED)),
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  backgroundColor: Colors.white,
-                  isDismissible: false, // chặn tap ra ngoài
-                  enableDrag: false, // chặn kéo xuống
-                  builder: (_) => VoiceRecorderWidget(
-                    onSend: (path) {
-                      Navigator.pop(context);
-                      final content = {'type': 'audio', 'content': path};
-                      _performSend(content);
-                    },
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.send, color: Color(0xFF7C3AED)),
-              onPressed: _sendMessage,
-            ),
-          ],
-        ),
       ),
     );
   }

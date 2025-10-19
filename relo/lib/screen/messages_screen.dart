@@ -171,8 +171,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             lastMessage = 'Bạn: [Hình ảnh]';
           } else {
             lastMessage =
-                'Bạn: ' + conversation['lastMessage']?['content']['content'] ??
-                'Chưa có tin nhắn';
+                'Bạn: ${conversation['lastMessage']?['content']['content'] ?? ''}';
           }
         } else {
           if (conversation['lastMessage']?['content']['type'] == 'audio') {
