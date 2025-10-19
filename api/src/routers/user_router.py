@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from typing import List
 from ..services import UserService
 from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate, UserSearchResult
@@ -21,6 +21,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         displayName=current_user.displayName,
         avatarUrl=current_user.avatarUrl,
+        backgroundUrl=current_user.backgroundUrl,
         bio=current_user.bio
     )
 
@@ -232,4 +233,6 @@ async def debug_current_user(current_user: User = Depends(get_current_user)):
         "backgroundUrl": current_user.backgroundUrl,
         "username": current_user.username,
         "email": current_user.email,
+        "avatarPublicId": getattr(current_user, "avatarPublicId", None),
+        "backgroundPublicId": getattr(current_user, "backgroundPublicId", None),
     }

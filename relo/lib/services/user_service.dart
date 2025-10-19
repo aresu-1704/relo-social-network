@@ -157,23 +157,43 @@ class UserService {
     }
   }
 
-  // Cập nhật avatar
-  Future<void> updateAvatar(String base64Image) async {
+  // Cập nhật avatar và trả về user data mới
+  Future<User?> updateAvatar(String base64Image) async {
     try {
-      await _dio.put('users/me', data: {
+      final response = await _dio.put('users/me', data: {
         'avatarBase64': base64Image,
       });
+      
+      // Server should return updated user data
+      if (response.statusCode == 200) {
+        // Fetch updated user data
+        return await getMe();
+      }
+      return null;
+    } on DioException catch (e) {
+      print('Error updating avatar: ${e.response?.data}');
+      throw Exception('Không thể cập nhật ảnh đại diện: ${e.message}');
     } catch (e) {
       throw Exception('Không thể cập nhật ảnh đại diện: $e');
     }
   }
 
-  // Cập nhật ảnh bìa
-  Future<void> updateBackground(String base64Image) async {
+  // Cập nhật ảnh bìa và trả về user data mới
+  Future<User?> updateBackground(String base64Image) async {
     try {
-      await _dio.put('users/me', data: {
+      final response = await _dio.put('users/me', data: {
         'backgroundBase64': base64Image,
       });
+      
+      // Server should return updated user data
+      if (response.statusCode == 200) {
+        // Fetch updated user data
+        return await getMe();
+      }
+      return null;
+    } on DioException catch (e) {
+      print('Error updating background: ${e.response?.data}');
+      throw Exception('Không thể cập nhật ảnh bìa: ${e.message}');
     } catch (e) {
       throw Exception('Không thể cập nhật ảnh bìa: $e');
     }

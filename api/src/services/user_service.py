@@ -316,92 +316,133 @@ class UserService:
     @staticmethod
     async def update_user(user_id: str, user_update: UserUpdate):
         """
-        Cập nhật thông tin người dùng, bao gồm cả upload avatar lên Cloudinary.
+        Cập nhật thông tin người dùng, bao gồm cả upload avatar và background lên Cloudinary.
         """
         user = await User.get(user_id)
         if not user:
             raise ValueError("Không tìm thấy người dùng.")
 
         update_data = user_update.model_dump(exclude_unset=True)
-        print(f"DEBUG: Received update data: {update_data}")
+        print(f"DEBUG: Received update data keys: {list(update_data.keys())}")
 
-        # Ảnh đại diện
-        if "avatarBase64" in update_data and update_data["avatarBase64"]:
-            try:
+        tmp_avatar_path = None
+        tmp_background_path = None
+
+        try:
+            # 1️⃣ Upload Avatar lên Cloudinary
+            if "avatarBase64" in update_data and update_data["avatarBase64"]:
+                print("DEBUG: Processing avatar upload...")
                 avatar_data = update_data["avatarBase64"]
+                
+                # Giải mã base64
                 if "," in avatar_data:
-                    # Format: data:image/jpeg;base64,<base64_string>
-                    image_bytes = base64.b64decode(avatar_data.split(",")[1])
+                    header, data = avatar_data.split(",", 1)
+                    image_bytes = base64.b64decode(data)
                 else:
-                    # Format: <base64_string>
                     image_bytes = base64.b64decode(avatar_data)
 
+                print(f"DEBUG: Avatar decoded, size: {len(image_bytes)} bytes")
+
+                # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
-                    tmp_path = tmp.name
+                    tmp_avatar_path = tmp.name
 
-                # Xóa ảnh cũ nếu có (tùy chọn)
-                if getattr(user, "avatarPublicId", None):
-                    destroy(user.avatarPublicId)
+                print(f"DEBUG: Temp avatar file created at: {tmp_avatar_path}")
 
-                result = cloudinary_upload(tmp_path, folder="avatars")
+                # Xóa ảnh cũ nếu có
+                if user.avatarPublicId:
+                    print(f"DEBUG: Deleting old avatar: {user.avatarPublicId}")
+                    try:
+                        destroy(user.avatarPublicId)
+                    except Exception as e:
+                        print(f"WARNING: Could not delete old avatar: {e}")
+
+                # Upload lên Cloudinary
+                print("DEBUG: Uploading avatar to Cloudinary...")
+                result = cloudinary_upload(tmp_avatar_path, folder="avatars")
                 user.avatarUrl = result["secure_url"]
                 user.avatarPublicId = result["public_id"]
+                print(f"✅ Avatar uploaded successfully! URL: {user.avatarUrl}")
                 
                 # Clean up temp file
-                os.unlink(tmp_path)
+                os.unlink(tmp_avatar_path)
+                tmp_avatar_path = None
 
-            except Exception as e:
-                # Clean up temp file on error
-                if 'tmp_path' in locals():
-                    try:
-                        os.unlink(tmp_path)
-                    except:
-                        pass
-                raise ValueError(f"Lỗi xử lý ảnh: {e}")
-            
-        # Ảnh bìa
-        if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
-            try:
+            # 2️⃣ Upload Background lên Cloudinary
+            if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
+                print("DEBUG: Processing background upload...")
                 background_data = update_data["backgroundBase64"]
+                
+                # Giải mã base64
                 if "," in background_data:
-                    # Format: data:image/jpeg;base64,<base64_string>
-                    image_bytes = base64.b64decode(background_data.split(",")[1])
+                    header, data = background_data.split(",", 1)
+                    image_bytes = base64.b64decode(data)
                 else:
-                    # Format: <base64_string>
                     image_bytes = base64.b64decode(background_data)
 
+                print(f"DEBUG: Background decoded, size: {len(image_bytes)} bytes")
+
+                # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
-                    tmp_path = tmp.name
+                    tmp_background_path = tmp.name
 
-                # Xóa ảnh cũ nếu có (tùy chọn)
-                if getattr(user, "backgroundPublicId", None):
-                    destroy(user.backgroundPublicId)
+                print(f"DEBUG: Temp background file created at: {tmp_background_path}")
 
-                result = cloudinary_upload(tmp_path, folder="backgrounds")
+                # Xóa ảnh cũ nếu có
+                if user.backgroundPublicId:
+                    print(f"DEBUG: Deleting old background: {user.backgroundPublicId}")
+                    try:
+                        destroy(user.backgroundPublicId)
+                    except Exception as e:
+                        print(f"WARNING: Could not delete old background: {e}")
+
+                # Upload lên Cloudinary
+                print("DEBUG: Uploading background to Cloudinary...")
+                result = cloudinary_upload(tmp_background_path, folder="backgrounds")
                 user.backgroundUrl = result["secure_url"]
                 user.backgroundPublicId = result["public_id"]
+                print(f"✅ Background uploaded successfully! URL: {user.backgroundUrl}")
                 
                 # Clean up temp file
-                os.unlink(tmp_path)
+                os.unlink(tmp_background_path)
+                tmp_background_path = None
 
-            except Exception as e:
-                # Clean up temp file on error
-                if 'tmp_path' in locals():
-                    try:
-                        os.unlink(tmp_path)
-                    except:
-                        pass
-                raise ValueError(f"Lỗi xử lý ảnh: {e}")
+            # 3️⃣ Cập nhật các trường text
+            if "displayName" in update_data and update_data["displayName"]:
+                user.displayName = update_data["displayName"]
+                print(f"DEBUG: Updated displayName to: {user.displayName}")
+                
+            if "bio" in update_data:
+                user.bio = update_data["bio"] if update_data["bio"] else ""
+                print(f"DEBUG: Updated bio to: {user.bio}")
 
-        # 2️⃣ Cập nhật các trường text
-        if "displayName" in update_data:
-            user.displayName = update_data["displayName"]
-        if "bio" in update_data:
-            user.bio = update_data["bio"]
+            # 4️⃣ Lưu vào database
+            await user.save()
+            print(f"✅ User saved successfully!")
+            print(f"   - DisplayName: {user.displayName}")
+            print(f"   - Bio: {user.bio}")
+            print(f"   - AvatarURL: {user.avatarUrl}")
+            print(f"   - BackgroundURL: {user.backgroundUrl}")
+            
+            return user
 
-        # 3️⃣ Lưu lại
-        await user.save()
-        print(f"DEBUG: User saved successfully. DisplayName: {user.displayName}, Bio: {user.bio}")
-        return user
+        except Exception as e:
+            print(f"❌ ERROR in update_user: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Clean up temp files on error
+            if tmp_avatar_path and os.path.exists(tmp_avatar_path):
+                try:
+                    os.unlink(tmp_avatar_path)
+                except:
+                    pass
+            if tmp_background_path and os.path.exists(tmp_background_path):
+                try:
+                    os.unlink(tmp_background_path)
+                except:
+                    pass
+            
+            raise ValueError(f"Lỗi cập nhật thông tin: {str(e)}")
