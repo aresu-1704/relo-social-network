@@ -7,6 +7,10 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -47,6 +51,13 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _hasMore = true; // true: còn tin nhắn cũ, false: hết
   bool _showReachedTopNotification = false;
 
+  // Audio recording
+  final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isRecording = false;
+  String? _recordingPath;
+  bool _showRecordingView = false;
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +71,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     _textController.dispose();
     _webSocketSubscription?.cancel();
+    _audioRecorder.closeRecorder();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -253,12 +266,26 @@ class _ChatScreenState extends State<ChatScreen> {
   void _sendMessage() async {
     if (_textController.text.trim().isEmpty || _conversationId == null) return;
 
-    final content = {
-      'type': 'text',
-      'content': _textController.text.trim(),
-    }; //TODO: Chưa xử lý media
+    final content = {'type': 'text', 'content': _textController.text.trim()};
     _textController.clear();
 
+    _performSend(content);
+  }
+
+  void _sendVoiceMessage() async {
+    if (_recordingPath == null || _conversationId == null) return;
+
+    final content = {'type': 'audio', 'content': _recordingPath!};
+
+    _performSend(content);
+
+    setState(() {
+      _recordingPath = null;
+      _showRecordingView = false;
+    });
+  }
+
+  void _performSend(Map<String, dynamic> content) async {
     // 1️⃣ Tạo message tạm thời với status pending
     final tempMessage = Message(
       id: _uuid.v4(),
@@ -301,6 +328,50 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      var status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        print("Microphone permission denied");
+        return;
+      }
+
+      await _audioRecorder.openRecorder();
+
+      final tempDir = await getTemporaryDirectory();
+      _recordingPath = '${tempDir.path}/recording.aac';
+
+      await _audioRecorder.startRecorder(
+        toFile: _recordingPath!,
+        codec: Codec.aacADTS, // Có thể đổi sang Codec.opusWebM nếu cần
+        bitRate: 128000,
+        sampleRate: 44100,
+      );
+
+      setState(() {
+        _isRecording = true;
+      });
+    } catch (e) {
+      print('Error starting recording: $e');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      await _audioRecorder.stopRecorder();
+      await _audioRecorder.closeRecorder();
+      setState(() {
+        _isRecording = false;
+      });
+    } catch (e) {
+      print('Error stopping recording: $e');
+    }
+  }
+
+  void _playAudio(String url) async {
+    await _audioPlayer.play(UrlSource(url));
   }
 
   @override
@@ -381,7 +452,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       ),
               ),
-              _buildMessageComposer(),
+              _showRecordingView
+                  ? _buildRecordingView()
+                  : _buildMessageComposer(),
             ],
           ),
           // Animated notification widget
@@ -411,12 +484,31 @@ class _ChatScreenState extends State<ChatScreen> {
               ? const Color.fromARGB(255, 255, 255, 255)
               : message.status == 'failed'
               ? Colors.redAccent
-              : const Color(0xFF7A2FC0))
+              : const Color.fromARGB(255, 165, 85, 240))
         : const Color.fromARGB(255, 255, 255, 255);
     final textColor = isMe ? Colors.white : Colors.black87;
 
     final timeString =
         "${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}";
+
+    Widget messageContent;
+    if (message.content['type'] == 'audio') {
+      messageContent = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.play_arrow, color: textColor),
+            onPressed: () => _playAudio(message.content['content']),
+          ),
+          Text('Voice Message', style: TextStyle(color: textColor)),
+        ],
+      );
+    } else {
+      messageContent = Text(
+        message.content['content'] ?? '',
+        style: TextStyle(color: textColor, fontSize: 15),
+      );
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -456,10 +548,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.content['content'] ?? '', //TODO: Chưa xử lý media
-                    style: TextStyle(color: textColor, fontSize: 15),
-                  ),
+                  messageContent,
                   const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -529,8 +618,61 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             IconButton(
+              icon: const Icon(Icons.mic, color: Color(0xFF7C3AED)),
+              onPressed: () {
+                setState(() {
+                  _showRecordingView = true;
+                });
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.send, color: Color(0xFF7C3AED)),
               onPressed: _sendMessage,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecordingView() {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          boxShadow: [
+            BoxShadow(
+              offset: const Offset(0, -1),
+              blurRadius: 2,
+              color: Colors.grey.withOpacity(0.1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.cancel, color: Colors.red),
+              onPressed: () {
+                setState(() {
+                  _showRecordingView = false;
+                  _recordingPath = null;
+                });
+              },
+            ),
+            IconButton(
+              icon: Icon(
+                _isRecording ? Icons.stop : Icons.mic,
+                color: Color(0xFF7C3AED),
+              ),
+              onPressed: _isRecording ? _stopRecording : _startRecording,
+            ),
+            IconButton(
+              icon: const Icon(Icons.send, color: Color(0xFF7C3AED)),
+              onPressed: (_recordingPath != null && !_isRecording)
+                  ? _sendVoiceMessage
+                  : null,
             ),
           ],
         ),

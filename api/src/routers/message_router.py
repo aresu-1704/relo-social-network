@@ -1,19 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
 from typing import List
 from ..services import MessageService, UserService
 from ..schemas import (
     ConversationCreate,
-    MessageCreate,
     ConversationPublic,
     MessagePublic,
-    SimpleMessagePublic,
     LastMessagePublic,
     ConversationWithParticipants,
+    SimpleMessagePublic
 )
 from ..schemas.user_schema import UserPublic
 from ..models import User, Conversation, Message
-from ..security import get_current_user, get_user_from_token
-from ..websocket import manager
+from ..security import get_current_user
 
 def map_conversation_to_public(convo: Conversation) -> ConversationPublic:
     return ConversationPublic(
@@ -88,24 +86,26 @@ async def get_user_conversations(
     return result
 
 
-@router.post("/conversations/{conversation_id}/messages", response_model=MessagePublic, status_code=201)
+@router.post("/conversations/{conversation_id}/messages")
 async def send_message(
     conversation_id: str,
-    message_data: MessageCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    type: str = Form(...),
+    file: UploadFile = File(None),
+    text: str = Form(None)
 ):
-    """Gửi một tin nhắn đến một cuộc trò chuyện cụ thể."""
-    try:
-        message = await MessageService.send_message(
-            sender_id=str(current_user.id),
-            conversation_id=conversation_id,
-            content=message_data.content
-        )
-        return map_message_to_public(message)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+    """
+    Nhận tin nhắn (text hoặc media) từ client và giao cho service xử lý.
+    """
+    content = {"type": type, "content": text}
+
+    message = await MessageService.send_message(
+        sender_id=str(current_user.id),
+        conversation_id=conversation_id,
+        content=content,
+        file=file  # chuyển file xuống Service
+    )
+    return map_message_to_public(message)
 
 @router.get("/conversations/{conversation_id}/messages", response_model=List[SimpleMessagePublic])
 async def get_conversation_messages(
