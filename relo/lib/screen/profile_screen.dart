@@ -200,17 +200,29 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       Navigator.pop(context); // Close loading
       
       if (updatedUser != null) {
+        // Clear cache of new URL to force reload
+        if (updatedUser.avatarUrl != null) {
+          await CachedNetworkImage.evictFromCache(updatedUser.avatarUrl!);
+          PaintingBinding.instance.imageCache.clear();
+          PaintingBinding.instance.imageCache.clearLiveImages();
+        }
+        
         setState(() {
           _user = updatedUser;
           _tempAvatarPath = null;
         });
         
-        // Precache new image
-        if (updatedUser.avatarUrl != null) {
-          await precacheImage(
-            CachedNetworkImageProvider(updatedUser.avatarUrl!),
-            context,
-          );
+        // Wait a bit then precache new image
+        await Future.delayed(Duration(milliseconds: 300));
+        if (updatedUser.avatarUrl != null && mounted) {
+          try {
+            await precacheImage(
+              CachedNetworkImageProvider(updatedUser.avatarUrl!),
+              context,
+            );
+          } catch (e) {
+            print('Precache failed: $e');
+          }
         }
         
         _showSuccess('Ảnh đại diện đã được cập nhật!');
@@ -283,17 +295,29 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       Navigator.pop(context); // Close loading
       
       if (updatedUser != null) {
+        // Clear cache of new URL to force reload
+        if (updatedUser.backgroundUrl != null) {
+          await CachedNetworkImage.evictFromCache(updatedUser.backgroundUrl!);
+          PaintingBinding.instance.imageCache.clear();
+          PaintingBinding.instance.imageCache.clearLiveImages();
+        }
+        
         setState(() {
           _user = updatedUser;
           _tempBackgroundPath = null;
         });
         
-        // Precache new image
-        if (updatedUser.backgroundUrl != null) {
-          await precacheImage(
-            CachedNetworkImageProvider(updatedUser.backgroundUrl!),
-            context,
-          );
+        // Wait a bit then precache new image
+        await Future.delayed(Duration(milliseconds: 300));
+        if (updatedUser.backgroundUrl != null && mounted) {
+          try {
+            await precacheImage(
+              CachedNetworkImageProvider(updatedUser.backgroundUrl!),
+              context,
+            );
+          } catch (e) {
+            print('Precache failed: $e');
+          }
         }
         
         _showSuccess('Ảnh bìa đã được cập nhật!');
@@ -694,6 +718,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   GestureDetector(
                     onTap: _isOwnProfile ? () => _showImageOptions(false) : null,
                     child: Container(
+                      key: ValueKey('background_${_user!.backgroundUrl}'),
                       height: 200,
                       decoration: BoxDecoration(
                         image: _tempBackgroundPath != null
@@ -769,6 +794,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                 Hero(
                                   tag: 'avatar_${_user!.id}',
                                   child: CircleAvatar(
+                                    key: ValueKey('avatar_${_user!.avatarUrl}'),
                                     radius: 45,
                                     backgroundColor: Colors.white,
                                     child: CircleAvatar(
