@@ -1,11 +1,12 @@
 import asyncio
 from ..models.conversation import Conversation, LastMessage
 from ..models.message import Message
-from ..models.user import User
 from ..websocket import manager
 from ..schemas.message_schema import ConversationPublic, LastMessagePublic, MessagePublic, SimpleMessagePublic
 from datetime import datetime
 from .user_service import UserService
+from ..utils import upload_to_cloudinary
+from fastapi import UploadFile
 
 # Các hàm trợ giúp để chuyển đổi các đối tượng mô hình thành từ điển để phát sóng
 def map_conversation_to_public_dict(convo: Conversation) -> dict:
@@ -55,18 +56,23 @@ class MessageService:
         return conversation
 
     @staticmethod
-    async def send_message(sender_id: str, conversation_id: str, content: dict):
+    async def send_message(sender_id: str, conversation_id: str, content: dict, file: UploadFile = None):
         """
-        Gửi một tin nhắn, lưu nó và phát nó đến những người tham gia được kết nối.
+        Gửi tin nhắn, upload file nếu có, lưu DB và phát tới người tham gia.
         """
         conversation = await Conversation.get(conversation_id)
         if not conversation:
             raise ValueError("Không tìm thấy cuộc trò chuyện.")
 
         if sender_id not in conversation.participantIds:
-            raise PermissionError("Người gửi không phải là người tham gia cuộc trò chuyện này.")
+            raise PermissionError("Người gửi không thuộc cuộc trò chuyện này.")
 
-        # Tạo và lưu tin nhắn
+        # 🧩 Nếu có file (image, video, voice) thì upload lên Cloudinary
+        if file:
+            upload_result = await upload_to_cloudinary(file)
+            content["content"] = upload_result["url"]
+
+        # 📨 Tạo và lưu tin nhắn
         message = Message(
             conversationId=conversation_id,
             senderId=sender_id,
@@ -74,36 +80,34 @@ class MessageService:
         )
         await message.save()
 
-        # Cập nhật tin nhắn cuối cùng và dấu thời gian của cuộc trò chuyện
+        # 🔁 Cập nhật lastMessage cho conversation
         conversation.lastMessage = LastMessage(
-            content=message.content, 
-            senderId=message.senderId, 
+            content=message.content,
+            senderId=message.senderId,
             createdAt=message.createdAt
         )
         conversation.updatedAt = datetime.utcnow()
+        conversation.seenIds = [sender_id]
         await conversation.save()
 
-        # Chuẩn bị dữ liệu để phát sóng
+        # 📡 Phát broadcast tin nhắn mới
         message_data = map_message_to_public_dict(message)
         conversation_data = map_conversation_to_public_dict(conversation)
 
-        # Phát sự kiện tin nhắn mới tới tất cả những người tham gia
-        broadcast_tasks = []
-        for user_id in conversation.participantIds:
-            event_payload = {
-                "type": "new_message",
-                "payload": {
-                    "message": message_data,
-                    "conversation": conversation_data
+        tasks = [
+            manager.broadcast_to_user(
+                uid,
+                {
+                    "type": "new_message",
+                    "payload": {"message": message_data, "conversation": conversation_data}
                 }
-            }
-            task = manager.broadcast_to_user(user_id, event_payload)
-            broadcast_tasks.append(task)
-        
-        await asyncio.gather(*broadcast_tasks)
+            )
+            for uid in conversation.participantIds
+        ]
+        await asyncio.gather(*tasks)
 
         return message
-
+    
     @staticmethod
     async def get_messages_for_conversation(conversation_id: str, user_id: str, limit: int = 50, skip: int = 0):
         """

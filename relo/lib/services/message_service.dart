@@ -64,33 +64,51 @@ class MessageService {
     }
   }
 
-  //Gửi tin nhắn
+  // Gửi tin nhắn
   Future<Message> sendMessage(
     String conversationId,
     Map<String, dynamic> content,
     String senderId,
   ) async {
-    // 1️⃣ Tạo message local với trạng thái pending
     final tempMessage = Message(
-      id: DateTime.now().millisecondsSinceEpoch.toString(), // ID tạm thời
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
       content: content,
-      senderId: senderId, // current user
+      senderId: senderId,
       conversationId: conversationId,
       timestamp: DateTime.now(),
       status: 'pending',
     );
 
-    // Lưu ngay vào SQLite
     await MessageDatabase.instance.create(tempMessage);
 
     try {
-      // 2️⃣ Gửi lên server
+      // 🧩 Xác định loại dữ liệu để tạo form tương ứng
+      FormData formData;
+
+      if (content['type'] == 'text') {
+        formData = FormData.fromMap({
+          'type': content['type'],
+          'text': content['content'],
+        });
+      } else {
+        // image / video / voice
+        final filePath = content['content']; // đường dẫn file local
+        final fileName = filePath.split('/').last;
+
+        formData = FormData.fromMap({
+          'type': content['type'],
+          'file': await MultipartFile.fromFile(filePath, filename: fileName),
+        });
+      }
+
+      // 🚀 Gửi form-data lên server
       final response = await _dio.post(
         'messages/conversations/$conversationId/messages',
-        data: {'content': content},
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
       );
 
-      // 3️⃣ Cập nhật trạng thái thành sent
+      // ✅ Cập nhật trạng thái thành sent
       final sentMessage = Message.fromJson(response.data);
       final updatedMessage = tempMessage.copyWith(
         id: sentMessage.id,
@@ -99,12 +117,12 @@ class MessageService {
       );
 
       await MessageDatabase.instance.update(updatedMessage);
-
       return updatedMessage;
     } catch (e) {
-      // 3️⃣ Gửi thất bại → status = failed
+      // ❌ Gửi thất bại
       final failedMessage = tempMessage.copyWith(status: 'failed');
       await MessageDatabase.instance.update(failedMessage);
+      print("Send message error: $e");
       return failedMessage;
     }
   }
