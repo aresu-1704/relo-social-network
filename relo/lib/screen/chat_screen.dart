@@ -7,10 +7,8 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
-import 'package:flutter_sound/flutter_sound.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:relo/widgets/voice_recorder_widget.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -52,11 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showReachedTopNotification = false;
 
   // Audio recording
-  final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isRecording = false;
-  String? _recordingPath;
-  bool _showRecordingView = false;
 
   @override
   void initState() {
@@ -71,7 +65,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     _textController.dispose();
     _webSocketSubscription?.cancel();
-    _audioRecorder.closeRecorder();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -132,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       if (_conversationId != null) {
-        await _fetchMessages(isInitial: true);
+        await _loadMessages(isInitial: true);
       } else {
         throw Exception("Could not establish a conversation.");
       }
@@ -151,8 +144,11 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _fetchMessages({bool isInitial = false}) async {
+  Future<void> _loadMessages({bool isInitial = false}) async {
     if (_conversationId == null) return;
+    if (!isInitial && (_isLoadingMore || !_hasMore)) return;
+
+    if (!isInitial) setState(() => _isLoadingMore = true);
 
     try {
       final newMessages = await _messageService.getMessages(
@@ -164,72 +160,24 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
 
       setState(() {
+        if (isInitial) _messages.clear();
+
         if (newMessages.isEmpty) {
           _hasMore = false;
-          return;
-        }
-
-        if (isInitial) {
-          _messages
-            ..clear()
-            ..addAll(newMessages);
-          _offset = newMessages.length; // Cập nhật offset = số tin đã load
         } else {
           _messages.insertAll(0, newMessages);
-          _offset += newMessages.length; // Tăng offset
-        }
-
-        // Nếu số tin nhắn trả về < limit => hết tin nhắn
-        if (newMessages.length < _limit) {
-          _hasMore = false;
+          _offset += newMessages.length;
+          if (newMessages.length < _limit) _hasMore = false;
         }
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch messages: ${e.toString()}')),
-        );
-      }
-    }
-  }
-
-  Future<void> _loadMoreMessages() async {
-    if (_isLoadingMore || _conversationId == null || !_hasMore) return;
-
-    setState(() => _isLoadingMore = true);
-
-    try {
-      final newMessages = await _messageService.getMessages(
-        _conversationId!,
-        offset: _offset,
-        limit: _limit,
-      );
-
-      if (!mounted) return;
-
-      if (newMessages.isEmpty) {
-        debugPrint('⚠️ No more messages to load.');
-        setState(() => _hasMore = false);
-        return;
-      }
-
-      setState(() {
-        _messages.insertAll(0, newMessages);
-        _offset += newMessages.length;
-
-        // Nếu số tin nhắn trả về < limit => hết tin nhắn
-        if (newMessages.length < _limit) {
-          _hasMore = false;
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load more: ${e.toString()}')),
+          SnackBar(content: Text('Failed to load messages: ${e.toString()}')),
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoadingMore = false);
+      if (!isInitial && mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -241,7 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Load thêm khi scroll gần đến đỉnh
     if (_hasMore && position.pixels >= position.maxScrollExtent - threshold) {
-      _loadMoreMessages();
+      _loadMessages();
     }
 
     // Hiển thị thông báo khi đã ở đỉnh
@@ -270,19 +218,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.clear();
 
     _performSend(content);
-  }
-
-  void _sendVoiceMessage() async {
-    if (_recordingPath == null || _conversationId == null) return;
-
-    final content = {'type': 'audio', 'content': _recordingPath!};
-
-    _performSend(content);
-
-    setState(() {
-      _recordingPath = null;
-      _showRecordingView = false;
-    });
   }
 
   void _performSend(Map<String, dynamic> content) async {
@@ -330,47 +265,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _startRecording() async {
-    try {
-      var status = await Permission.microphone.request();
-      if (status != PermissionStatus.granted) {
-        print("Microphone permission denied");
-        return;
-      }
-
-      await _audioRecorder.openRecorder();
-
-      final tempDir = await getTemporaryDirectory();
-      _recordingPath = '${tempDir.path}/recording.aac';
-
-      await _audioRecorder.startRecorder(
-        toFile: _recordingPath!,
-        codec: Codec.aacADTS, // Có thể đổi sang Codec.opusWebM nếu cần
-        bitRate: 128000,
-        sampleRate: 44100,
-      );
-
-      setState(() {
-        _isRecording = true;
-      });
-    } catch (e) {
-      print('Error starting recording: $e');
-    }
-  }
-
-  Future<void> _stopRecording() async {
-    try {
-      await _audioRecorder.stopRecorder();
-      await _audioRecorder.closeRecorder();
-      setState(() {
-        _isRecording = false;
-      });
-    } catch (e) {
-      print('Error stopping recording: $e');
-    }
-  }
-
   void _playAudio(String url) async {
+    await _audioPlayer.stop();
     await _audioPlayer.play(UrlSource(url));
   }
 
@@ -452,9 +348,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         },
                       ),
               ),
-              _showRecordingView
-                  ? _buildRecordingView()
-                  : _buildMessageComposer(),
+              _buildMessageComposer(),
             ],
           ),
           // Animated notification widget
@@ -493,15 +387,53 @@ class _ChatScreenState extends State<ChatScreen> {
 
     Widget messageContent;
     if (message.content['type'] == 'audio') {
-      messageContent = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: Icon(Icons.play_arrow, color: textColor),
-            onPressed: () => _playAudio(message.content['content']),
-          ),
-          Text('Voice Message', style: TextStyle(color: textColor)),
-        ],
+      messageContent = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: isMe ? Colors.white : Color.fromARGB(255, 165, 85, 240),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: Icon(
+                  Icons.play_arrow,
+                  color: isMe
+                      ? Color.fromARGB(255, 165, 85, 240)
+                      : Colors.white,
+                  size: 18,
+                ),
+                onPressed: () => _playAudio(message.content['content']),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.graphic_eq,
+              color: isMe
+                  ? const Color.fromARGB(255, 196, 191, 196)
+                  : Color.fromARGB(255, 165, 85, 240),
+              size: 20,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Tin nhắn thoại',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       );
     } else {
       messageContent = Text(
@@ -620,59 +552,24 @@ class _ChatScreenState extends State<ChatScreen> {
             IconButton(
               icon: const Icon(Icons.mic, color: Color(0xFF7C3AED)),
               onPressed: () {
-                setState(() {
-                  _showRecordingView = true;
-                });
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.white,
+                  isDismissible: false, // chặn tap ra ngoài
+                  enableDrag: false, // chặn kéo xuống
+                  builder: (_) => VoiceRecorderWidget(
+                    onSend: (path) {
+                      Navigator.pop(context);
+                      final content = {'type': 'audio', 'content': path};
+                      _performSend(content);
+                    },
+                  ),
+                );
               },
             ),
             IconButton(
               icon: const Icon(Icons.send, color: Color(0xFF7C3AED)),
               onPressed: _sendMessage,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecordingView() {
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(8.0),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          boxShadow: [
-            BoxShadow(
-              offset: const Offset(0, -1),
-              blurRadius: 2,
-              color: Colors.grey.withOpacity(0.1),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.cancel, color: Colors.red),
-              onPressed: () {
-                setState(() {
-                  _showRecordingView = false;
-                  _recordingPath = null;
-                });
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                _isRecording ? Icons.stop : Icons.mic,
-                color: Color(0xFF7C3AED),
-              ),
-              onPressed: _isRecording ? _stopRecording : _startRecording,
-            ),
-            IconButton(
-              icon: const Icon(Icons.send, color: Color(0xFF7C3AED)),
-              onPressed: (_recordingPath != null && !_isRecording)
-                  ? _sendVoiceMessage
-                  : null,
             ),
           ],
         ),

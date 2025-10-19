@@ -21,7 +21,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   final SecureStorageService _secureStorage = const SecureStorageService();
   StreamSubscription? _webSocketSubscription;
   String? _currentUserId;
-  
+
   bool _isLoading = true;
   List<dynamic> conversations = [];
 
@@ -164,13 +164,27 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         if (_currentUserId != null &&
             _currentUserId == conversation['lastMessage']?['senderId']) {
-          lastMessage =
-              'Bạn: ' + conversation['lastMessage']?['content']['content'] ??
-              'Chưa có tin nhắn'; //TODO: Chưa xử lý Media
+          if (conversation['lastMessage']?['content']['type'] == 'audio') {
+            lastMessage = 'Bạn: [Tin nhắn thoại]';
+          } else if (conversation['lastMessage']?['content']['type'] ==
+              'image') {
+            lastMessage = 'Bạn: [Hình ảnh]';
+          } else {
+            lastMessage =
+                'Bạn: ' + conversation['lastMessage']?['content']['content'] ??
+                'Chưa có tin nhắn';
+          }
         } else {
-          lastMessage =
-              conversation['lastMessage']?['content']['content'] ??
-              'Chưa có tin nhắn';
+          if (conversation['lastMessage']?['content']['type'] == 'audio') {
+            lastMessage = 'Bạn: [Tin nhắn thoại]';
+          } else if (conversation['lastMessage']?['content']['type'] ==
+              'image') {
+            lastMessage = 'Bạn: [Hình ảnh]';
+          } else {
+            lastMessage =
+                conversation['lastMessage']?['content']['content'] ??
+                'Chưa có tin nhắn';
+          }
         }
 
         final updatedAt = conversation['updatedAt'];
