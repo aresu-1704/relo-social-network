@@ -25,7 +25,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
     )
 
 # Cập nhật hồ sơ của người dùng hiện tại
-@router.put("/me", response_model=UserPublic)
+@router.put("/me")
 async def update_user_me(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user)
@@ -38,7 +38,16 @@ async def update_user_me(
             user_id=str(current_user.id),
             user_update=user_update
         )
-        return {"message": "Cập nhật thành công."}
+        return {
+            "message": "Cập nhật thành công.",
+            "user": {
+                "id": str(updated_user.id),
+                "displayName": updated_user.displayName,
+                "bio": updated_user.bio,
+                "avatarUrl": updated_user.avatarUrl,
+                "backgroundUrl": updated_user.backgroundUrl,
+            }
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -169,3 +178,58 @@ async def search_users(query: str = Query(..., min_length=1), current_user: User
         ]
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+# Kiểm tra trạng thái kết bạn
+@router.get("/{user_id}/friend-status")
+async def check_friend_status(user_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Kiểm tra trạng thái kết bạn giữa người dùng hiện tại và người dùng khác.
+    """
+    try:
+        status = await UserService.check_friend_status(str(current_user.id), user_id)
+        return {"status": status}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Hủy kết bạn
+@router.post("/{user_id}/unfriend", status_code=200)
+async def unfriend_user(user_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Hủy kết bạn với một người dùng.
+    """
+    try:
+        result = await UserService.unfriend_user(str(current_user.id), user_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Test endpoint để kiểm tra cập nhật profile
+@router.post("/test-update")
+async def test_update_profile(
+    test_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Test endpoint để kiểm tra dữ liệu cập nhật profile.
+    """
+    return {
+        "message": "Test successful",
+        "received_data": test_data,
+        "user_id": str(current_user.id)
+    }
+
+# Debug endpoint để kiểm tra dữ liệu user hiện tại
+@router.get("/debug-me")
+async def debug_current_user(current_user: User = Depends(get_current_user)):
+    """
+    Debug endpoint để kiểm tra dữ liệu user hiện tại trong database.
+    """
+    return {
+        "id": str(current_user.id),
+        "displayName": current_user.displayName,
+        "bio": current_user.bio,
+        "avatarUrl": current_user.avatarUrl,
+        "backgroundUrl": current_user.backgroundUrl,
+        "username": current_user.username,
+        "email": current_user.email,
+    }

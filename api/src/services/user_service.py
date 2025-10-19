@@ -1,4 +1,5 @@
 import asyncio
+import os
 from ..models import User
 from ..models import FriendRequest
 from ..schemas import UserUpdate
@@ -245,6 +246,74 @@ class UserService:
         return users
 
     @staticmethod
+    async def check_friend_status(user_id: str, target_user_id: str):
+        """
+        Kiểm tra trạng thái kết bạn giữa hai người dùng.
+        Trả về: 'friends', 'pending_sent', 'pending_received', 'none'
+        """
+        if user_id == target_user_id:
+            return 'self'
+        
+        # Lấy thông tin người dùng hiện tại
+        current_user = await User.get(user_id)
+        if not current_user:
+            raise ValueError("Không tìm thấy người dùng hiện tại.")
+        
+        # Kiểm tra xem đã là bạn bè chưa
+        if target_user_id in current_user.friendIds:
+            return 'friends'
+        
+        # Kiểm tra lời mời kết bạn
+        # Lời mời do user_id gửi cho target_user_id
+        sent_request = await FriendRequest.find_one({
+            "fromUserId": user_id,
+            "toUserId": target_user_id,
+            "status": "pending"
+        })
+        if sent_request:
+            return 'pending_sent'
+        
+        # Lời mời do target_user_id gửi cho user_id
+        received_request = await FriendRequest.find_one({
+            "fromUserId": target_user_id,
+            "toUserId": user_id,
+            "status": "pending"
+        })
+        if received_request:
+            return 'pending_received'
+        
+        return 'none'
+
+    @staticmethod
+    async def unfriend_user(user_id: str, friend_id: str):
+        """
+        Hủy kết bạn với một người dùng.
+        """
+        if user_id == friend_id:
+            raise ValueError("Không thể hủy kết bạn với chính mình.")
+        
+        # Lấy thông tin cả hai người dùng
+        user = await User.get(user_id)
+        friend = await User.get(friend_id)
+        
+        if not user or not friend:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Kiểm tra xem có phải bạn bè không
+        if friend_id not in user.friendIds:
+            raise ValueError("Người dùng này không phải là bạn bè của bạn.")
+        
+        # Xóa khỏi danh sách bạn bè của cả hai
+        user.friendIds.remove(friend_id)
+        friend.friendIds.remove(user_id)
+        
+        # Lưu thay đổi
+        await user.save()
+        await friend.save()
+        
+        return {"message": "Đã hủy kết bạn thành công."}
+
+    @staticmethod
     async def update_user(user_id: str, user_update: UserUpdate):
         """
         Cập nhật thông tin người dùng, bao gồm cả upload avatar lên Cloudinary.
@@ -253,13 +322,19 @@ class UserService:
         if not user:
             raise ValueError("Không tìm thấy người dùng.")
 
-        update_data = user_update.dict(exclude_unset=True)
+        update_data = user_update.model_dump(exclude_unset=True)
+        print(f"DEBUG: Received update data: {update_data}")
 
         # Ảnh đại diện
         if "avatarBase64" in update_data and update_data["avatarBase64"]:
             try:
-                data = update_data["avatarBase64"].split(",") if "," in update_data["avatarBase64"] else (None, update_data["avatarBase64"])
-                image_bytes = base64.b64decode(data)
+                avatar_data = update_data["avatarBase64"]
+                if "," in avatar_data:
+                    # Format: data:image/jpeg;base64,<base64_string>
+                    image_bytes = base64.b64decode(avatar_data.split(",")[1])
+                else:
+                    # Format: <base64_string>
+                    image_bytes = base64.b64decode(avatar_data)
 
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
@@ -272,15 +347,29 @@ class UserService:
                 result = cloudinary_upload(tmp_path, folder="avatars")
                 user.avatarUrl = result["secure_url"]
                 user.avatarPublicId = result["public_id"]
+                
+                # Clean up temp file
+                os.unlink(tmp_path)
 
             except Exception as e:
+                # Clean up temp file on error
+                if 'tmp_path' in locals():
+                    try:
+                        os.unlink(tmp_path)
+                    except:
+                        pass
                 raise ValueError(f"Lỗi xử lý ảnh: {e}")
             
         # Ảnh bìa
         if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
             try:
-                data = update_data["backgroundBase64"].split(",") if "," in update_data["backgroundBase64"] else (None, update_data["backgroundBase64"])
-                image_bytes = base64.b64decode(data)
+                background_data = update_data["backgroundBase64"]
+                if "," in background_data:
+                    # Format: data:image/jpeg;base64,<base64_string>
+                    image_bytes = base64.b64decode(background_data.split(",")[1])
+                else:
+                    # Format: <base64_string>
+                    image_bytes = base64.b64decode(background_data)
 
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
@@ -293,8 +382,17 @@ class UserService:
                 result = cloudinary_upload(tmp_path, folder="backgrounds")
                 user.backgroundUrl = result["secure_url"]
                 user.backgroundPublicId = result["public_id"]
+                
+                # Clean up temp file
+                os.unlink(tmp_path)
 
             except Exception as e:
+                # Clean up temp file on error
+                if 'tmp_path' in locals():
+                    try:
+                        os.unlink(tmp_path)
+                    except:
+                        pass
                 raise ValueError(f"Lỗi xử lý ảnh: {e}")
 
         # 2️⃣ Cập nhật các trường text
@@ -305,4 +403,5 @@ class UserService:
 
         # 3️⃣ Lưu lại
         await user.save()
+        print(f"DEBUG: User saved successfully. DisplayName: {user.displayName}, Bio: {user.bio}")
         return user
