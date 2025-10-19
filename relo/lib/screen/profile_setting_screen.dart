@@ -5,6 +5,8 @@ import 'package:relo/models/user.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/auth_service.dart';
 import 'default_screen.dart';
+import 'profile_screen.dart';
+import 'privacy_settings_screen.dart';
 
 class ProfileSettingScreen extends StatefulWidget {
   const ProfileSettingScreen({Key? key}) : super(key: key);
@@ -51,7 +53,12 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                 // Add more widgets here
                 InkWell(
                   onTap: () {
-                    //TODO: Mở giao diện trang cá nhân
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfileScreen(),
+                      ),
+                    );
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -179,7 +186,12 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
 
                 InkWell(
                   onTap: () {
-                    // TODO: Mở trang "Quyền riêng tư"
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PrivacySettingsScreen(),
+                      ),
+                    );
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(

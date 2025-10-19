@@ -136,4 +136,46 @@ class UserService {
       throw Exception('Failed to load pending friend requests: $e');
     }
   }
+
+  // Cập nhật thông tin profile người dùng
+  Future<void> updateProfile({
+    String? displayName,
+    String? bio,
+    String? avatarBase64,
+    String? backgroundBase64,
+  }) async {
+    try {
+      Map<String, dynamic> data = {};
+      if (displayName != null) data['displayName'] = displayName;
+      if (bio != null) data['bio'] = bio;
+      if (avatarBase64 != null) data['avatarBase64'] = avatarBase64;
+      if (backgroundBase64 != null) data['backgroundBase64'] = backgroundBase64;
+      
+      await _dio.put('users/me', data: data);
+    } catch (e) {
+      throw Exception('Không thể cập nhật hồ sơ: $e');
+    }
+  }
+
+  // Cập nhật avatar
+  Future<void> updateAvatar(String base64Image) async {
+    try {
+      await _dio.put('users/me', data: {
+        'avatarBase64': base64Image,
+      });
+    } catch (e) {
+      throw Exception('Không thể cập nhật ảnh đại diện: $e');
+    }
+  }
+
+  // Cập nhật ảnh bìa
+  Future<void> updateBackground(String base64Image) async {
+    try {
+      await _dio.put('users/me', data: {
+        'backgroundBase64': base64Image,
+      });
+    } catch (e) {
+      throw Exception('Không thể cập nhật ảnh bìa: $e');
+    }
+  }
 }
