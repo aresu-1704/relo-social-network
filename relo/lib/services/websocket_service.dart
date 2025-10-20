@@ -103,7 +103,7 @@ class WebSocketService {
   }
 
   void send(dynamic data) {
-    if (_channel != null && _channel!.sink != null) {
+    if (_channel != null) {
       _channel!.sink.add(jsonEncode(data));
     }
   }
