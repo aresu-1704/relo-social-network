@@ -51,7 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showReachedTopNotification = false;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
-  String? _currentlyPlayingUrl; // 👈 Theo dõi audio đang phát
+  String? _currentlyPlayingUrl;
 
   @override
   void initState() {
@@ -257,7 +257,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           final isMe = message.senderId == _currentUserId;
 
                           if (message.content['type'] == 'audio') {
-                            final url = message.content['content'];
+                            final url = message.content['url'];
                             final isPlaying = _currentlyPlayingUrl == url;
 
                             return AudioMessageBubble(

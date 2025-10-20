@@ -48,11 +48,18 @@ class MessageService {
   //Thêm hoặc tao cuộc trò chuyện
   Future<Map<String, dynamic>> getOrCreateConversation(
     List<String> participantIds,
+    bool isGroup,
+    String? name,
   ) async {
     try {
       final response = await _dio.post(
         'messages/conversations',
-        data: {'participant_ids': participantIds},
+        data: {
+          'participant_ids': participantIds,
+          'is_group': isGroup,
+          'name': name,
+        },
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
       return response.data;
     } on DioException catch (e) {
@@ -88,11 +95,11 @@ class MessageService {
       if (content['type'] == 'text') {
         formData = FormData.fromMap({
           'type': content['type'],
-          'text': content['content'],
+          'text': content['text'],
         });
       } else {
         // image / video / voice
-        final filePath = content['content']; // đường dẫn file local
+        final filePath = content['path']; // đường dẫn file local
         final fileName = filePath.split('/').last;
 
         formData = FormData.fromMap({

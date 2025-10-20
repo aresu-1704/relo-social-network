@@ -6,11 +6,13 @@ import 'package:relo/screen/main_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
-import 'package:intl/intl.dart';
 import 'package:relo/services/websocket_service.dart';
-import '../services/message_service.dart';
+import 'package:relo/services/message_service.dart';
+import 'package:relo/utils/format.dart';
 
 class MessagesScreen extends StatefulWidget {
+  const MessagesScreen({Key? key}) : super(key: key);
+
   @override
   _MessagesScreenState createState() => _MessagesScreenState();
 }
@@ -87,11 +89,17 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-        ? Center(child: CircularProgressIndicator())
-        : conversations.isEmpty
-        ? _buildEmptyState()
-        : _buildConversationList();
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final hasLastMessage = conversations.any((c) => c['lastMessage'] != null);
+
+    if (!hasLastMessage || conversations.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return _buildConversationList();
   }
 
   Widget _buildEmptyState() {
@@ -135,7 +143,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
         final participants = List<Map<String, dynamic>>.from(
           conversation['participants'],
         );
-        final isGroupChat = participants.length > 2;
 
         // Loại bỏ user hiện tại khỏi danh sách hiển thị
         final otherParticipants = participants
@@ -145,7 +152,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         String title;
         ImageProvider avatar;
 
-        if (isGroupChat) {
+        if (conversation['isGroup']) {
           // Group chat
           title =
               conversation['name'] ??
@@ -169,24 +176,34 @@ class _MessagesScreenState extends State<MessagesScreen> {
           } else if (conversation['lastMessage']?['content']['type'] ==
               'image') {
             lastMessage = 'Bạn: [Hình ảnh]';
+          } else if (conversation['lastMessage']?['content']['type'] ==
+              'video') {
+            lastMessage = 'Bạn: [Video]';
           } else {
             lastMessage =
-                'Bạn: ${conversation['lastMessage']?['content']['content'] ?? ''}';
+                'Bạn: ${conversation['lastMessage']?['content']['text'] ?? ''}';
           }
         } else {
           if (conversation['lastMessage']?['content']['type'] == 'audio') {
-            lastMessage = 'Bạn: [Tin nhắn thoại]';
+            lastMessage = '[Tin nhắn thoại]';
           } else if (conversation['lastMessage']?['content']['type'] ==
               'image') {
-            lastMessage = 'Bạn: [Hình ảnh]';
+            lastMessage = '[Hình ảnh]';
+          } else if (conversation['lastMessage']?['content']['type'] ==
+              'video') {
+            lastMessage = '[Video]';
           } else {
             lastMessage =
-                conversation['lastMessage']?['content']['content'] ??
+                conversation['lastMessage']?['content']['text'] ??
                 'Chưa có tin nhắn';
           }
         }
 
         final updatedAt = conversation['updatedAt'];
+
+        if (conversation['lastMessage'] == null) {
+          return const SizedBox.shrink();
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,7 +256,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
               ),
               trailing: updatedAt != null
                   ? Text(
-                      _formatZaloTime(updatedAt),
+                      Format.formatZaloTime(updatedAt),
                       style: TextStyle(
                         color: Colors.grey,
                         fontSize: 12,
@@ -262,7 +279,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   MaterialPageRoute(
                     builder: (context) => ChatScreen(
                       conversationId: conversation['id'],
-                      isGroup: isGroupChat,
+                      isGroup: conversation['isGroup'],
                       friendName: title,
                       memberIds: participants
                           .map((p) => p['id']?.toString() ?? '')
@@ -284,41 +301,5 @@ class _MessagesScreenState extends State<MessagesScreen> {
         );
       },
     );
-  }
-
-  String _formatZaloTime(dynamic updatedAt) {
-    try {
-      DateTime date;
-
-      if (updatedAt is int) {
-        // Nếu là timestamp (milliseconds)
-        date = DateTime.fromMillisecondsSinceEpoch(updatedAt);
-      } else if (updatedAt is String) {
-        date = DateTime.parse(updatedAt);
-      } else {
-        return '';
-      }
-
-      final now = DateTime.now();
-      final diff = now.difference(date);
-
-      if (diff.inMinutes < 1) {
-        return 'Vừa xong';
-      } else if (diff.inMinutes < 60) {
-        return '${diff.inMinutes} phút trước';
-      } else if (diff.inHours < 24) {
-        return '${diff.inHours} giờ trước';
-      } else if (diff.inDays == 1) {
-        return 'Hôm qua';
-      } else if (diff.inDays < 7) {
-        return '${diff.inDays} ngày trước';
-      } else {
-        // Nếu quá 7 ngày, chỉ hiển thị ngày/tháng
-        return DateFormat('dd/MM').format(date);
-      }
-    } catch (e) {
-      print('Lỗi format thời gian: $e');
-      return '';
-    }
   }
 }

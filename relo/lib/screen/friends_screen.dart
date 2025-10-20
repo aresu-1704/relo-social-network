@@ -198,9 +198,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
       onTap: () async {
         try {
           // Gọi API get_or_create_conversation (tự xử lý trong backend)
-          final conversation = await _messageService.getOrCreateConversation([
-            friend.id,
-          ]);
+          final conversation = await _messageService.getOrCreateConversation(
+            [friend.id],
+            false,
+            null,
+          );
 
           if (conversation.isEmpty || conversation['id'] == null) {
             ScaffoldMessenger.of(context).showSnackBar(

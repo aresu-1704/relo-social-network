@@ -12,7 +12,7 @@ class MessageComposer extends StatelessWidget {
 
     void sendMessage() {
       if (textController.text.trim().isEmpty) return;
-      final content = {'type': 'text', 'content': textController.text.trim()};
+      final content = {'type': 'text', 'text': textController.text.trim()};
       textController.clear();
       onSend(content);
     }
@@ -56,7 +56,7 @@ class MessageComposer extends StatelessWidget {
                   builder: (_) => VoiceRecorderWidget(
                     onSend: (path) {
                       Navigator.pop(context);
-                      final content = {'type': 'audio', 'content': path};
+                      final content = {'type': 'audio', 'path': path};
                       onSend(content);
                     },
                   ),

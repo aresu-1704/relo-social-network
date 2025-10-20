@@ -73,7 +73,7 @@ class TextMessageBubble extends StatelessWidget {
               children: [
                 // 💬 Nội dung
                 Text(
-                  message.content['content'] ?? '',
+                  message.content['text'] ?? '',
                   style: TextStyle(color: textColor, fontSize: 15, height: 1.3),
                 ),
                 const SizedBox(height: 4),

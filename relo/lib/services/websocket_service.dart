@@ -88,12 +88,10 @@ class WebSocketService {
           _streamController.add(data);
         },
         onDone: () async {
-          print('WebSocket connection done.');
           await _handleDisconnect();
         },
         onError: (error) async {
           _streamController.addError(error);
-          print('WebSocket error: $error');
           await _handleDisconnect();
         },
       );

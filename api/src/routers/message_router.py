@@ -1,35 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
 from typing import List
-from ..services import MessageService, UserService
+from ..services import MessageService
 from ..schemas import (
     ConversationCreate,
     ConversationPublic,
-    MessagePublic,
-    LastMessagePublic,
     ConversationWithParticipants,
     SimpleMessagePublic
 )
-from ..schemas.user_schema import UserPublic
-from ..models import User, Conversation, Message
+from ..models import User
 from ..security import get_current_user
+from ..utils import map_conversation_to_public_dict, map_message_to_public_dict
 
-def map_conversation_to_public(convo: Conversation) -> ConversationPublic:
-    return ConversationPublic(
-        id=str(convo.id),
-        participantIds=convo.participantIds,
-        lastMessage=LastMessagePublic(**convo.lastMessage.model_dump()) if convo.lastMessage else None,
-        updatedAt=convo.updatedAt,
-        seenIds=convo.seenIds
-    )
 
-def map_message_to_public(msg: Message) -> MessagePublic:
-    return MessagePublic(
-        id=str(msg.id),
-        conversationId=msg.conversationId,
-        senderId=msg.senderId,
-        content=msg.content,
-        createdAt=msg.createdAt
-    )
 
 router = APIRouter(tags=["Chat"])
 
@@ -43,8 +25,12 @@ async def get_or_create_conversation(
     participant_ids.add(str(current_user.id))
     
     try:
-        conversation = await MessageService.get_or_create_conversation(list(participant_ids))
-        return map_conversation_to_public(conversation)
+        conversation = await MessageService.get_or_create_conversation(
+            participant_ids=list(participant_ids),
+            is_group=convo_data.is_group,
+            name=convo_data.name
+        )
+        return map_conversation_to_public_dict(conversation)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -56,34 +42,8 @@ async def get_user_conversations(
     convos = await MessageService.get_conversations_for_user(
         user_id=str(current_user.id),
     )
-    
-    result = []
-    
-    for convo in convos:
-        # Lấy thông tin chi tiết của những người tham gia
-        participants = await UserService.get_users_by_ids(convo.participantIds)
-        
-        # Chuyển đổi sang UserPublic
-        participant_publics = [
-            UserPublic(
-                id=str(p.id),
-                username=p.username,
-                email=p.email,
-                displayName=p.displayName
-            ) for p in participants
-        ]
-        
-        # Tạo đối tượng ConversationWithParticipants
-        convo_with_participants = ConversationWithParticipants(
-            id=str(convo.id),
-            participants=participant_publics,  # ✅ Dùng list đã convert
-            lastMessage=LastMessagePublic(**convo.lastMessage.model_dump()) if convo.lastMessage else None,
-            updatedAt=convo.updatedAt,
-            seenIds=convo.seenIds
-        )
-        result.append(convo_with_participants)
-        
-    return result
+
+    return convos
 
 
 @router.post("/conversations/{conversation_id}/messages")
@@ -97,7 +57,10 @@ async def send_message(
     """
     Nhận tin nhắn (text hoặc media) từ client và giao cho service xử lý.
     """
-    content = {"type": type, "content": text}
+    if type == "text":
+        content = {"type": type, "text": text}
+    else:
+        content = {"type": type, "url": None}
 
     message = await MessageService.send_message(
         sender_id=str(current_user.id),
@@ -105,7 +68,7 @@ async def send_message(
         content=content,
         file=file  # chuyển file xuống Service
     )
-    return map_message_to_public(message)
+    return map_message_to_public_dict(message)
 
 @router.get("/conversations/{conversation_id}/messages", response_model=List[SimpleMessagePublic])
 async def get_conversation_messages(
