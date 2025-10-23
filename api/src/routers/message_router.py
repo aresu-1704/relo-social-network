@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
-from typing import List
+from typing import List, Optional
 from ..services import MessageService
 from ..schemas import (
     ConversationCreate,
@@ -51,22 +51,24 @@ async def send_message(
     conversation_id: str,
     current_user: User = Depends(get_current_user),
     type: str = Form(...),
-    file: UploadFile = File(None),
+    files: Optional[List[UploadFile]] = None,
     text: str = Form(None)
 ):
     """
     Nhận tin nhắn (text hoặc media) từ client và giao cho service xử lý.
     """
-    if type == "text":
+    if type == "text": #Tin nhắn văn bản
         content = {"type": type, "text": text}
-    else:
+    elif type == "audio": #Tin nhắn thoại
         content = {"type": type, "url": None}
+    else: #Tin nhắn hình ảnh, video
+        content = {"type": type, "urls": None}
 
     message = await MessageService.send_message(
         sender_id=str(current_user.id),
         conversation_id=conversation_id,
         content=content,
-        file=file  # chuyển file xuống Service
+        files=files
     )
     return map_message_to_public_dict(message)
 

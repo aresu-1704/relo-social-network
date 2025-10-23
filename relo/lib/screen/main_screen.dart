@@ -4,6 +4,7 @@ import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 import 'profile_setting_screen.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -45,6 +46,7 @@ class MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        shadowColor: Colors.black,
         automaticallyImplyLeading: false,
         backgroundColor: Color(0xFF7A2FC0),
         elevation: 0,
@@ -110,21 +112,21 @@ class MainScreenState extends State<MainScreen> {
           },
           items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
+              icon: Icon(LucideIcons.messageCircle),
               label: 'Tin nhắn',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.article_outlined),
+              icon: Icon(LucideIcons.layoutGrid),
               label: 'Tường nhà',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.group_outlined),
+              icon: Icon(LucideIcons.users),
               label: 'Bạn bè',
             ),
             BottomNavigationBarItem(
               icon: Stack(
                 children: [
-                  Icon(Icons.notifications_none),
+                  Icon(LucideIcons.bell),
                   if (_notificationCount > 0)
                     Positioned(
                       top: 0,
@@ -151,7 +153,7 @@ class MainScreenState extends State<MainScreen> {
               label: 'Thông báo',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
+              icon: Icon(LucideIcons.user),
               label: 'Cá nhân',
             ),
           ],

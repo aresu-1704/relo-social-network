@@ -89,22 +89,26 @@ class MessageService {
     await MessageDatabase.instance.create(tempMessage);
 
     try {
-      // 🧩 Xác định loại dữ liệu để tạo form tương ứng
-      FormData formData;
+      FormData? formData;
 
       if (content['type'] == 'text') {
         formData = FormData.fromMap({
           'type': content['type'],
           'text': content['text'],
         });
-      } else {
-        // image / video / voice
-        final filePath = content['path']; // đường dẫn file local
-        final fileName = filePath.split('/').last;
-
+      } else if (content['type'] == 'audio') {
         formData = FormData.fromMap({
           'type': content['type'],
-          'file': await MultipartFile.fromFile(filePath, filename: fileName),
+          'files': await MultipartFile.fromFile(content['path']),
+        });
+      } else if (content['type'] == 'media') {
+        List<MultipartFile> files = [];
+        for (var filePath in content['paths']) {
+          files.add(await MultipartFile.fromFile(filePath));
+        }
+        formData = FormData.fromMap({
+          'type': content['type'],
+          'files': files,
         });
       }
 
@@ -126,7 +130,6 @@ class MessageService {
       await MessageDatabase.instance.update(updatedMessage);
       return updatedMessage;
     } catch (e) {
-      // ❌ Gửi thất bại
       final failedMessage = tempMessage.copyWith(status: 'failed');
       await MessageDatabase.instance.update(failedMessage);
       print("Send message error: $e");

@@ -41,7 +41,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   Future<void> _getCurrentUserId() async {
     _currentUserId = await _secureStorage.getUserId();
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _listenToWebSocket() {
@@ -174,11 +176,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
           if (conversation['lastMessage']?['content']['type'] == 'audio') {
             lastMessage = 'Bạn: [Tin nhắn thoại]';
           } else if (conversation['lastMessage']?['content']['type'] ==
-              'image') {
-            lastMessage = 'Bạn: [Hình ảnh]';
-          } else if (conversation['lastMessage']?['content']['type'] ==
-              'video') {
-            lastMessage = 'Bạn: [Video]';
+              'media') {
+            lastMessage = 'Bạn: [Đa phương tiện]';
           } else {
             lastMessage =
                 'Bạn: ${conversation['lastMessage']?['content']['text'] ?? ''}';
@@ -187,11 +186,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
           if (conversation['lastMessage']?['content']['type'] == 'audio') {
             lastMessage = '[Tin nhắn thoại]';
           } else if (conversation['lastMessage']?['content']['type'] ==
-              'image') {
-            lastMessage = '[Hình ảnh]';
-          } else if (conversation['lastMessage']?['content']['type'] ==
-              'video') {
-            lastMessage = '[Video]';
+              'media') {
+            lastMessage = '[Đa phương tiện]';
           } else {
             lastMessage =
                 conversation['lastMessage']?['content']['text'] ??

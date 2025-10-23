@@ -1,10 +1,10 @@
 import asyncio
+from datetime import datetime, timedelta
 from typing import List, Optional
 from ..models import Conversation, LastMessage, Message, ParticipantInfo
 from ..websocket import manager
 from ..schemas import SimpleMessagePublic, LastMessagePublic, ConversationWithParticipants
 from ..schemas.user_schema import UserPublic
-from datetime import datetime
 from .user_service import UserService
 from ..utils import upload_to_cloudinary
 from fastapi import UploadFile
@@ -50,7 +50,12 @@ class MessageService:
         return conversation
 
     @staticmethod
-    async def send_message(sender_id: str, conversation_id: str, content: dict, file: UploadFile = None):
+    async def send_message(
+        sender_id: str, 
+        conversation_id: str, 
+        content: dict, 
+        files: Optional[List[UploadFile]] = None
+    ):
         """
         Gửi tin nhắn, upload file nếu có, lưu DB và phát tới người tham gia.
         """
@@ -61,31 +66,37 @@ class MessageService:
         if sender_id not in [p.userId for p in conversation.participants]:
             raise PermissionError("Người gửi không thuộc cuộc trò chuyện này.");
 
-        # 🧩 Nếu có file (image, video, voice) thì upload lên Cloudinary
-        if file:
-            upload_result = await upload_to_cloudinary(file)
-            content["url"] = upload_result["url"]
+        if files:
+            if content['type'] == 'audio':
+                upload_tasks = [upload_to_cloudinary(f) for f in files]    
+                results = await asyncio.gather(*upload_tasks)
+                content["url"] = results[0]["url"]
+            else:
+                if content['type'] == 'media':
+                    upload_tasks = [upload_to_cloudinary(f) for f in files]    
+                    results = await asyncio.gather(*upload_tasks)
+                    content["urls"] = [result["url"] for result in results]
 
-        # 📨 Tạo và lưu tin nhắn
+        # Tạo và lưu tin nhắn
         message = Message(
             conversationId=conversation_id,
             senderId=sender_id,
             content=content,
-            createdAt=datetime.utcnow() + datetime.timedelta(hours=7)
+            createdAt=datetime.utcnow() + timedelta(hours=7)
         )
         await message.save()
 
-        # 🔁 Cập nhật lastMessage cho conversation
+        # Cập nhật lastMessage cho conversation
         conversation.lastMessage = LastMessage(
             content=message.content,
             senderId=message.senderId,
             createdAt=message.createdAt
         )
-        conversation.updatedAt = datetime.utcnow() + datetime.timedelta(hours=7)
+        conversation.updatedAt = datetime.utcnow() + timedelta(hours=7)
         conversation.seenIds = [sender_id]
         await conversation.save()
 
-        # 📡 Phát broadcast tin nhắn mới
+        # Phát broadcast tin nhắn mới
         message_data = map_message_to_public_dict(message)
         conversation_data = map_conversation_to_public_dict(conversation)
 
@@ -139,7 +150,7 @@ class MessageService:
             ).to_list()
         )
 
-        # 📋 Lấy người gửi để gắn thêm thông tin hiển thị
+        # Lấy người gửi để gắn thêm thông tin hiển thị
         sender_ids = list(set(msg.senderId for msg in messages))
         senders = await UserService.get_users_by_ids(sender_ids)
         senders_map = {str(s.id): s for s in senders}
