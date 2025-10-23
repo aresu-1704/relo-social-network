@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:relo/models/message.dart';
-import 'package:extended_image/extended_image.dart';
 import 'package:relo/screen/media_fullscreen_viewer.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
@@ -218,7 +217,6 @@ class _SingleMediaView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const maxWidth = 280.0;
-    const maxHeight = 400.0;
 
     if (isVideo) {
       return ClipRRect(

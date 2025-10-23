@@ -53,25 +53,79 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
     if (_selectedAssets.isEmpty) return;
 
     final List<File> files = [];
+    int totalSize = 0;
+
     for (final asset in _selectedAssets) {
       final file = await asset.file;
       if (file != null) {
+        final fileSize = await file.length(); // bytes
+        totalSize += fileSize;
         files.add(file);
       }
     }
+
+    const maxSize = 150 * 1024 * 1024; // 150 MB in bytes
+    if (totalSize > maxSize) {
+      _showAlertDialog(
+        "Tổng dung lượng file vượt quá 150MB, vui lòng chọn ít hơn",
+      );
+      return;
+    }
+
     widget.onPicked(files);
   }
 
+  Future<void> _showAlertDialog(String message) async {
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 16),
+        ),
+        actionsPadding: EdgeInsets.zero,
+        actions: [
+          const SizedBox(height: 18),
+          Divider(height: 1, thickness: 1, color: Colors.grey[400]),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "Ok",
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _toggleSelection(AssetEntity asset) {
-    setState(() {
-      if (_selectedAssets.contains(asset)) {
+    if (_selectedAssets.contains(asset)) {
+      setState(() {
         _selectedAssets.remove(asset);
-      } else {
-        if (_selectedAssets.length < 30) {
-          _selectedAssets.add(asset);
-        }
+      });
+    } else {
+      if (_selectedAssets.length >= 30) {
+        _showAlertDialog("Bạn chỉ có thể chọn tối đa 30 mục");
+        return;
       }
-    });
+      setState(() {
+        _selectedAssets.add(asset);
+      });
+    }
   }
 
   @override
@@ -149,10 +203,7 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
                                   ),
                                   Text(
                                     "Mở máy ảnh",
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    style: TextStyle(color: Colors.black),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -216,7 +267,7 @@ class AssetThumbnail extends StatelessWidget {
           if (isSelected)
             Container(
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF7C3AED), width: 2),
               ),
