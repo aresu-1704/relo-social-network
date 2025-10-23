@@ -44,6 +44,8 @@ dependencies:
   lucide_icons: ^0.257.0
   shimmer: ^3.0.0
   extended_image: ^8.2.1
+  camera: ^0.10.6
+  video_thumbnail: ^0.5.0
 
 dev_dependencies:
   flutter_test:

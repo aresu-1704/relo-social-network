@@ -1,12 +1,44 @@
+// file: media_message_bubble.dart
 import 'dart:io';
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:relo/models/message.dart';
-import 'package:video_player/video_player.dart';
 import 'package:extended_image/extended_image.dart';
 import 'package:relo/screen/media_fullscreen_viewer.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
+/// =================== GLOBAL CACHES ===================
+class VideoThumbnailCache {
+  VideoThumbnailCache._privateConstructor();
+  static final VideoThumbnailCache instance =
+      VideoThumbnailCache._privateConstructor();
+  final Map<String, Uint8List> _cache = {};
+
+  Uint8List? get(String url) => _cache[url];
+  void set(String url, Uint8List bytes) => _cache[url] = bytes;
+}
+
+class ImageCacheGlobal {
+  ImageCacheGlobal._private();
+  static final ImageCacheGlobal instance = ImageCacheGlobal._private();
+  final Map<String, ImageProvider> _cache = {};
+
+  ImageProvider? get(String url) => _cache[url];
+  void set(String url, ImageProvider provider) => _cache[url] = provider;
+}
+
+class ImageSizeCache {
+  ImageSizeCache._private();
+  static final ImageSizeCache instance = ImageSizeCache._private();
+  final Map<String, Size> _cache = {};
+
+  Size? get(String url) => _cache[url];
+  void set(String url, Size size) => _cache[url] = size;
+}
+
+/// =================== MAIN WIDGET ===================
 class MediaMessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
@@ -96,43 +128,26 @@ class MediaMessageBubble extends StatelessWidget {
   Widget _buildMediaLayout(BuildContext context, List<String> mediaUrls) {
     if (mediaUrls.isEmpty) return const SizedBox();
 
-    // 🖼 Một ảnh hoặc video
     if (mediaUrls.length == 1) {
       final url = mediaUrls.first;
       final isVideo = _isVideo(url);
-
       return GestureDetector(
         onTap: () {
           Navigator.push(
             context,
             PageRouteBuilder(
               opaque: false,
-              pageBuilder: (_, __, ___) => MediaFullScreenViewer(
-                mediaUrls: mediaUrls,
-                initialIndex: mediaUrls.indexOf(url),
-              ),
+              pageBuilder: (_, __, ___) =>
+                  MediaFullScreenViewer(mediaUrls: mediaUrls, initialIndex: 0),
               transitionsBuilder: (_, anim, __, child) =>
                   FadeTransition(opacity: anim, child: child),
             ),
           );
         },
-
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Opacity(
-              opacity: message.status == 'pending'
-                  ? 0.5
-                  : message.status == 'failed'
-                  ? 0.7
-                  : 1.0,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                transitionBuilder: (child, anim) =>
-                    FadeTransition(opacity: anim, child: child),
-                child: _SingleMediaView(url: url, isVideo: isVideo),
-              ),
-            ),
+            _SingleMediaView(url: url, isVideo: isVideo),
             if (message.status == 'pending')
               const Positioned.fill(
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -152,7 +167,6 @@ class MediaMessageBubble extends StatelessWidget {
       );
     }
 
-    // 🧱 Nhiều ảnh
     return GridView.builder(
       itemCount: mediaUrls.length,
       shrinkWrap: true,
@@ -173,16 +187,15 @@ class MediaMessageBubble extends StatelessWidget {
                 opaque: false,
                 pageBuilder: (_, __, ___) => MediaFullScreenViewer(
                   mediaUrls: mediaUrls,
-                  initialIndex: mediaUrls.indexOf(url),
+                  initialIndex: index,
                 ),
                 transitionsBuilder: (_, anim, __, child) =>
                     FadeTransition(opacity: anim, child: child),
               ),
             );
           },
-
           child: isVideo
-              ? _VideoThumbnail(url: url)
+              ? CachedVideoThumbnail(url: url)
               : _ImageThumbnail(url: url),
         );
       },
@@ -195,6 +208,7 @@ class MediaMessageBubble extends StatelessWidget {
   }
 }
 
+/// =================== SINGLE MEDIA VIEW ===================
 class _SingleMediaView extends StatelessWidget {
   final String url;
   final bool isVideo;
@@ -203,48 +217,68 @@ class _SingleMediaView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isNetwork = url.startsWith('http');
     const maxWidth = 280.0;
     const maxHeight = 400.0;
 
+    if (isVideo) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: CachedVideoThumbnail(url: url),
+        ),
+      );
+    }
+
+    final cachedSize = ImageSizeCache.instance.get(url);
+    if (cachedSize != null) {
+      return _buildImageWithSize(cachedSize);
+    }
+
     return FutureBuilder<Size>(
-      future: _getImageSize(url, isNetwork),
+      future: _getImageSize(url),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return _shimmerBox(width: maxWidth, height: 200);
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          ImageSizeCache.instance.set(url, snapshot.data!);
+          return _buildImageWithSize(snapshot.data!);
         }
-
-        final imageSize = snapshot.data!;
-        final aspectRatio = imageSize.width / imageSize.height;
-
-        double displayWidth;
-        double displayHeight;
-
-        if (aspectRatio < 0.8) {
-          displayHeight = maxHeight;
-          displayWidth = maxHeight * aspectRatio;
-        } else {
-          displayWidth = maxWidth;
-          displayHeight = maxWidth / aspectRatio;
-        }
-
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: SizedBox(
-            width: displayWidth,
-            height: displayHeight,
-            child: isVideo
-                ? _VideoThumbnail(url: url)
-                : _ImageThumbnail(url: url),
-          ),
-        );
+        return _shimmerBox(width: maxWidth, height: 200);
       },
     );
   }
 
-  Future<Size> _getImageSize(String url, bool isNetwork) async {
+  Widget _buildImageWithSize(Size size) {
+    const maxWidth = 280.0;
+    const maxHeight = 400.0;
+    double displayWidth, displayHeight;
+
+    final aspectRatio = size.width / size.height;
+    if (aspectRatio < 0.8) {
+      displayHeight = maxHeight;
+      displayWidth = maxHeight * aspectRatio;
+    } else {
+      displayWidth = maxWidth;
+      displayHeight = maxWidth / aspectRatio;
+    }
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      width: displayWidth,
+      height: displayHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: _ImageThumbnail(url: url),
+      ),
+    );
+  }
+
+  Future<Size> _getImageSize(String url) async {
     final completer = Completer<Size>();
-    final image = isNetwork ? Image.network(url) : Image.file(File(url));
+    final image = url.startsWith('http')
+        ? Image.network(url)
+        : Image.file(File(url));
 
     image.image
         .resolve(const ImageConfiguration())
@@ -274,6 +308,7 @@ class _SingleMediaView extends StatelessWidget {
   }
 }
 
+/// =================== IMAGE THUMBNAIL ===================
 class _ImageThumbnail extends StatelessWidget {
   final String url;
 
@@ -281,94 +316,127 @@ class _ImageThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isNetworkImage = url.startsWith('http');
+    final isNetwork = url.startsWith('http');
+    final cachedProvider = isNetwork
+        ? ImageCacheGlobal.instance.get(url)
+        : null;
+
+    final ImageProvider imageProvider =
+        cachedProvider ??
+        (isNetwork ? NetworkImage(url) : FileImage(File(url)));
+
+    if (isNetwork && cachedProvider == null) {
+      ImageCacheGlobal.instance.set(url, imageProvider);
+    }
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: isNetworkImage
-          ? ExtendedImage.network(
-              url,
-              fit: BoxFit.cover,
-              cache: true,
-              loadStateChanged: (state) {
-                if (state.extendedImageLoadState == LoadState.loading) {
-                  return Shimmer.fromColors(
-                    baseColor: Colors.grey[300]!,
-                    highlightColor: Colors.grey[100]!,
-                    child: Container(color: Colors.grey[300]),
-                  );
-                }
-                return null; // default display
-              },
-            )
-          : Image.file(
-              File(url),
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  const Icon(Icons.error, color: Colors.redAccent),
-            ),
+      child: Image(
+        image: imageProvider,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Shimmer.fromColors(
+            baseColor: Colors.grey[300]!,
+            highlightColor: Colors.grey[100]!,
+            child: Container(color: Colors.grey[300]),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.error, color: Colors.redAccent),
+      ),
     );
   }
 }
 
-class _VideoThumbnail extends StatefulWidget {
+/// =================== VIDEO THUMBNAIL ===================
+class CachedVideoThumbnail extends StatefulWidget {
   final String url;
 
-  const _VideoThumbnail({required this.url});
+  const CachedVideoThumbnail({super.key, required this.url});
 
   @override
-  State<_VideoThumbnail> createState() => _VideoThumbnailState();
+  State<CachedVideoThumbnail> createState() => _CachedVideoThumbnailState();
 }
 
-class _VideoThumbnailState extends State<_VideoThumbnail> {
-  late VideoPlayerController _controller;
+class _CachedVideoThumbnailState extends State<CachedVideoThumbnail>
+    with AutomaticKeepAliveClientMixin {
+  Uint8List? _bytes;
 
   @override
   void initState() {
     super.initState();
-    final isNetworkVideo = widget.url.startsWith('http');
-
-    _controller = isNetworkVideo
-        ? VideoPlayerController.network(widget.url)
-        : VideoPlayerController.file(File(widget.url));
-
-    _controller.initialize().then((_) => setState(() {}));
+    _loadThumbnail();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  Future<void> _loadThumbnail() async {
+    final cached = VideoThumbnailCache.instance.get(widget.url);
+    if (cached != null) {
+      setState(() => _bytes = cached);
+      return;
+    }
+
+    try {
+      final bytes = await VideoThumbnail.thumbnailData(
+        video: widget.url,
+        imageFormat: ImageFormat.PNG,
+        maxWidth: 280,
+        quality: 75,
+      );
+      if (!mounted) return;
+
+      if (bytes != null) {
+        VideoThumbnailCache.instance.set(widget.url, bytes);
+      }
+
+      setState(() => _bytes = bytes);
+    } catch (_) {
+      // ignore lỗi thumbnail
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (_controller.value.isInitialized)
-            FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: _controller.value.size.width,
-                height: _controller.value.size.height,
-                child: VideoPlayer(_controller),
-              ),
-            )
-          else
-            Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(color: Colors.grey[300]),
-            ),
-          Container(color: Colors.black.withOpacity(0.3)),
-          const Center(
-            child: Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
+    super.build(context);
+
+    if (_bytes == null) {
+      return Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(10),
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.memory(
+            _bytes!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ),
+        ),
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.black38,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.play_arrow, color: Colors.white, size: 30),
+        ),
+      ],
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }

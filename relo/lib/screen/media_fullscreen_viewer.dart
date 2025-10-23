@@ -1,8 +1,11 @@
+// file: media_fullscreen_viewer.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:extended_image/extended_image.dart';
-import 'package:shimmer/shimmer.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:dio/dio.dart';
 
 class MediaFullScreenViewer extends StatefulWidget {
   final List<String> mediaUrls;
@@ -21,6 +24,7 @@ class MediaFullScreenViewer extends StatefulWidget {
 class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
   late PageController _pageController;
   late int _currentIndex;
+  bool _isDownloading = false;
 
   @override
   void initState() {
@@ -32,6 +36,75 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
   bool _isVideo(String url) {
     final ext = url.split('.').last.toLowerCase();
     return ['mp4', 'mov', 'avi', 'mkv'].contains(ext);
+  }
+
+  Future<void> _downloadCurrentMedia() async {
+    final url = widget.mediaUrls[_currentIndex];
+
+    setState(() => _isDownloading = true);
+
+    try {
+      // Yêu cầu quyền lưu
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.request();
+        if (!status.isGranted) throw Exception('Permission denied');
+      }
+
+      final dir = Platform.isAndroid
+          ? Directory('/storage/emulated/0/Download')
+          : await getApplicationDocumentsDirectory();
+
+      final fileName = url.split('/').last;
+      final filePath = '${dir.path}/$fileName';
+
+      final dio = Dio();
+      await dio.download(url, filePath);
+
+      if (!mounted) return;
+
+      setState(() => _isDownloading = false);
+
+      // Thông báo nhỏ kiểu Zalo
+      _showToast(context, 'Đã tải xuống');
+    } catch (e) {
+      setState(() => _isDownloading = false);
+      _showToast(context, 'Tải xuống thất bại');
+    }
+  }
+
+  void _showToast(BuildContext context, String msg) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 50,
+        left: 50,
+        right: 50,
+        child: Material(
+          color: Colors.transparent,
+          child: AnimatedOpacity(
+            opacity: 1.0,
+            duration: const Duration(milliseconds: 300),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(221, 160, 158, 158),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                msg,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+    Future.delayed(
+      const Duration(seconds: 2),
+    ).then((_) => overlayEntry.remove());
   }
 
   @override
@@ -80,6 +153,28 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
             ),
           ),
 
+          // Nút tải xuống
+          Positioned(
+            top: 40,
+            right: 20,
+            child: _isDownloading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black45,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.download,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      onPressed: _downloadCurrentMedia,
+                    ),
+                  ),
+          ),
+
           // Hiển thị vị trí ảnh/video
           Positioned(
             bottom: 40,
@@ -94,7 +189,7 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
   }
 }
 
-/// Ảnh có shimmer khi loading
+/// Ảnh
 class _ImageViewer extends StatelessWidget {
   final String url;
   const _ImageViewer({required this.url});
@@ -107,46 +202,11 @@ class _ImageViewer extends StatelessWidget {
           : ExtendedFileImageProvider(File(url)),
       fit: BoxFit.contain,
       mode: ExtendedImageMode.gesture,
-      loadStateChanged: (state) {
-        switch (state.extendedImageLoadState) {
-          case LoadState.loading:
-            return Shimmer.fromColors(
-              baseColor: Colors.grey.shade800,
-              highlightColor: Colors.grey.shade600,
-              child: Container(
-                color: Colors.grey.shade900,
-                width: double.infinity,
-                height: double.infinity,
-              ),
-            );
-          case LoadState.completed:
-            return ExtendedRawImage(
-              image: state.extendedImageInfo?.image,
-              fit: BoxFit.contain,
-            );
-          case LoadState.failed:
-            return const Center(
-              child: Icon(Icons.error, color: Colors.redAccent, size: 50),
-            );
-        }
-      },
-      initGestureConfigHandler: (state) {
-        return GestureConfig(
-          minScale: 1.0,
-          maxScale: 4.0,
-          animationMinScale: 0.8,
-          animationMaxScale: 4.5,
-          speed: 1.0,
-          inertialSpeed: 100.0,
-          initialScale: 1.0,
-          inPageView: true,
-        );
-      },
     );
   }
 }
 
-/// Video có hiệu ứng điều khiển mượt mà
+/// Video
 class _VideoViewer extends StatefulWidget {
   final String url;
   const _VideoViewer({required this.url});
@@ -202,31 +262,22 @@ class _VideoViewerState extends State<_VideoViewer> {
               child: VideoPlayer(_controller),
             )
           else
-            Shimmer.fromColors(
-              baseColor: Colors.grey.shade800,
-              highlightColor: Colors.grey.shade600,
-              child: Container(
-                color: Colors.grey.shade900,
-                width: double.infinity,
-                height: double.infinity,
-              ),
+            Container(
+              color: Colors.grey.shade900,
+              width: double.infinity,
+              height: double.infinity,
             ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _showControls
-                ? IconButton(
-                    key: ValueKey(_controller.value.isPlaying),
-                    icon: Icon(
-                      _controller.value.isPlaying
-                          ? Icons.pause_circle
-                          : Icons.play_circle,
-                      color: Colors.white,
-                      size: 70,
-                    ),
-                    onPressed: _togglePlayPause,
-                  )
-                : const SizedBox.shrink(),
-          ),
+          if (_showControls)
+            IconButton(
+              icon: Icon(
+                _controller.value.isPlaying
+                    ? Icons.pause_circle
+                    : Icons.play_circle,
+                color: Colors.white,
+                size: 70,
+              ),
+              onPressed: _togglePlayPause,
+            ),
         ],
       ),
     );

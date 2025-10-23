@@ -181,14 +181,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _playAudio(String url) async {
-    // 👇 Nếu đang phát cùng audio thì dừng lại
     if (_currentlyPlayingUrl == url) {
       await _audioPlayer.stop();
       setState(() => _currentlyPlayingUrl = null);
       return;
     }
 
-    // 👇 Nếu đang phát cái khác thì dừng trước
     if (_currentlyPlayingUrl != null) {
       await _audioPlayer.stop();
     }

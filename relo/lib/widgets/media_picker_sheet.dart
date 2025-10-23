@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'package:relo/screen/camera_screen.dart';
 
 class MediaPickerSheet extends StatefulWidget {
   final void Function(List<File> files) onPicked;
@@ -121,18 +122,40 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
                         if (index == 0) {
                           // Camera button
                           return GestureDetector(
-                            onTap: () {
-                              // TODO: Open camera
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CameraScreen(),
+                                ),
+                              );
+                              if (result != null && result is File) {
+                                widget.onPicked([result]);
+                              }
                             },
                             child: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey[300],
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.black,
-                                size: 36,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.black,
+                                    size: 36,
+                                  ),
+                                  Text(
+                                    "Mở máy ảnh",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             ),
                           );
