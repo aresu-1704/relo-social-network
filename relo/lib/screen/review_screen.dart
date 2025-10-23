@@ -34,8 +34,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   void _downloadFile() async {
     setState(() => _isDownloading = true);
     try {
-      final dir =
-          await getExternalStorageDirectory(); // Lưu vào thư mục Downloads/Android
+      final dir = await getExternalStorageDirectory();
       final fileName = widget.file.path.split('/').last;
       final newPath = '${dir!.path}/$fileName';
       final newFile = await widget.file.copy(newPath);
