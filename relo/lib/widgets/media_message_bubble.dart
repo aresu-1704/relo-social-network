@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:relo/models/message.dart';
 import 'package:video_player/video_player.dart';
 import 'package:extended_image/extended_image.dart';
+import 'package:relo/screen/media_fullscreen_viewer.dart';
 
 class MediaMessageBubble extends StatelessWidget {
   final Message message;
@@ -102,8 +103,20 @@ class MediaMessageBubble extends StatelessWidget {
 
       return GestureDetector(
         onTap: () {
-          // TODO: mở full screen viewer
+          Navigator.push(
+            context,
+            PageRouteBuilder(
+              opaque: false,
+              pageBuilder: (_, __, ___) => MediaFullScreenViewer(
+                mediaUrls: mediaUrls,
+                initialIndex: mediaUrls.indexOf(url),
+              ),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
+            ),
+          );
         },
+
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -153,7 +166,21 @@ class MediaMessageBubble extends StatelessWidget {
         final url = mediaUrls[index];
         final isVideo = _isVideo(url);
         return GestureDetector(
-          onTap: () {},
+          onTap: () {
+            Navigator.push(
+              context,
+              PageRouteBuilder(
+                opaque: false,
+                pageBuilder: (_, __, ___) => MediaFullScreenViewer(
+                  mediaUrls: mediaUrls,
+                  initialIndex: mediaUrls.indexOf(url),
+                ),
+                transitionsBuilder: (_, anim, __, child) =>
+                    FadeTransition(opacity: anim, child: child),
+              ),
+            );
+          },
+
           child: isVideo
               ? _VideoThumbnail(url: url)
               : _ImageThumbnail(url: url),

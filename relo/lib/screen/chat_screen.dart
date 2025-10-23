@@ -222,13 +222,21 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Text(
                     widget.friendName ?? 'Chat',
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (widget.isGroup)
                     const Text(
                       'Nhóm trò chuyện',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                 ],
               ),
@@ -236,20 +244,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.call_outlined, color: Colors.white),
-            onPressed: () {
-              //TODO:
-            },
-            tooltip: 'Gọi thoại',
-          ),
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined, color: Colors.white),
-            onPressed: () {
-              //TODO:
-            },
-            tooltip: 'Gọi video',
-          ),
           IconButton(
             icon: const Icon(Icons.info_outline, color: Colors.white),
             onPressed: () {
