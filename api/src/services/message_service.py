@@ -1,62 +1,61 @@
 import asyncio
-from ..models.conversation import Conversation, LastMessage
-from ..models.message import Message
+from datetime import datetime, timedelta
+from typing import List, Optional
+from ..models import Conversation, LastMessage, Message, ParticipantInfo
 from ..websocket import manager
-from ..schemas.message_schema import ConversationPublic, LastMessagePublic, MessagePublic, SimpleMessagePublic
-from datetime import datetime
+from ..schemas import SimpleMessagePublic, LastMessagePublic, ConversationWithParticipants
+from ..schemas.user_schema import UserPublic
 from .user_service import UserService
 from ..utils import upload_to_cloudinary
 from fastapi import UploadFile
-
-# Các hàm trợ giúp để chuyển đổi các đối tượng mô hình thành từ điển để phát sóng
-def map_conversation_to_public_dict(convo: Conversation) -> dict:
-    """Chuyển đổi một mô hình Conversation thành một từ điển có thể tuần tự hóa JSON."""
-    public_convo = ConversationPublic(
-        id=str(convo.id),
-        participantIds=convo.participantIds,
-        lastMessage=LastMessagePublic(**convo.lastMessage.model_dump()) if convo.lastMessage else None,
-        updatedAt=convo.updatedAt,
-        seenIds=convo.seenIds
-    )
-    return public_convo.model_dump()
-
-def map_message_to_public_dict(msg: Message) -> dict:
-    """Chuyển đổi một mô hình Message thành một từ điển có thể tuần tự hóa JSON."""
-    public_msg = MessagePublic(
-        id=str(msg.id),
-        conversationId=msg.conversationId,
-        senderId=msg.senderId,
-        content=msg.content,
-        createdAt=msg.createdAt
-    )
-    return public_msg.model_dump()
-
+from ..utils import map_message_to_public_dict, map_conversation_to_public_dict
 
 class MessageService:
 
-    @staticmethod
-    async def get_or_create_conversation(participant_ids: list[str]):
+    async def get_or_create_conversation(
+        participant_ids: List[str],
+        is_group: bool = False,
+        name: Optional[str] = None,
+    ):
         """
-        Tìm một cuộc trò chuyện hiện có hoặc tạo một cuộc trò chuyện mới.
+        Tìm một cuộc trò chuyện hiện có hoặc tạo mới.
+        - Nếu là chat 1–1 => tìm chính xác 2 người.
+        - Nếu là group => luôn tạo mới (vì có thể có nhiều nhóm trùng thành viên).
         """
-        # Sắp xếp các ID để đảm bảo tính nhất quán cho các truy vấn
         canonical_participants = sorted(list(set(participant_ids)))
 
         if len(canonical_participants) < 2:
             raise ValueError("Một cuộc trò chuyện yêu cầu ít nhất hai người tham gia.")
 
-        # Tìm kiếm một cuộc trò chuyện với chính xác những người tham gia này
-        conversation = await Conversation.find_one({"participantIds": canonical_participants})
+        if not is_group:
+            # 🔍 Tìm chat 1–1 có đúng 2 user
+            conversation = await Conversation.find_one({
+                "participants": {"$size": len(canonical_participants)},
+                "participants.userId": {"$all": canonical_participants},
+                "isGroup": False
+            })
+        else:
+            # 🔍 Group chat luôn tạo mới
+            conversation = None
 
         if not conversation:
-            # Nếu không tìm thấy, hãy tạo một cuộc trò chuyện mới
-            conversation = Conversation(participantIds=canonical_participants)
-            await conversation.save()
-        
+            participants = [ParticipantInfo(userId=uid) for uid in canonical_participants]
+            conversation = Conversation(
+                participants=participants,
+                isGroup=is_group,
+                name=name,
+            )
+            await conversation.insert()
+
         return conversation
 
     @staticmethod
-    async def send_message(sender_id: str, conversation_id: str, content: dict, file: UploadFile = None):
+    async def send_message(
+        sender_id: str, 
+        conversation_id: str, 
+        content: dict, 
+        files: Optional[List[UploadFile]] = None
+    ):
         """
         Gửi tin nhắn, upload file nếu có, lưu DB và phát tới người tham gia.
         """
@@ -64,33 +63,40 @@ class MessageService:
         if not conversation:
             raise ValueError("Không tìm thấy cuộc trò chuyện.")
 
-        if sender_id not in conversation.participantIds:
-            raise PermissionError("Người gửi không thuộc cuộc trò chuyện này.")
+        if sender_id not in [p.userId for p in conversation.participants]:
+            raise PermissionError("Người gửi không thuộc cuộc trò chuyện này.");
 
-        # 🧩 Nếu có file (image, video, voice) thì upload lên Cloudinary
-        if file:
-            upload_result = await upload_to_cloudinary(file)
-            content["content"] = upload_result["url"]
+        if files:
+            if content['type'] == 'audio':
+                upload_tasks = [upload_to_cloudinary(f) for f in files]    
+                results = await asyncio.gather(*upload_tasks)
+                content["url"] = results[0]["url"]
+            else:
+                if content['type'] == 'media':
+                    upload_tasks = [upload_to_cloudinary(f) for f in files]    
+                    results = await asyncio.gather(*upload_tasks)
+                    content["urls"] = [result["url"] for result in results]
 
-        # 📨 Tạo và lưu tin nhắn
+        # Tạo và lưu tin nhắn
         message = Message(
             conversationId=conversation_id,
             senderId=sender_id,
-            content=content
+            content=content,
+            createdAt=datetime.utcnow() + timedelta(hours=7)
         )
         await message.save()
 
-        # 🔁 Cập nhật lastMessage cho conversation
+        # Cập nhật lastMessage cho conversation
         conversation.lastMessage = LastMessage(
             content=message.content,
             senderId=message.senderId,
             createdAt=message.createdAt
         )
-        conversation.updatedAt = datetime.utcnow()
+        conversation.updatedAt = datetime.utcnow() + timedelta(hours=7)
         conversation.seenIds = [sender_id]
         await conversation.save()
 
-        # 📡 Phát broadcast tin nhắn mới
+        # Phát broadcast tin nhắn mới
         message_data = map_message_to_public_dict(message)
         conversation_data = map_conversation_to_public_dict(conversation)
 
@@ -102,35 +108,53 @@ class MessageService:
                     "payload": {"message": message_data, "conversation": conversation_data}
                 }
             )
-            for uid in conversation.participantIds
+            for uid in [p.userId for p in conversation.participants]
         ]
         await asyncio.gather(*tasks)
 
         return message
     
     @staticmethod
-    async def get_messages_for_conversation(conversation_id: str, user_id: str, limit: int = 50, skip: int = 0):
+    async def get_messages_for_conversation(
+        conversation_id: str,
+        user_id: str,
+        limit: int = 50,
+        skip: int = 0
+    ):
         """
-        Lấy tất cả các tin nhắn cho một cuộc trò chuyện, xác minh người dùng là người tham gia.
+        Lấy tin nhắn cho một cuộc trò chuyện, chỉ gồm những tin nhắn sau khi user xóa (nếu có).
         """
         conversation = await Conversation.get(conversation_id)
-        if not conversation or user_id not in conversation.participantIds:
+        if not conversation:
+            raise PermissionError("Cuộc trò chuyện không tồn tại.")
+
+        # 🔍 Kiểm tra user có trong participant không
+        participant = next((p for p in conversation.participants if p.userId == user_id), None)
+        if not participant:
             raise PermissionError("Bạn không được phép xem cuộc trò chuyện này.")
 
-        # Lấy các tin nhắn cho cuộc trò chuyện, được sắp xếp theo mới nhất trước tiên
-        messages = await Message.find(
-            Message.conversationId == conversation_id, 
-            sort="-createdAt", 
-            skip=skip, 
-            limit=limit
-        ).to_list()
+        # 🔸 Thời điểm user này đã xóa tin nhắn (nếu có)
+        delete_time = participant.lastMessageDelete
 
-        # Lấy ID người gửi duy nhất từ các tin nhắn
+        # 🔎 Tạo điều kiện truy vấn tin nhắn
+        query = {"conversationId": conversation_id}
+        if delete_time:
+            query["createdAt"] = {"$gt": delete_time}
+
+        messages = (
+            await Message.find(
+                query,
+                sort="-createdAt",
+                skip=skip,
+                limit=limit
+            ).to_list()
+        )
+
+        # Lấy người gửi để gắn thêm thông tin hiển thị
         sender_ids = list(set(msg.senderId for msg in messages))
         senders = await UserService.get_users_by_ids(sender_ids)
         senders_map = {str(s.id): s for s in senders}
 
-        # Tạo các đối tượng tin nhắn đơn giản
         simple_messages = []
         for msg in messages:
             sender = senders_map.get(msg.senderId)
@@ -146,16 +170,68 @@ class MessageService:
 
         return simple_messages
 
+
     @staticmethod
     async def get_conversations_for_user(user_id: str):
         """
         Lấy tất cả các cuộc trò chuyện cho một người dùng cụ thể.
         """
-        # Lấy các cuộc trò chuyện cho người dùng, được sắp xếp theo hoạt động gần đây nhất
-        return await Conversation.find(
-            Conversation.participantIds == user_id, 
-            sort="-updatedAt", 
-        ).to_list()
+        convos = await Conversation.find(
+            {"participants.userId": user_id}
+        ).sort("-updatedAt").to_list()
+
+        result = []
+
+        for convo in convos:
+            # 🔍 Lấy participant info của current_user trong conversation này
+            participant_info = next(
+                (p for p in convo.participants if p.userId == str(user_id)),
+                None
+            )
+            delete_time = participant_info.lastMessageDelete if participant_info else None
+
+            # 📦 Lấy thông tin chi tiết của người tham gia
+            participants = await UserService.get_users_by_ids([p.userId for p in convo.participants])
+
+            participant_publics = [
+                UserPublic(
+                    id=str(p.id),
+                    username=p.username,
+                    email=p.email,
+                    displayName=p.displayName,
+                    avatarUrl=p.avatarUrl,
+                    backgroundUrl=p.backgroundUrl,
+                    bio=p.bio
+                )
+                for p in participants
+            ]
+
+            last_message_preview = None
+
+            if convo.lastMessage:
+                if delete_time and convo.lastMessage.createdAt <= delete_time:
+                    last_message_preview = None
+                else:
+                    last_message_preview = convo.lastMessage
+
+            convo_with_participants = ConversationWithParticipants(
+                id=str(convo.id),
+                participantsInfo=convo.participants,
+                participants=participant_publics,
+                lastMessage=(
+                    LastMessagePublic(**last_message_preview.model_dump())
+                    if last_message_preview
+                    else None
+                ),
+                updatedAt=convo.updatedAt,
+                seenIds=convo.seenIds,
+                isGroup=convo.isGroup,
+                name=convo.name,
+                avatarUrl=convo.avatarUrl,
+            )
+            result.append(convo_with_participants)
+
+        return result
     
     @staticmethod
     async def mark_conversation_as_seen(conversation_id: str, user_id: str):
@@ -163,7 +239,7 @@ class MessageService:
         Đánh dấu một cuộc trò chuyện là đã xem bởi người dùng cụ thể.
         """
         conversation = await Conversation.get(conversation_id)
-        if not conversation or user_id not in conversation.participantIds:
+        if not conversation or user_id not in [p.userId for p in conversation.participants]:
             raise PermissionError("Bạn không được phép xem cuộc trò chuyện này.")
 
         if user_id not in conversation.seenIds:

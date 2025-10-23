@@ -175,50 +175,52 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
         height: 240,
         padding: const EdgeInsets.all(25),
         color: Colors.white,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Text(
-              'Nhấn để bắt đầu ghi âm',
-              style: TextStyle(
-                color: Color(0xFF7A2FC0),
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 18),
-
-            // 🔊 Nếu đang ghi thì hiển thị sóng âm, ngược lại hiển thị nút mic
-            if (_isRecording)
-              _buildWaveform()
-            else
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: _isRecording
-                    ? const Color(0xFF7A2FC0)
-                    : Colors.grey[300],
-                child: IconButton(
-                  iconSize: 36,
-                  icon: const Icon(Icons.mic, color: Colors.white),
-                  onPressed: _startRecording,
-                ),
-              ),
-
-            const SizedBox(height: 12),
-
-            if (_isRecording)
-              Text(
-                _formatDuration(_seconds),
-                style: const TextStyle(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                'Nhấn để bắt đầu ghi âm',
+                style: TextStyle(
+                  color: Color(0xFF7A2FC0),
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF7A2FC0),
                 ),
               ),
+              const SizedBox(height: 18),
 
-            if (_isRecorded) _buildRecordedControls(context),
-          ],
+              // 🔊 Nếu đang ghi thì hiển thị sóng âm, ngược lại hiển thị nút mic
+              if (_isRecording)
+                _buildWaveform()
+              else
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: _isRecording
+                      ? const Color(0xFF7A2FC0)
+                      : Colors.grey[300],
+                  child: IconButton(
+                    iconSize: 36,
+                    icon: const Icon(Icons.mic, color: Colors.white),
+                    onPressed: _startRecording,
+                  ),
+                ),
+
+              const SizedBox(height: 12),
+
+              if (_isRecording)
+                Text(
+                  _formatDuration(_seconds),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF7A2FC0),
+                  ),
+                ),
+
+              if (_isRecorded) _buildRecordedControls(context),
+            ],
+          ),
         ),
       ),
     );

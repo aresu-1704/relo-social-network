@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:relo/widgets/audio_message_bubble.dart';
+import 'package:relo/widgets/media_message_bubble.dart';
 import 'package:relo/widgets/text_message_bubble.dart';
 import 'package:relo/widgets/message_composer.dart';
 import 'package:relo/utils/message_utils.dart';
@@ -51,7 +52,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showReachedTopNotification = false;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
-  String? _currentlyPlayingUrl; // 👈 Theo dõi audio đang phát
+  String? _currentlyPlayingUrl;
 
   @override
   void initState() {
@@ -180,14 +181,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _playAudio(String url) async {
-    // 👇 Nếu đang phát cùng audio thì dừng lại
     if (_currentlyPlayingUrl == url) {
       await _audioPlayer.stop();
       setState(() => _currentlyPlayingUrl = null);
       return;
     }
 
-    // 👇 Nếu đang phát cái khác thì dừng trước
     if (_currentlyPlayingUrl != null) {
       await _audioPlayer.stop();
     }
@@ -207,16 +206,52 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        shadowColor: Colors.black,
         backgroundColor: const Color(0xFF7A2FC0),
-        title: Text(
-          widget.friendName ?? 'Chat',
-          style: const TextStyle(color: Colors.white),
-        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.friendName ?? 'Chat',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (widget.isGroup)
+                    const Text(
+                      'Nhóm trò chuyện',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline, color: Colors.white),
+            onPressed: () {
+              //TODO:
+            },
+            tooltip: 'Xem chi tiết',
+          ),
+        ],
       ),
+
       backgroundColor: const Color.fromARGB(255, 232, 233, 235),
       body: Stack(
         children: [
@@ -256,8 +291,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           final message = _messages[index];
                           final isMe = message.senderId == _currentUserId;
 
-                          if (message.content['type'] == 'audio') {
-                            final url = message.content['content'];
+                          final messageType = message.content['type'];
+
+                          if (messageType == 'audio') {
+                            final url = message.content['url'];
                             final isPlaying = _currentlyPlayingUrl == url;
 
                             return AudioMessageBubble(
@@ -265,6 +302,11 @@ class _ChatScreenState extends State<ChatScreen> {
                               isMe: isMe,
                               isPlaying: isPlaying,
                               onPlay: () => _playAudio(url),
+                            );
+                          } else if (messageType == 'media') {
+                            return MediaMessageBubble(
+                              message: message,
+                              isMe: isMe,
                             );
                           } else {
                             return TextMessageBubble(

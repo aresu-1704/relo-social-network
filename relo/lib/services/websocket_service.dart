@@ -88,12 +88,10 @@ class WebSocketService {
           _streamController.add(data);
         },
         onDone: () async {
-          print('WebSocket connection done.');
           await _handleDisconnect();
         },
         onError: (error) async {
           _streamController.addError(error);
-          print('WebSocket error: $error');
           await _handleDisconnect();
         },
       );
@@ -105,7 +103,7 @@ class WebSocketService {
   }
 
   void send(dynamic data) {
-    if (_channel != null && _channel!.sink != null) {
+    if (_channel != null) {
       _channel!.sink.add(jsonEncode(data));
     }
   }

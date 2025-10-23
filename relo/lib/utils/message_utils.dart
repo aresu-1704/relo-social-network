@@ -43,9 +43,6 @@ class MessageUtils {
         messages[index] = tempMessage.copyWith(status: 'failed');
         updateMessages(List.from(messages));
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Gửi tin nhắn thất bại')));
     }
   }
 }

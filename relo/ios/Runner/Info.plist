@@ -47,5 +47,11 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Ứng dụng cần quyền truy cập vào thư viện để bạn có thể chọn và gửi ảnh.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Ứng dụng cần quyền truy cập vào máy ảnh để bạn có thể chụp và gửi ảnh.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Ứng dụng cần quyền truy cập vào micro để bạn có thể ghi và gửi tin nhắn thoại.</string>
 	</dict>
 </plist>
