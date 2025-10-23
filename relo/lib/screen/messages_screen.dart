@@ -255,7 +255,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       Format.formatZaloTime(updatedAt),
                       style: TextStyle(
                         color: Colors.grey,
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight:
                             (conversation['seenIds'] != null &&
                                 (conversation['seenIds'] as List).contains(

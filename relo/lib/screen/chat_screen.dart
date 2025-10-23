@@ -290,30 +290,72 @@ class _ChatScreenState extends State<ChatScreen> {
 
                           final message = _messages[index];
                           final isMe = message.senderId == _currentUserId;
+                          final previousMessage = index + 1 < _messages.length
+                              ? _messages[index + 1]
+                              : null;
 
+                          final widgets = <Widget>[];
+
+                          // Hiển thị timestamp nếu cần
+                          if (_shouldShowTimestamp(message, previousMessage)) {
+                            widgets.add(
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10.0,
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color.fromARGB(
+                                        255,
+                                        197,
+                                        197,
+                                        197,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      _formatTimestamp(message.timestamp),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          // Xác định loại tin nhắn
                           final messageType = message.content['type'];
-
                           if (messageType == 'audio') {
                             final url = message.content['url'];
                             final isPlaying = _currentlyPlayingUrl == url;
 
-                            return AudioMessageBubble(
-                              message: message,
-                              isMe: isMe,
-                              isPlaying: isPlaying,
-                              onPlay: () => _playAudio(url),
+                            widgets.add(
+                              AudioMessageBubble(
+                                message: message,
+                                isMe: isMe,
+                                isPlaying: isPlaying,
+                                onPlay: () => _playAudio(url),
+                              ),
                             );
                           } else if (messageType == 'media') {
-                            return MediaMessageBubble(
-                              message: message,
-                              isMe: isMe,
+                            widgets.add(
+                              MediaMessageBubble(message: message, isMe: isMe),
                             );
                           } else {
-                            return TextMessageBubble(
-                              message: message,
-                              isMe: isMe,
+                            widgets.add(
+                              TextMessageBubble(message: message, isMe: isMe),
                             );
                           }
+
+                          return Column(children: widgets);
                         },
                       ),
               ),
@@ -338,5 +380,24 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  bool _shouldShowTimestamp(Message current, Message? previous) {
+    if (previous == null)
+      return true; // Nếu là tin nhắn đầu tiên, hiển thị timestamp
+    final diff = current.timestamp.difference(previous.timestamp);
+    return diff.inMinutes >= 60; // Hiển thị nếu cách nhau >= 1 giờ
+  }
+
+  String _formatTimestamp(DateTime time) {
+    final now = DateTime.now();
+    if (time.year == now.year &&
+        time.month == now.month &&
+        time.day == now.day) {
+      // cùng ngày
+      return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
+    } else {
+      return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} ${time.day}/${time.month}/${time.year}";
+    }
   }
 }

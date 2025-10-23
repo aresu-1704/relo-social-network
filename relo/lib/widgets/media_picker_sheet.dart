@@ -267,11 +267,11 @@ class AssetThumbnail extends StatelessWidget {
           if (isSelected)
             Container(
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Colors.black.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF7C3AED), width: 2),
               ),
-              child: const Icon(Icons.check_circle, color: Colors.white),
+              child: const Icon(Icons.check_circle, color: Color(0xFF7C3AED)),
             ),
         ],
       ),
