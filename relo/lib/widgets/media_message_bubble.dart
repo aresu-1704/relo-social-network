@@ -1,4 +1,3 @@
-// file: media_message_bubble.dart
 import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';
@@ -7,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:relo/models/message.dart';
 import 'package:relo/screen/media_fullscreen_viewer.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:relo/widgets/message_status.dart';
 
 /// =================== GLOBAL CACHES ===================
 class VideoThumbnailCache {
@@ -41,11 +41,13 @@ class ImageSizeCache {
 class MediaMessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
+  final bool isLastFromMe;
 
   const MediaMessageBubble({
     super.key,
     required this.message,
     required this.isMe,
+    required this.isLastFromMe,
   });
 
   @override
@@ -57,69 +59,67 @@ class MediaMessageBubble extends StatelessWidget {
     final timeString =
         "${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}";
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: isMe
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
-        if (!isMe)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundImage:
-                  (message.avatarUrl != null && message.avatarUrl!.isNotEmpty)
-                  ? NetworkImage(message.avatarUrl!)
-                  : const NetworkImage(
-                      'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
-                    ),
-            ),
-          ),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: isMe
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.start,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 280),
-                child: _buildMediaLayout(context, mediaUrls),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment: isMe
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          children: [
+            if (!isMe)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundImage:
+                      (message.avatarUrl != null &&
+                          message.avatarUrl!.isNotEmpty)
+                      ? NetworkImage(message.avatarUrl!)
+                      : const NetworkImage(
+                          'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
+                        ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
+              ),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    child: _buildMediaLayout(context, mediaUrls),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 197, 197, 197),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
                       timeString,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.black87,
-                      ),
+                      style: const TextStyle(fontSize: 10, color: Colors.white),
                     ),
-                    if (isMe &&
-                        (message.status == 'pending' ||
-                            message.status == 'failed')) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        message.status == 'pending'
-                            ? Icons.access_time
-                            : Icons.error_outline,
-                        size: 13,
-                        color: Colors.black54,
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 5),
-            ],
-          ),
+            ),
+          ],
         ),
+
+        if (isMe && isLastFromMe)
+          Padding(
+            padding: const EdgeInsets.only(top: 1, right: 0),
+            child: MessageStatusWidget(message: message),
+          ),
       ],
     );
   }

@@ -1,4 +1,3 @@
-// file: media_fullscreen_viewer.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -6,6 +5,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
+import 'package:relo/utils/show_toast.dart';
 
 class MediaFullScreenViewer extends StatefulWidget {
   final List<String> mediaUrls;
@@ -65,46 +65,11 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
       setState(() => _isDownloading = false);
 
       // Thông báo nhỏ kiểu Zalo
-      _showToast(context, 'Đã tải xuống');
+      await showToast(context, 'Đã tải xuống');
     } catch (e) {
       setState(() => _isDownloading = false);
-      _showToast(context, 'Tải xuống thất bại');
+      await showToast(context, 'Tải xuống thất bại');
     }
-  }
-
-  void _showToast(BuildContext context, String msg) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        bottom: 50,
-        left: 50,
-        right: 50,
-        child: Material(
-          color: Colors.transparent,
-          child: AnimatedOpacity(
-            opacity: 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color.fromARGB(221, 160, 158, 158),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                msg,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-    Future.delayed(
-      const Duration(seconds: 2),
-    ).then((_) => overlayEntry.remove());
   }
 
   @override

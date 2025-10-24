@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:relo/screen/camera_screen.dart';
+import 'package:relo/utils/show_alert_dialog.dart';
 
 class MediaPickerSheet extends StatefulWidget {
   final void Function(List<File> files) onPicked;
@@ -26,8 +27,10 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
   Future<void> _fetchAssets() async {
     final permitted = await PhotoManager.requestPermissionExtend();
     if (!permitted.isAuth) {
-      // Handle permission denial
-      // Maybe show a message to the user
+      await showCustomAlertDialog(
+        context,
+        message: "Ứng dụng cần quyền truy cập ảnh và video để gửi tệp",
+      );
       PhotoManager.openSetting();
       return;
     }
@@ -39,7 +42,7 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
 
     final recentAssets = await albums.first.getAssetListRange(
       start: 0,
-      end: 100, // Load 100 recent items
+      end: 100,
     );
 
     if (mounted) {
@@ -66,8 +69,9 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
 
     const maxSize = 150 * 1024 * 1024; // 150 MB in bytes
     if (totalSize > maxSize) {
-      _showAlertDialog(
-        "Tổng dung lượng file vượt quá 150MB, vui lòng chọn ít hơn",
+      await showCustomAlertDialog(
+        context,
+        message: "Tổng dung lượng file vượt quá 150MB, vui lòng chọn ít hơn",
       );
       return;
     }
@@ -75,51 +79,17 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
     widget.onPicked(files);
   }
 
-  Future<void> _showAlertDialog(String message) async {
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        content: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16),
-        ),
-        actionsPadding: EdgeInsets.zero,
-        actions: [
-          const SizedBox(height: 18),
-          Divider(height: 1, thickness: 1, color: Colors.grey[400]),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "Ok",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _toggleSelection(AssetEntity asset) {
+  void _toggleSelection(AssetEntity asset) async {
     if (_selectedAssets.contains(asset)) {
       setState(() {
         _selectedAssets.remove(asset);
       });
     } else {
       if (_selectedAssets.length >= 30) {
-        _showAlertDialog("Bạn chỉ có thể chọn tối đa 30 mục");
+        await showCustomAlertDialog(
+          context,
+          message: "Chỉ được chọn tối đa 30 mục",
+        );
         return;
       }
       setState(() {

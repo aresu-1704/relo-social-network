@@ -8,11 +8,12 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:relo/widgets/audio_message_bubble.dart';
-import 'package:relo/widgets/media_message_bubble.dart';
-import 'package:relo/widgets/text_message_bubble.dart';
+import 'package:relo/widgets/message_list.dart';
 import 'package:relo/widgets/message_composer.dart';
 import 'package:relo/utils/message_utils.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:flutter/services.dart';
+import 'package:relo/utils/show_toast.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -202,6 +203,76 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _showMessageActions(Message message) {
+    final isMe = message.senderId == _currentUserId;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, -3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              if (message.content['type'] == 'text')
+                // Nút sao chép
+                _ActionButton(
+                  icon: LucideIcons.copy,
+                  label: 'Sao chép',
+                  color: const Color(0xFF4CAF50),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    Clipboard.setData(
+                      ClipboardData(text: message.content['text']),
+                    );
+                    await showToast(
+                      context,
+                      'Đã sao chép văn bản vào bộ nhớ tạm',
+                    );
+                  },
+                ),
+
+              // Nút chuyển tiếp
+              _ActionButton(
+                icon: LucideIcons.share2, // icon mới gọn, đẹp hơn
+                label: 'Chuyển tiếp',
+                color: const Color(0xFF2979FF),
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: logic chuyển tiếp
+                },
+              ),
+
+              // Nút thu hồi (chỉ hiện với tin nhắn của mình)
+              if (isMe)
+                _ActionButton(
+                  icon: LucideIcons.trash2,
+                  label: 'Thu hồi',
+                  color: const Color(0xFFFF5252),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: logic thu hồi
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -253,151 +324,132 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
 
       backgroundColor: const Color.fromARGB(255, 232, 233, 235),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _messages.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.message_outlined,
-                              size: 80,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 20),
-                            Text("Chưa có tin nhắn nào, hãy gửi một lời chào"),
-                          ],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _messages.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.message_outlined,
+                                size: 80,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 20),
+                              Text(
+                                "Chưa có tin nhắn nào, hãy gửi một lời chào",
+                              ),
+                            ],
+                          ),
+                        )
+                      : MessageList(
+                          messages: _messages,
+                          currentUserId: _currentUserId!,
+                          isLoadingMore: _isLoadingMore,
+                          hasMore: _hasMore,
+                          scrollController: _scrollController,
+                          currentlyPlayingUrl: _currentlyPlayingUrl,
+                          onPlayAudio: _playAudio,
+                          onMessageLongPress: _showMessageActions,
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.all(8.0),
-                        itemCount: _messages.length + (_isLoadingMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (_isLoadingMore && index == _messages.length) {
-                            return const Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Center(child: CircularProgressIndicator()),
-                            );
-                          }
-
-                          final message = _messages[index];
-                          final isMe = message.senderId == _currentUserId;
-                          final previousMessage = index + 1 < _messages.length
-                              ? _messages[index + 1]
-                              : null;
-
-                          final widgets = <Widget>[];
-
-                          // Hiển thị timestamp nếu cần
-                          if (_shouldShowTimestamp(message, previousMessage)) {
-                            widgets.add(
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10.0,
-                                ),
-                                child: Center(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color.fromARGB(
-                                        255,
-                                        197,
-                                        197,
-                                        197,
-                                      ),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      _formatTimestamp(message.timestamp),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-
-                          // Xác định loại tin nhắn
-                          final messageType = message.content['type'];
-                          if (messageType == 'audio') {
-                            final url = message.content['url'];
-                            final isPlaying = _currentlyPlayingUrl == url;
-
-                            widgets.add(
-                              AudioMessageBubble(
-                                message: message,
-                                isMe: isMe,
-                                isPlaying: isPlaying,
-                                onPlay: () => _playAudio(url),
-                              ),
-                            );
-                          } else if (messageType == 'media') {
-                            widgets.add(
-                              MediaMessageBubble(message: message, isMe: isMe),
-                            );
-                          } else {
-                            widgets.add(
-                              TextMessageBubble(message: message, isMe: isMe),
-                            );
-                          }
-
-                          return Column(children: widgets);
-                        },
-                      ),
-              ),
-              MessageComposer(
-                onSend: (content) => MessageUtils.performSend(
-                  context,
-                  _messageService,
-                  _uuid,
-                  _messages,
-                  _conversationId!,
-                  _currentUserId!,
-                  content,
-                  (updatedMessages) => setState(() {
-                    _messages
-                      ..clear()
-                      ..addAll(updatedMessages);
-                  }),
                 ),
+                MessageComposer(
+                  onSend: (content) => MessageUtils.performSend(
+                    context,
+                    _messageService,
+                    _uuid,
+                    _messages,
+                    _conversationId!,
+                    _currentUserId!,
+                    content,
+                    (updatedMessages) => setState(() {
+                      _messages
+                        ..clear()
+                        ..addAll(updatedMessages);
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Widget nút với hiệu ứng scale khi nhấn
+class _ActionButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton>
+    with SingleTickerProviderStateMixin {
+  double _scale = 1.0;
+
+  void _onTapDown(TapDownDetails details) {
+    setState(() => _scale = 0.9);
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    setState(() => _scale = 1.0);
+    widget.onTap();
+  }
+
+  void _onTapCancel() {
+    setState(() => _scale = 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedScale(
+            scale: _scale,
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOut,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: widget.color.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-            ],
+              child: Icon(widget.icon, size: 28, color: widget.color),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.label,
+            style: TextStyle(color: widget.color, fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
-  }
-
-  bool _shouldShowTimestamp(Message current, Message? previous) {
-    if (previous == null)
-      return true; // Nếu là tin nhắn đầu tiên, hiển thị timestamp
-    final diff = current.timestamp.difference(previous.timestamp);
-    return diff.inMinutes >= 60; // Hiển thị nếu cách nhau >= 1 giờ
-  }
-
-  String _formatTimestamp(DateTime time) {
-    final now = DateTime.now();
-    if (time.year == now.year &&
-        time.month == now.month &&
-        time.day == now.day) {
-      // cùng ngày
-      return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
-    } else {
-      return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} ${time.day}/${time.month}/${time.year}";
-    }
   }
 }

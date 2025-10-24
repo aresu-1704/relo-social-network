@@ -15,7 +15,7 @@ class MessageComposer extends StatefulWidget {
 class _MessageComposerState extends State<MessageComposer> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
-  String? _activeInput; // 'gallery', 'voice', or null
+  String? _activeInput;
 
   @override
   void initState() {
@@ -41,6 +41,7 @@ class _MessageComposerState extends State<MessageComposer> {
     final content = {'type': 'text', 'text': _textController.text.trim()};
     _textController.clear();
     widget.onSend(content);
+    _focusNode.unfocus();
   }
 
   void _toggleInput(String type) {
@@ -116,6 +117,7 @@ class _MessageComposerState extends State<MessageComposer> {
                         child: TextField(
                           controller: _textController,
                           focusNode: _focusNode,
+                          autofocus: false,
                           decoration: const InputDecoration.collapsed(
                             hintText: 'Tin nhắn',
                           ),

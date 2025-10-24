@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:relo/utils/show_alert_dialog.dart';
 
 class VoiceRecorderWidget extends StatefulWidget {
   final void Function(String path) onSend;
@@ -38,6 +39,18 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   }
 
   Future<void> _startRecording() async {
+    // 👉 Kiểm tra quyền micro trước khi ghi
+    final status = await Permission.microphone.request();
+
+    if (status.isDenied || status.isPermanentlyDenied) {
+      await showCustomAlertDialog(
+        context,
+        message: "Ứng dụng cần quyền truy cập micro để ghi âm",
+      );
+      openAppSettings(); // gợi ý: mở settings nếu bị từ chối vĩnh viễn
+      return;
+    }
+
     final dir = await getTemporaryDirectory();
     _path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';
     await _recorder.startRecorder(toFile: _path!, codec: Codec.aacADTS);
@@ -77,7 +90,10 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   Future<void> _togglePlay() async {
     if (_path == null) return;
     if (_seconds < 1) {
-      await _showAlertDialog();
+      await showCustomAlertDialog(
+        context,
+        message: "Ghi âm quá ngắn, vui lòng thử lại",
+      );
       return;
     }
 
@@ -305,7 +321,10 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
             label: const Text("Gửi", style: TextStyle(color: Colors.white)),
             onPressed: () async {
               if (_seconds < 1) {
-                await _showAlertDialog();
+                await showCustomAlertDialog(
+                  context,
+                  message: "Ghi âm quá ngắn, vui lòng thử lại",
+                );
                 return;
               }
               if (_path != null) widget.onSend(_path!);
@@ -346,43 +365,6 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
           ),
         ),
       ],
-    );
-  }
-
-  Future<void> _showAlertDialog() async {
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        content: const Text(
-          "Ghi âm quá ngắn, vui lòng thử lại",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16),
-        ),
-        actionsPadding: EdgeInsets.zero,
-        actions: [
-          const SizedBox(height: 18),
-          Divider(height: 1, thickness: 1, color: Colors.grey[400]),
-          Padding(
-            padding: const EdgeInsets.only(right: 12), // 👈 dịch nhẹ sang trái
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end, // 👈 vẫn căn phải
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "Ok",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 

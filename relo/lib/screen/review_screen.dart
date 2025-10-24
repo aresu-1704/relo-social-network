@@ -1,4 +1,3 @@
-// file: review_screen.dart
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -6,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/edit_image.dart';
 import 'package:video_player/video_player.dart';
+import 'package:relo/utils/show_toast.dart';
 
 class ReviewScreen extends StatefulWidget {
   final File file;
@@ -39,46 +39,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
       final newPath = '${dir!.path}/$fileName';
       final newFile = await widget.file.copy(newPath);
 
-      _showToast(context, 'Đã tải xuống');
+      await showToast(context, 'Đã tải xuống');
     } catch (e) {
       debugPrint("Error saving file: $e");
-      _showToast(context, 'Lỗi khi tải xuống');
+      await showToast(context, 'Lỗi khi tải xuống');
     } finally {
       setState(() => _isDownloading = false);
     }
-  }
-
-  void _showToast(BuildContext context, String msg) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        bottom: 100, // cách đáy màn hình
-        left: 50,
-        right: 50,
-        child: Material(
-          color: Colors.transparent,
-          child: AnimatedOpacity(
-            opacity: 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                msg,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 2), () => overlayEntry.remove());
   }
 
   @override
