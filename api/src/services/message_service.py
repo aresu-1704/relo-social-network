@@ -246,4 +246,16 @@ class MessageService:
             conversation.seenIds.append(user_id)
             await conversation.save()
 
+        task = [
+            # Phát tính hiệu refresh
+            manager.broadcast_to_user(
+                user_id,
+                {
+                    "type": "conversation_seen",
+                    "payload": {"conversationId": conversation_id}
+                }
+            )
+        ]
+        await asyncio.gather(*task)
+
         return conversation

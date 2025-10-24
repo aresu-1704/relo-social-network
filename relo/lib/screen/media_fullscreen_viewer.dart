@@ -1,4 +1,3 @@
-// file: media_fullscreen_viewer.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -6,6 +5,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
+import 'package:relo/utils/show_toast.dart';
 
 class MediaFullScreenViewer extends StatefulWidget {
   final List<String> mediaUrls;
@@ -41,10 +41,15 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
   Future<void> _downloadCurrentMedia() async {
     final url = widget.mediaUrls[_currentIndex];
 
+    // Nếu là file local thì không tải
+    if (!url.startsWith('http')) {
+      await showToast(context, 'Tệp này đã nằm trong máy rồi');
+      return;
+    }
+
     setState(() => _isDownloading = true);
 
     try {
-      // Yêu cầu quyền lưu
       if (Platform.isAndroid) {
         final status = await Permission.storage.request();
         if (!status.isGranted) throw Exception('Permission denied');
@@ -61,50 +66,13 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
       await dio.download(url, filePath);
 
       if (!mounted) return;
-
       setState(() => _isDownloading = false);
-
-      // Thông báo nhỏ kiểu Zalo
-      _showToast(context, 'Đã tải xuống');
+      await showToast(context, 'Đã tải xuống');
     } catch (e) {
       setState(() => _isDownloading = false);
-      _showToast(context, 'Tải xuống thất bại');
+      debugPrint('Download error: $e');
+      await showToast(context, 'Tải xuống thất bại');
     }
-  }
-
-  void _showToast(BuildContext context, String msg) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        bottom: 50,
-        left: 50,
-        right: 50,
-        child: Material(
-          color: Colors.transparent,
-          child: AnimatedOpacity(
-            opacity: 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color.fromARGB(221, 160, 158, 158),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                msg,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-    Future.delayed(
-      const Duration(seconds: 2),
-    ).then((_) => overlayEntry.remove());
   }
 
   @override
@@ -196,10 +164,15 @@ class _ImageViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isNetwork = url.startsWith('http');
+    final path = url.startsWith('file://')
+        ? url.replaceFirst('file://', '')
+        : url;
+
     return ExtendedImage(
-      image: url.startsWith('http')
+      image: isNetwork
           ? ExtendedNetworkImageProvider(url)
-          : ExtendedFileImageProvider(File(url)),
+          : ExtendedFileImageProvider(File(path)),
       fit: BoxFit.contain,
       mode: ExtendedImageMode.gesture,
     );
@@ -224,12 +197,16 @@ class _VideoViewerState extends State<_VideoViewer> {
   void initState() {
     super.initState();
     final isNetwork = widget.url.startsWith('http');
+    final path = widget.url.startsWith('file://')
+        ? widget.url.replaceFirst('file://', '')
+        : widget.url;
+
     _controller = isNetwork
         ? VideoPlayerController.network(widget.url)
-        : VideoPlayerController.file(File(widget.url));
+        : VideoPlayerController.file(File(path));
 
     _controller.initialize().then((_) {
-      setState(() => _isReady = true);
+      if (mounted) setState(() => _isReady = true);
     });
   }
 

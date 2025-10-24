@@ -1,4 +1,3 @@
-// file: review_screen.dart
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -6,6 +5,8 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/edit_image.dart';
 import 'package:video_player/video_player.dart';
+import 'package:relo/utils/show_toast.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ReviewScreen extends StatefulWidget {
   final File file;
@@ -31,54 +32,60 @@ class _ReviewScreenState extends State<ReviewScreen> {
   Color _selectedColor = Colors.redAccent;
   final double _strokeWidth = 4.0;
 
-  void _downloadFile() async {
+  Future<void> _downloadFile() async {
     setState(() => _isDownloading = true);
-    try {
-      final dir = await getExternalStorageDirectory();
-      final fileName = widget.file.path.split('/').last;
-      final newPath = '${dir!.path}/$fileName';
-      final newFile = await widget.file.copy(newPath);
 
-      _showToast(context, 'Đã tải xuống');
+    try {
+      // 1️⃣ Yêu cầu quyền ghi bộ nhớ (Android 13 trở xuống)
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.request();
+        if (!status.isGranted) {
+          await showToast(context, 'Không có quyền lưu tệp');
+          return;
+        }
+      }
+
+      // 2️⃣ Lấy đường dẫn thư mục "Download" của hệ thống
+      Directory? dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/Download');
+        if (!await dir.exists()) {
+          dir = await getExternalStorageDirectory();
+        }
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      if (dir == null) throw Exception('Không xác định được thư mục tải xuống');
+
+      // 3️⃣ Tạo tên file đích và copy
+      final fileName = widget.file.path.split('/').last;
+      final newPath = '${dir.path}/$fileName';
+
+      // Nếu file đã tồn tại → thêm hậu tố để tránh ghi đè
+      final newFile = File(newPath);
+      if (await newFile.exists()) {
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final name = fileName.contains('.')
+            ? fileName.substring(0, fileName.lastIndexOf('.'))
+            : fileName;
+        final ext = fileName.contains('.')
+            ? fileName.substring(fileName.lastIndexOf('.'))
+            : '';
+        final altPath = '${dir.path}/$name-$timestamp$ext';
+        await widget.file.copy(altPath);
+      } else {
+        await widget.file.copy(newPath);
+      }
+
+      // 4️⃣ Hiển thị toast thành công
+      await showToast(context, 'Đã lưu vào thư mục Tải xuống');
     } catch (e) {
       debugPrint("Error saving file: $e");
-      _showToast(context, 'Lỗi khi tải xuống');
+      await showToast(context, 'Lỗi khi tải xuống');
     } finally {
       setState(() => _isDownloading = false);
     }
-  }
-
-  void _showToast(BuildContext context, String msg) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        bottom: 100, // cách đáy màn hình
-        left: 50,
-        right: 50,
-        child: Material(
-          color: Colors.transparent,
-          child: AnimatedOpacity(
-            opacity: 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                msg,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 2), () => overlayEntry.remove());
   }
 
   @override

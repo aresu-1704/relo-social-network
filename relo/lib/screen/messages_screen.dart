@@ -52,7 +52,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
         final data = jsonDecode(message);
 
         // Assuming the server sends an event type
-        if (data['type'] == 'new_message') {
+        if (data['type'] == 'new_message' ||
+            data['type'] == 'conversation_seen') {
           // A new message has arrived, refresh the conversation list
           // A more optimized approach would be to update the specific conversation
           fetchConversations();
@@ -164,9 +165,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
           // Chat 1-1
           final friend = otherParticipants.first;
           title = friend['displayName'];
-          avatar = const AssetImage(
-            'assets/icons/app_logo.png',
-          ); // hoặc friend['avatarUrl'] nếu có
+          final avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
+              ? friend['avatarUrl']
+              : 'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
+
+          avatar = NetworkImage(avatarUrl);
         }
 
         String lastMessage = 'Chưa có tin nhắn';
@@ -255,7 +258,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       Format.formatZaloTime(updatedAt),
                       style: TextStyle(
                         color: Colors.grey,
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight:
                             (conversation['seenIds'] != null &&
                                 (conversation['seenIds'] as List).contains(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:relo/screen/camera_screen.dart';
+import 'package:relo/utils/show_alert_dialog.dart';
 
 class MediaPickerSheet extends StatefulWidget {
   final void Function(List<File> files) onPicked;
@@ -24,28 +25,61 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
   }
 
   Future<void> _fetchAssets() async {
-    final permitted = await PhotoManager.requestPermissionExtend();
-    if (!permitted.isAuth) {
-      // Handle permission denial
-      // Maybe show a message to the user
-      PhotoManager.openSetting();
-      return;
-    }
+    try {
+      // 1️⃣ Xin quyền truy cập ảnh & video
+      final permitted = await PhotoManager.requestPermissionExtend();
 
-    final albums = await PhotoManager.getAssetPathList(
-      type: RequestType.common,
-    );
-    if (albums.isEmpty) return;
+      if (!permitted.isAuth) {
+        final openSettings = await showCustomAlertDialog(
+          context,
+          message: "Ứng dụng cần quyền truy cập ảnh và video để gửi tệp",
+          buttonText: "Mở cài đặt",
+          buttonColor: const Color(0xFF7A2FC0),
+        );
 
-    final recentAssets = await albums.first.getAssetListRange(
-      start: 0,
-      end: 100, // Load 100 recent items
-    );
+        if (openSettings == true) {
+          await PhotoManager.openSetting(); // ⚙️ Mở Settings
+          await Future.delayed(const Duration(seconds: 1));
 
-    if (mounted) {
-      setState(() {
-        _assets = recentAssets;
-      });
+          final after = await PhotoManager.requestPermissionExtend();
+          if (!after.isAuth) {
+            if (context.mounted) {
+              await showCustomAlertDialog(
+                context,
+                message: "Vẫn chưa có quyền truy cập ảnh/video.",
+              );
+              Navigator.pop(context); // 🚪 Thoát hoặc đóng sheet
+            }
+            return;
+          }
+        } else {
+          if (context.mounted) Navigator.pop(context);
+          return;
+        }
+      }
+
+      // 2️⃣ Nếu đã có quyền → lấy album & assets
+      final albums = await PhotoManager.getAssetPathList(
+        type: RequestType.common,
+      );
+      if (albums.isEmpty) return;
+
+      final recentAssets = await albums.first.getAssetListRange(
+        start: 0,
+        end: 100,
+      );
+
+      if (mounted) {
+        setState(() {
+          _assets = recentAssets;
+        });
+      }
+    } catch (e) {
+      await showCustomAlertDialog(
+        context,
+        message: "Không thể tải ảnh/video: $e",
+      );
+      if (context.mounted) Navigator.pop(context);
     }
   }
 
@@ -66,8 +100,9 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
 
     const maxSize = 150 * 1024 * 1024; // 150 MB in bytes
     if (totalSize > maxSize) {
-      _showAlertDialog(
-        "Tổng dung lượng file vượt quá 150MB, vui lòng chọn ít hơn",
+      await showCustomAlertDialog(
+        context,
+        message: "Tổng dung lượng file vượt quá 150MB, vui lòng chọn ít hơn",
       );
       return;
     }
@@ -75,51 +110,17 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
     widget.onPicked(files);
   }
 
-  Future<void> _showAlertDialog(String message) async {
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        content: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16),
-        ),
-        actionsPadding: EdgeInsets.zero,
-        actions: [
-          const SizedBox(height: 18),
-          Divider(height: 1, thickness: 1, color: Colors.grey[400]),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "Ok",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _toggleSelection(AssetEntity asset) {
+  void _toggleSelection(AssetEntity asset) async {
     if (_selectedAssets.contains(asset)) {
       setState(() {
         _selectedAssets.remove(asset);
       });
     } else {
       if (_selectedAssets.length >= 30) {
-        _showAlertDialog("Bạn chỉ có thể chọn tối đa 30 mục");
+        await showCustomAlertDialog(
+          context,
+          message: "Chỉ được chọn tối đa 30 mục",
+        );
         return;
       }
       setState(() {
@@ -164,60 +165,78 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
             Expanded(
               child: _assets.isEmpty
                   ? const Center(child: CircularProgressIndicator())
-                  : GridView.builder(
-                      itemCount: _assets.length + 1, // +1 for camera button
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: 4,
-                            mainAxisSpacing: 4,
-                          ),
-                      itemBuilder: (_, index) {
-                        if (index == 0) {
-                          // Camera button
-                          return GestureDetector(
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const CameraScreen(),
-                                ),
-                              );
-                              if (result != null && result is File) {
-                                widget.onPicked([result]);
-                              }
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.camera_alt,
-                                    color: Colors.black,
-                                    size: 36,
-                                  ),
-                                  Text(
-                                    "Mở máy ảnh",
-                                    style: TextStyle(color: Colors.black),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
+                  : Scrollbar(
+                      interactive: true,
+                      thumbVisibility: true,
+                      thickness: 10,
+                      radius: const Radius.circular(12),
+                      child: GridView.builder(
+                        itemCount: _assets.length + 1, // +1 for camera button
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 4,
+                              mainAxisSpacing: 4,
                             ),
+                        itemBuilder: (_, index) {
+                          if (index == 0) {
+                            // Camera button
+                            return GestureDetector(
+                              onTap: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const CameraScreen(),
+                                  ),
+                                );
+                                if (result != null && result is File) {
+                                  widget.onPicked([result]);
+                                }
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.camera_alt,
+                                      color: const Color.fromARGB(
+                                        255,
+                                        112,
+                                        112,
+                                        112,
+                                      ),
+                                      size: 36,
+                                    ),
+                                    Text(
+                                      "Mở máy ảnh",
+                                      style: TextStyle(
+                                        color: const Color.fromARGB(
+                                          255,
+                                          112,
+                                          112,
+                                          112,
+                                        ),
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          final asset = _assets[index - 1];
+                          return AssetThumbnail(
+                            asset: asset,
+                            isSelected: _selectedAssets.contains(asset),
+                            onTap: () => _toggleSelection(asset),
                           );
-                        }
-                        final asset = _assets[index - 1];
-                        return AssetThumbnail(
-                          asset: asset,
-                          isSelected: _selectedAssets.contains(asset),
-                          onTap: () => _toggleSelection(asset),
-                        );
-                      },
+                        },
+                      ),
                     ),
             ),
           ],
@@ -267,11 +286,11 @@ class AssetThumbnail extends StatelessWidget {
           if (isSelected)
             Container(
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Colors.black.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF7C3AED), width: 2),
               ),
-              child: const Icon(Icons.check_circle, color: Colors.white),
+              child: const Icon(Icons.check_circle, color: Color(0xFF7C3AED)),
             ),
         ],
       ),
