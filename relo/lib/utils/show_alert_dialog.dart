@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-Future<void> showCustomAlertDialog(
+Future<bool> showCustomAlertDialog(
   BuildContext context, {
   required String message,
   String buttonText = "Ok",
   Color buttonColor = Colors.red,
 }) async {
-  await showDialog(
+  final result = await showDialog(
     context: context,
     builder: (_) => AlertDialog(
       contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
@@ -25,7 +25,9 @@ Future<void> showCustomAlertDialog(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  Navigator.pop(context, true);
+                },
                 child: Text(
                   buttonText,
                   style: TextStyle(
@@ -40,4 +42,5 @@ Future<void> showCustomAlertDialog(
       ],
     ),
   );
+  return result ?? false;
 }

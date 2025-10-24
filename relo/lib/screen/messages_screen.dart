@@ -52,7 +52,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
         final data = jsonDecode(message);
 
         // Assuming the server sends an event type
-        if (data['type'] == 'new_message') {
+        if (data['type'] == 'new_message' ||
+            data['type'] == 'conversation_seen') {
           // A new message has arrived, refresh the conversation list
           // A more optimized approach would be to update the specific conversation
           fetchConversations();

@@ -24,7 +24,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   String? _path;
   Timer? _timer;
   int _seconds = 0;
-  double _amplitude = 0.0; // 👈 giả lập biên độ sóng
+  double _amplitude = 0.0;
 
   @override
   void initState() {
@@ -39,42 +39,73 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   }
 
   Future<void> _startRecording() async {
-    // 👉 Kiểm tra quyền micro trước khi ghi
-    final status = await Permission.microphone.request();
+    try {
+      // 1️⃣ Kiểm tra và xin quyền micro
+      final micStatus = await Permission.microphone.request();
 
-    if (status.isDenied || status.isPermanentlyDenied) {
+      if (!micStatus.isGranted) {
+        final openSettings = await showCustomAlertDialog(
+          context,
+          message: "Ứng dụng cần quyền truy cập micro để ghi âm",
+          buttonText: "Mở cài đặt",
+          buttonColor: const Color(0xFF7A2FC0),
+        );
+
+        if (openSettings == true) {
+          await openAppSettings(); // ⚙️ Mở Settings
+          await Future.delayed(const Duration(seconds: 1));
+
+          // Kiểm tra lại sau khi quay lại app
+          final micAfter = await Permission.microphone.status;
+          if (!micAfter.isGranted) {
+            if (context.mounted) {
+              await showCustomAlertDialog(
+                context,
+                message: "Vẫn chưa có quyền micro, không thể ghi âm.",
+              );
+              Navigator.pop(context); // 🚪 Thoát khỏi màn ghi âm
+            }
+            return;
+          }
+        } else {
+          if (context.mounted) Navigator.pop(context);
+          return;
+        }
+      }
+
+      final dir = await getTemporaryDirectory();
+      _path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';
+
+      await _recorder.startRecorder(toFile: _path!, codec: Codec.aacADTS);
+
+      // Timer cập nhật biên độ sóng
+      _timer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        setState(() {
+          _amplitude =
+              (0.3 + (0.7 * (DateTime.now().millisecond % 1000) / 1000));
+        });
+      });
+
+      // Timer đếm thời gian
+      Timer.periodic(const Duration(seconds: 1), (t) {
+        if (!_isRecording) {
+          t.cancel();
+        } else {
+          setState(() => _seconds++);
+        }
+      });
+
+      setState(() {
+        _isRecording = true;
+        _isRecorded = false;
+      });
+    } catch (e) {
       await showCustomAlertDialog(
         context,
-        message: "Ứng dụng cần quyền truy cập micro để ghi âm",
+        message: "Không thể bắt đầu ghi âm: $e",
       );
-      openAppSettings(); // gợi ý: mở settings nếu bị từ chối vĩnh viễn
-      return;
+      if (context.mounted) Navigator.pop(context);
     }
-
-    final dir = await getTemporaryDirectory();
-    _path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';
-    await _recorder.startRecorder(toFile: _path!, codec: Codec.aacADTS);
-
-    // Timer biên độ sóng
-    _timer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      setState(() {
-        _amplitude = (0.3 + (0.7 * (DateTime.now().millisecond % 1000) / 1000));
-      });
-    });
-
-    // Timer đếm thời gian riêng
-    Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!_isRecording) {
-        t.cancel();
-      } else {
-        setState(() => _seconds++);
-      }
-    });
-
-    setState(() {
-      _isRecording = true;
-      _isRecorded = false;
-    });
   }
 
   Future<void> _stopRecording() async {

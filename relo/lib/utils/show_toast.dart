@@ -15,8 +15,8 @@ Future<void> showToast(BuildContext context, String msg) async {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(8),
+              color: const Color.fromARGB(221, 136, 136, 136),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               msg,

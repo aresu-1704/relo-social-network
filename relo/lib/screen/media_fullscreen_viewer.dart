@@ -41,10 +41,15 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
   Future<void> _downloadCurrentMedia() async {
     final url = widget.mediaUrls[_currentIndex];
 
+    // Nếu là file local thì không tải
+    if (!url.startsWith('http')) {
+      await showToast(context, 'Tệp này đã nằm trong máy rồi');
+      return;
+    }
+
     setState(() => _isDownloading = true);
 
     try {
-      // Yêu cầu quyền lưu
       if (Platform.isAndroid) {
         final status = await Permission.storage.request();
         if (!status.isGranted) throw Exception('Permission denied');
@@ -61,13 +66,11 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
       await dio.download(url, filePath);
 
       if (!mounted) return;
-
       setState(() => _isDownloading = false);
-
-      // Thông báo nhỏ kiểu Zalo
       await showToast(context, 'Đã tải xuống');
     } catch (e) {
       setState(() => _isDownloading = false);
+      debugPrint('Download error: $e');
       await showToast(context, 'Tải xuống thất bại');
     }
   }
@@ -161,10 +164,15 @@ class _ImageViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isNetwork = url.startsWith('http');
+    final path = url.startsWith('file://')
+        ? url.replaceFirst('file://', '')
+        : url;
+
     return ExtendedImage(
-      image: url.startsWith('http')
+      image: isNetwork
           ? ExtendedNetworkImageProvider(url)
-          : ExtendedFileImageProvider(File(url)),
+          : ExtendedFileImageProvider(File(path)),
       fit: BoxFit.contain,
       mode: ExtendedImageMode.gesture,
     );
@@ -189,12 +197,16 @@ class _VideoViewerState extends State<_VideoViewer> {
   void initState() {
     super.initState();
     final isNetwork = widget.url.startsWith('http');
+    final path = widget.url.startsWith('file://')
+        ? widget.url.replaceFirst('file://', '')
+        : widget.url;
+
     _controller = isNetwork
         ? VideoPlayerController.network(widget.url)
-        : VideoPlayerController.file(File(widget.url));
+        : VideoPlayerController.file(File(path));
 
     _controller.initialize().then((_) {
-      setState(() => _isReady = true);
+      if (mounted) setState(() => _isReady = true);
     });
   }
 

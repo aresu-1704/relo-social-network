@@ -22,10 +22,10 @@ class TextMessageBubble extends StatelessWidget {
     // 🎨 Màu bong bóng
     final bubbleColor = isMe
         ? (isPending
-              ? Colors.grey[400]
+              ? Color(0xFFA555F0).withOpacity(0.2)
               : isFailed
-              ? Colors.red[400]
-              : const Color(0xFFA555F0))
+              ? Colors.grey[400]
+              : Color(0xFFA555F0))
         : Colors.white;
 
     final textColor = isMe ? Colors.white : Colors.black87;
