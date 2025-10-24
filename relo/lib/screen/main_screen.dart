@@ -4,9 +4,10 @@ import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 import 'profile_setting_screen.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => MainScreenState();
@@ -15,8 +16,6 @@ class MainScreen extends StatefulWidget {
 class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
-
-  final Color primaryColor = Color(0xFF7C3AED);
 
   @override
   void initState() {
@@ -47,13 +46,14 @@ class MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        shadowColor: Colors.black,
         automaticallyImplyLeading: false,
         backgroundColor: Color(0xFF7A2FC0),
         elevation: 0,
         title: Row(
           children: [
             Expanded(
-              child: Container(
+              child: SizedBox(
                 height: 31,
                 child: GestureDetector(
                   onTap: () {
@@ -94,7 +94,7 @@ class MainScreenState extends State<MainScreen> {
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          selectedItemColor: primaryColor,
+          selectedItemColor: Color(0xFF7A2FC0),
           unselectedItemColor: Colors.grey, // Màu icon chưa chọn là xám
           backgroundColor: Colors
               .transparent, // Nền trong suốt để màu của container hiển thị
@@ -112,21 +112,21 @@ class MainScreenState extends State<MainScreen> {
           },
           items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
+              icon: Icon(LucideIcons.messageCircle),
               label: 'Tin nhắn',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.article_outlined),
+              icon: Icon(LucideIcons.layoutGrid),
               label: 'Tường nhà',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.group_outlined),
+              icon: Icon(LucideIcons.users),
               label: 'Bạn bè',
             ),
             BottomNavigationBarItem(
               icon: Stack(
                 children: [
-                  Icon(Icons.notifications_none),
+                  Icon(LucideIcons.bell),
                   if (_notificationCount > 0)
                     Positioned(
                       top: 0,
@@ -153,7 +153,7 @@ class MainScreenState extends State<MainScreen> {
               label: 'Thông báo',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
+              icon: Icon(LucideIcons.user),
               label: 'Cá nhân',
             ),
           ],

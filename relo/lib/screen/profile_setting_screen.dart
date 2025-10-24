@@ -9,7 +9,7 @@ import 'profile_screen.dart';
 import 'privacy_settings_screen.dart';
 
 class ProfileSettingScreen extends StatefulWidget {
-  const ProfileSettingScreen({Key? key}) : super(key: key);
+  const ProfileSettingScreen({super.key});
 
   @override
   State<ProfileSettingScreen> createState() => _ProfileSettingScreenState();
@@ -29,10 +29,12 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
     _currentUserId = await storage.getUserId();
     if (_currentUserId != null) {
       User? user = await userService.getUserById(_currentUserId!);
-      setState(() {
-        _isLoading = false;
-        _currentUser = user;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _currentUser = user;
+        });
+      }
     }
   }
 
@@ -112,7 +114,9 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                                       onPressed: () {
                                         authService.logout();
                                         Navigator.of(context).pop();
-                                        Navigator.of(context).pushAndRemoveUntil(
+                                        Navigator.of(
+                                          context,
+                                        ).pushAndRemoveUntil(
                                           MaterialPageRoute(
                                             builder: (context) =>
                                                 DefaultScreen(),

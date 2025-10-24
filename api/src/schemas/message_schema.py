@@ -1,14 +1,16 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime
 from .user_schema import UserPublic
-
-
-class ConversationCreate(BaseModel):
-    participant_ids: List[str]
+from ..models import ParticipantInfo
 
 class MessageCreate(BaseModel):
     content: dict
+
+class ConversationCreate(BaseModel):
+    participant_ids: List[str]
+    is_group: bool = False
+    name: Optional[str] = None
 
 # Schema for simplified message response
 class SimpleMessagePublic(BaseModel):
@@ -43,10 +45,13 @@ class LastMessagePublic(BaseModel):
 
 class ConversationPublic(BaseModel):
     id: str
-    participantIds: List[str]
+    participants: List[ParticipantInfo]
     lastMessage: Optional[LastMessagePublic]
     updatedAt: datetime
     seenIds: List[str] = []
+    isGroup: bool = False
+    name: str | None = None
+    avatarUrl: str | None = None
 
     class Config:
         from_attributes = True
@@ -56,10 +61,14 @@ class ConversationPublic(BaseModel):
 
 class ConversationWithParticipants(BaseModel):
     id: str
+    participantsInfo: List[ParticipantInfo]
     participants: List[UserPublic]
     lastMessage: Optional[LastMessagePublic]
     updatedAt: datetime
     seenIds: List[str] = []
+    isGroup: bool = False
+    name: str | None = None
+    avatarUrl: str | None = None
 
     class Config:
         from_attributes = True

@@ -7,7 +7,7 @@ import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/services/message_service.dart';
 
 class FriendsScreen extends StatefulWidget {
-  const FriendsScreen({Key? key}) : super(key: key);
+  const FriendsScreen({super.key});
 
   @override
   _FriendsScreenState createState() => _FriendsScreenState();
@@ -34,7 +34,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
           a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
     );
 
-    final Map<String, List<User>> groupedFriends = LinkedHashMap();
+    final Map<String, List<User>> groupedFriends = {};
 
     for (var friend in friends) {
       if (friend.displayName.isNotEmpty) {
@@ -198,9 +198,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
       onTap: () async {
         try {
           // Gọi API get_or_create_conversation (tự xử lý trong backend)
-          final conversation = await _messageService.getOrCreateConversation([
-            friend.id,
-          ]);
+          final conversation = await _messageService.getOrCreateConversation(
+            [friend.id],
+            false,
+            null,
+          );
 
           if (conversation.isEmpty || conversation['id'] == null) {
             ScaffoldMessenger.of(context).showSnackBar(

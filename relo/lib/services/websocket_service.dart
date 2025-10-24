@@ -30,7 +30,6 @@ class WebSocketService {
       if (status != ConnectivityResult.none &&
           !isConnected &&
           !_isManualDisconnect) {
-        print('📶 Network restored, reconnecting WebSocket...');
         _reconnect();
       }
     });
@@ -40,28 +39,23 @@ class WebSocketService {
     if (_isManualDisconnect) return;
 
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print('❌ Max reconnect attempts reached. Disconnecting.');
       disconnect();
       return;
     }
 
     _reconnectAttempts++;
-    print('⚡ WebSocket disconnected, attempting to refresh token...');
 
     try {
       final newAccessToken = await _authService.refreshToken();
       if (newAccessToken != null) {
-        print('✅ Token refreshed successfully. Reconnecting WebSocket...');
         await _reconnect();
       } else {
-        print('❌ Failed to refresh token. Closing WebSocket connection.');
         if (onAuthError != null) {
           onAuthError!();
         }
         disconnect();
       }
     } catch (e) {
-      print('❌ Error during token refresh: $e. Closing WebSocket connection.');
       if (onAuthError != null) {
         onAuthError!();
       }
@@ -72,7 +66,6 @@ class WebSocketService {
   Future<void> _reconnect() async {
     final connectivity = await Connectivity().checkConnectivity();
     if (connectivity == ConnectivityResult.none) {
-      print('❌ No network, will not reconnect.');
       return;
     }
 
@@ -83,39 +76,34 @@ class WebSocketService {
   Future<void> _connect() async {
     final token = await _authService.accessToken;
     if (token == null) {
-      print('❌ No access token found for WebSocket.');
       return;
     }
 
     final url = 'ws://$webSocketBaseUrl/ws?token=$token';
     try {
       _channel = WebSocketChannel.connect(Uri.parse(url));
-      print('✅ WebSocket connected');
 
       _channel!.stream.listen(
         (data) {
           _streamController.add(data);
         },
         onDone: () async {
-          print('WebSocket connection done.');
           await _handleDisconnect();
         },
         onError: (error) async {
           _streamController.addError(error);
-          print('WebSocket error: $error');
           await _handleDisconnect();
         },
       );
 
       _reconnectAttempts = 0;
     } catch (e) {
-      print('❌ WebSocket connect failed: $e');
       await _handleDisconnect();
     }
   }
 
   void send(dynamic data) {
-    if (_channel != null && _channel!.sink != null) {
+    if (_channel != null) {
       _channel!.sink.add(jsonEncode(data));
     }
   }
@@ -129,7 +117,6 @@ class WebSocketService {
     if (!_streamController.isClosed) {
       _streamController.close();
     }
-    print('WebSocket disconnected manually.');
   }
 
   bool get isConnected => _channel != null && _channel!.closeCode == null;

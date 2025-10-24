@@ -106,15 +106,11 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (!_hasSearched) {
-      return const Center(
-        child: Text('Nhập để bắt đầu tìm kiếm.'),
-      );
+      return const Center(child: Text('Nhập để bắt đầu tìm kiếm.'));
     }
 
     if (_searchResults.isEmpty) {
-      return const Center(
-        child: Text('Không có kết quả'),
-      );
+      return const Center(child: Text('Không có kết quả'));
     }
 
     return ListView.builder(
@@ -156,12 +152,18 @@ class _UserSearchResultItem extends StatelessWidget {
       // Don't allow messaging yourself
       if (user.id == currentUserId) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bạn không thể nhắn tin cho chính mình.')),
+          const SnackBar(
+            content: Text('Bạn không thể nhắn tin cho chính mình.'),
+          ),
         );
         return;
       }
 
-      final conversation = await messageService.getOrCreateConversation([currentUserId, user.id]);
+      final conversation = await messageService.getOrCreateConversation(
+        [currentUserId, user.id],
+        false,
+        null,
+      );
       final conversationId = conversation['id'];
 
       if (context.mounted) {
@@ -221,17 +223,17 @@ class _UserSearchResultItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '@${user.username}',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 16),
             IconButton(
-              icon: const Icon(Icons.message_outlined, color: Color(0xFF7C3AED)),
+              icon: const Icon(
+                Icons.message_outlined,
+                color: Color(0xFF7C3AED),
+              ),
               onPressed: () => _navigateToChat(context),
             ),
           ],

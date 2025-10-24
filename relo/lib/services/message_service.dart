@@ -48,11 +48,18 @@ class MessageService {
   //Thêm hoặc tao cuộc trò chuyện
   Future<Map<String, dynamic>> getOrCreateConversation(
     List<String> participantIds,
+    bool isGroup,
+    String? name,
   ) async {
     try {
       final response = await _dio.post(
         'messages/conversations',
-        data: {'participant_ids': participantIds},
+        data: {
+          'participant_ids': participantIds,
+          'is_group': isGroup,
+          'name': name,
+        },
+        options: Options(headers: {'Content-Type': 'application/json'}),
       );
       return response.data;
     } on DioException catch (e) {
@@ -64,33 +71,55 @@ class MessageService {
     }
   }
 
-  //Gửi tin nhắn
+  // Gửi tin nhắn
   Future<Message> sendMessage(
     String conversationId,
     Map<String, dynamic> content,
     String senderId,
   ) async {
-    // 1️⃣ Tạo message local với trạng thái pending
     final tempMessage = Message(
-      id: DateTime.now().millisecondsSinceEpoch.toString(), // ID tạm thời
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
       content: content,
-      senderId: senderId, // current user
+      senderId: senderId,
       conversationId: conversationId,
       timestamp: DateTime.now(),
       status: 'pending',
     );
 
-    // Lưu ngay vào SQLite
     await MessageDatabase.instance.create(tempMessage);
 
     try {
-      // 2️⃣ Gửi lên server
+      FormData? formData;
+
+      if (content['type'] == 'text') {
+        formData = FormData.fromMap({
+          'type': content['type'],
+          'text': content['text'],
+        });
+      } else if (content['type'] == 'audio') {
+        formData = FormData.fromMap({
+          'type': content['type'],
+          'files': await MultipartFile.fromFile(content['path']),
+        });
+      } else if (content['type'] == 'media') {
+        List<MultipartFile> files = [];
+        for (var filePath in content['paths']) {
+          files.add(await MultipartFile.fromFile(filePath));
+        }
+        formData = FormData.fromMap({
+          'type': content['type'],
+          'files': files,
+        });
+      }
+
+      // 🚀 Gửi form-data lên server
       final response = await _dio.post(
         'messages/conversations/$conversationId/messages',
-        data: {'content': content},
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
       );
 
-      // 3️⃣ Cập nhật trạng thái thành sent
+      // ✅ Cập nhật trạng thái thành sent
       final sentMessage = Message.fromJson(response.data);
       final updatedMessage = tempMessage.copyWith(
         id: sentMessage.id,
@@ -99,12 +128,11 @@ class MessageService {
       );
 
       await MessageDatabase.instance.update(updatedMessage);
-
       return updatedMessage;
     } catch (e) {
-      // 3️⃣ Gửi thất bại → status = failed
       final failedMessage = tempMessage.copyWith(status: 'failed');
       await MessageDatabase.instance.update(failedMessage);
+      print("Send message error: $e");
       return failedMessage;
     }
   }
