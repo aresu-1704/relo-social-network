@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:relo/screen/review_screen.dart';
-import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -38,7 +38,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
       // Nếu không có quyền, hỏi user mở settings
       if (!cameraStatus.isGranted || !micStatus.isGranted) {
-        final openSettings = await showCustomAlertDialog(
+        final openSettings = await ShowNotification.showCustomAlertDialog(
           context,
           message: "Cần quyền camera và micro để chụp/quay",
           buttonText: "Mở cài đặt",
@@ -69,7 +69,7 @@ class _CameraScreenState extends State<CameraScreen> {
       // --- Nếu đã có quyền ---
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
-        await showCustomAlertDialog(
+        await ShowNotification.showCustomAlertDialog(
           context,
           message: "Không tìm thấy camera nào trên thiết bị này.",
         );
@@ -88,7 +88,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (context.mounted) setState(() => _isInitialized = true);
     } catch (e) {
-      await showCustomAlertDialog(
+      await ShowNotification.showCustomAlertDialog(
         context,
         message: "Không thể khởi tạo camera: $e",
       );

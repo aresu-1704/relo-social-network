@@ -13,7 +13,7 @@ import 'package:relo/widgets/message_composer.dart';
 import 'package:relo/utils/message_utils.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter/services.dart';
-import 'package:relo/utils/show_toast.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -241,10 +241,11 @@ class _ChatScreenState extends State<ChatScreen> {
           });
         }
       }
-
-      await showToast(context, 'Đã thu hồi tin nhắn');
     } catch (e) {
-      await showToast(context, 'Thu hồi tin nhắn thất bại: ${e.toString()}');
+      await ShowNotification.showToast(
+        context,
+        'Thu hồi tin nhắn thất bại: ${e.toString()}',
+      );
     }
   }
 
@@ -282,7 +283,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     Clipboard.setData(
                       ClipboardData(text: message.content['text']),
                     );
-                    await showToast(
+                    await ShowNotification.showToast(
                       context,
                       'Đã sao chép văn bản vào bộ nhớ tạm',
                     );

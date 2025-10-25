@@ -5,7 +5,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
-import 'package:relo/utils/show_toast.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class MediaFullScreenViewer extends StatefulWidget {
   final List<String> mediaUrls;
@@ -43,7 +43,7 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
 
     // Nếu là file local thì không tải
     if (!url.startsWith('http')) {
-      await showToast(context, 'Tệp này đã nằm trong máy rồi');
+      await ShowNotification.showToast(context, 'Tệp này đã nằm trong máy rồi');
       return;
     }
 
@@ -67,11 +67,11 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
 
       if (!mounted) return;
       setState(() => _isDownloading = false);
-      await showToast(context, 'Đã tải xuống');
+      await ShowNotification.showToast(context, 'Đã tải xuống');
     } catch (e) {
       setState(() => _isDownloading = false);
       debugPrint('Download error: $e');
-      await showToast(context, 'Tải xuống thất bại');
+      await ShowNotification.showToast(context, 'Tải xuống thất bại');
     }
   }
 

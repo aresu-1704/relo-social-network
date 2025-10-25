@@ -53,7 +53,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         // Assuming the server sends an event type
         if (data['type'] == 'new_message' ||
-            data['type'] == 'conversation_seen') {
+            data['type'] == 'conversation_seen' ) {
           // A new message has arrived, refresh the conversation list
           // A more optimized approach would be to update the specific conversation
           fetchConversations();
@@ -174,27 +174,25 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         String lastMessage = 'Chưa có tin nhắn';
 
-        if (_currentUserId != null &&
-            _currentUserId == conversation['lastMessage']?['senderId']) {
-          if (conversation['lastMessage']?['content']['type'] == 'audio') {
-            lastMessage = 'Bạn: [Tin nhắn thoại]';
-          } else if (conversation['lastMessage']?['content']['type'] ==
-              'media') {
-            lastMessage = 'Bạn: [Đa phương tiện]';
-          } else {
-            lastMessage =
-                'Bạn: ${conversation['lastMessage']?['content']['text'] ?? ''}';
-          }
-        } else {
-          if (conversation['lastMessage']?['content']['type'] == 'audio') {
-            lastMessage = '[Tin nhắn thoại]';
-          } else if (conversation['lastMessage']?['content']['type'] ==
-              'media') {
-            lastMessage = '[Đa phương tiện]';
-          } else {
-            lastMessage =
-                conversation['lastMessage']?['content']['text'] ??
-                'Chưa có tin nhắn';
+        final lastMsg = conversation['lastMessage'];
+        if (lastMsg != null) {
+          final isMe = _currentUserId == lastMsg['senderId'];
+          final prefix = isMe ? 'Bạn: ' : '';
+          final type = lastMsg['content']?['type'];
+          final text = lastMsg['content']?['text'];
+
+          switch (type) {
+            case 'audio':
+              lastMessage = '${prefix}[Tin nhắn thoại]';
+              break;
+            case 'media':
+              lastMessage = '${prefix}[Đa phương tiện]';
+              break;
+            case 'delete':
+              lastMessage = '${prefix}[Tin nhắn đã bị thu hồi]';
+              break;
+            default:
+              lastMessage = '$prefix${text ?? 'Chưa có tin nhắn'}';
           }
         }
 
