@@ -75,10 +75,11 @@ class MessageService {
   Future<Message> sendMessage(
     String conversationId,
     Map<String, dynamic> content,
-    String senderId,
-  ) async {
+    String senderId, {
+    String? tempId,
+  }) async {
     final tempMessage = Message(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: tempId ?? DateTime.now().millisecondsSinceEpoch.toString(),
       content: content,
       senderId: senderId,
       conversationId: conversationId,
@@ -106,29 +107,37 @@ class MessageService {
         for (var filePath in content['paths']) {
           files.add(await MultipartFile.fromFile(filePath));
         }
-        formData = FormData.fromMap({
-          'type': content['type'],
-          'files': files,
-        });
+        formData = FormData.fromMap({'type': content['type'], 'files': files});
       }
 
       // 🚀 Gửi form-data lên server
       final response = await _dio.post(
         'messages/conversations/$conversationId/messages',
         data: formData,
-        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+        options: Options(
+          headers: {'Content-Type': 'multipart/multipart/form-data'},
+        ),
       );
 
       // ✅ Cập nhật trạng thái thành sent
       final sentMessage = Message.fromJson(response.data);
-      final updatedMessage = tempMessage.copyWith(
+
+      // Create a new message with the final ID but with the original content
+      final finalMessage = Message(
         id: sentMessage.id,
+        content: tempMessage.content,
+        senderId: tempMessage.senderId,
+        conversationId: tempMessage.conversationId,
         timestamp: sentMessage.timestamp,
         status: 'sent',
+        avatarUrl: tempMessage.avatarUrl,
       );
 
-      await MessageDatabase.instance.update(updatedMessage);
-      return updatedMessage;
+      // Delete the temporary message and insert the final one
+      await MessageDatabase.instance.delete(tempMessage.id);
+      await MessageDatabase.instance.create(finalMessage);
+
+      return finalMessage;
     } catch (e) {
       final failedMessage = tempMessage.copyWith(status: 'failed');
       await MessageDatabase.instance.update(failedMessage);
@@ -145,6 +154,24 @@ class MessageService {
       throw Exception('Failed to mark as seen: $e');
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
+    }
+  }
+
+  // Thu hồi tin nhắn
+  Future<void> recallMessage(Message message) async {
+    if (message.status == 'pending' || message.status == 'failed') {
+      // Nếu tin nhắn chưa được gửi hoặc gửi thất bại, chỉ cần xóa nó khỏi local DB
+      await MessageDatabase.instance.delete(message.id);
+    } else {
+      // Nếu tin nhắn đã được gửi, hãy gọi API để thu hồi
+      try {
+        print(message.id);
+        await _dio.post('messages/messages/${message.id}/recall');
+      } on DioException catch (e) {
+        throw Exception('Failed to recall message: $e');
+      } catch (e) {
+        throw Exception('An unknown error occurred: $e');
+      }
     }
   }
 }

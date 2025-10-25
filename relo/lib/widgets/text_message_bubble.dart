@@ -1,31 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:relo/models/message.dart';
+import 'package:relo/widgets/message_status.dart';
 
 class TextMessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
+  final bool isLastFromMe;
 
   const TextMessageBubble({
     super.key,
     required this.message,
     required this.isMe,
+    required this.isLastFromMe,
   });
 
   @override
   Widget build(BuildContext context) {
     final isPending = message.status == 'pending';
     final isFailed = message.status == 'failed';
+    final isRecalled =
+        message.content['type'] == 'delete' ||
+        message.content['type'] == 'recalled_message';
 
     // 🎨 Màu bong bóng
-    final bubbleColor = isMe
+    final bubbleColor = isRecalled
+        ? Colors.grey[300]
+        : isMe
         ? (isPending
-              ? Colors.grey[400]
+              ? const Color(0xFFA555F0).withOpacity(0.2)
               : isFailed
-              ? Colors.red[400]
+              ? Colors.grey[700]
               : const Color(0xFFA555F0))
         : Colors.white;
 
-    final textColor = isMe ? Colors.white : Colors.black87;
+    final textColor = isRecalled
+        ? Colors.grey[700]
+        : isMe
+        ? Colors.white
+        : Colors.black87;
 
     // 🕓 Giờ gửi
     final timeString =
@@ -49,57 +61,73 @@ class TextMessageBubble extends StatelessWidget {
             ),
           ),
         Flexible(
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.7,
-            ),
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: isMe
-                    ? const Radius.circular(16)
-                    : const Radius.circular(4),
-                bottomRight: isMe
-                    ? const Radius.circular(4)
-                    : const Radius.circular(16),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 💬 Nội dung
-                Text(
-                  message.content['text'] ?? '',
-                  style: TextStyle(color: textColor, fontSize: 15, height: 1.3),
+          child: Column(
+            crossAxisAlignment: isMe
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            children: [
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.7,
                 ),
-                const SizedBox(height: 4),
-                // 🕓 Giờ + Icon trạng thái
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: bubbleColor,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: isMe
+                        ? const Radius.circular(16)
+                        : const Radius.circular(4),
+                    bottomRight: isMe
+                        ? const Radius.circular(4)
+                        : const Radius.circular(16),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      timeString,
+                      isRecalled
+                          ? 'Tin nhắn đã bị thu hồi'
+                          : message.content['text'] ?? '',
                       style: TextStyle(
-                        color: isMe ? Colors.white70 : Colors.grey[600],
-                        fontSize: 11,
+                        color: textColor,
+                        fontSize: 15,
+                        height: 1.3,
+                        fontStyle: isRecalled ? FontStyle.italic : null,
                       ),
                     ),
-                    if (isMe && (isPending || isFailed)) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        isPending ? Icons.access_time : Icons.error_outline,
-                        size: 14,
-                        color: Colors.white70,
-                      ),
-                    ],
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          timeString,
+                          style: TextStyle(
+                            color: isRecalled
+                                ? Colors.grey[700]
+                                : isMe
+                                ? Colors.white70
+                                : Colors.grey[600],
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              if (isMe && isLastFromMe && !isRecalled)
+                Padding(
+                  padding: const EdgeInsets.only(top: 1, right: 0),
+                  child: MessageStatusWidget(message: message),
+                ),
+            ],
           ),
         ),
       ],

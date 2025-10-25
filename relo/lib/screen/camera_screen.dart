@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:relo/screen/review_screen.dart';
-import 'package:relo/utils/permission_handler_util.dart';
-import 'package:relo/utils/show_alert_dialog.dart';
-import 'package:relo/utils/show_toast.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -24,7 +22,7 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isRecording = false;
   int _recordDuration = 0;
   Timer? _timer;
-  String _mode = "photo"; // 'photo' hoặc 'video'
+  String _mode = "photo";
   bool _isCapturing = false;
 
   @override
@@ -33,32 +31,49 @@ class _CameraScreenState extends State<CameraScreen> {
     _initCamera();
   }
 
-  Future<void> _showErrorAndExit(String message) async {
-    await showCustomAlertDialog(
-      context,
-      message: message,
-      buttonText: 'Đóng',
-      buttonColor: const Color(0xFF7C3AED),
-    );
-    if (mounted) Navigator.pop(context);
-  }
-
   Future<void> _initCamera() async {
     try {
-      // Yêu cầu cả hai quyền cùng lúc
-      final hasPermissions = await PermissionHandlerUtil.requestMultiplePermissions(
-        context,
-        [Permission.camera, Permission.microphone],
-      );
+      final cameraStatus = await Permission.camera.request();
+      final micStatus = await Permission.microphone.request();
 
-      if (!hasPermissions) {
-        if (mounted) Navigator.pop(context);
-        return;
+      // Nếu không có quyền, hỏi user mở settings
+      if (!cameraStatus.isGranted || !micStatus.isGranted) {
+        final openSettings = await ShowNotification.showCustomAlertDialog(
+          context,
+          message: "Cần quyền camera và micro để chụp/quay",
+          buttonText: "Mở cài đặt",
+          buttonColor: Color(0xFF7A2FC0),
+        );
+
+        if (openSettings == true) {
+          await openAppSettings();
+
+          // Đợi user quay lại app
+          await Future.delayed(const Duration(seconds: 1));
+
+          // Kiểm tra lại quyền
+          final camAfter = await Permission.camera.status;
+          final micAfter = await Permission.microphone.status;
+
+          if (!camAfter.isGranted || !micAfter.isGranted) {
+            if (context.mounted) Navigator.pop(context);
+            return;
+          }
+        } else {
+          // user chọn Hủy -> thoát trang
+          if (context.mounted) Navigator.pop(context);
+          return;
+        }
       }
 
+      // --- Nếu đã có quyền ---
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
-        await _showErrorAndExit("Không tìm thấy camera nào trên thiết bị này.");
+        await ShowNotification.showCustomAlertDialog(
+          context,
+          message: "Không tìm thấy camera nào trên thiết bị này.",
+        );
+        if (context.mounted) Navigator.pop(context);
         return;
       }
 
@@ -70,9 +85,14 @@ class _CameraScreenState extends State<CameraScreen> {
 
       await _controller!.initialize();
       await _controller!.setFlashMode(FlashMode.off);
-      if (mounted) setState(() => _isInitialized = true);
+
+      if (context.mounted) setState(() => _isInitialized = true);
     } catch (e) {
-      await _showErrorAndExit("Không thể khởi tạo camera: $e");
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: "Không thể khởi tạo camera: $e",
+      );
+      if (context.mounted) Navigator.pop(context);
     }
   }
 

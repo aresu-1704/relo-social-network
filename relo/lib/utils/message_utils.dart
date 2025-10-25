@@ -31,10 +31,11 @@ class MessageUtils {
         conversationId,
         content,
         currentUserId,
+        tempId: tempMessage.id,
       );
       final index = messages.indexWhere((msg) => msg.id == tempMessage.id);
       if (index != -1) {
-        messages[index] = sentMessage.copyWith(status: 'sent');
+        messages[index] = sentMessage;
         updateMessages(List.from(messages));
       }
     } catch (_) {

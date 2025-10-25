@@ -161,6 +161,7 @@ class MessageService:
             if sender:
                 simple_messages.append(
                     SimpleMessagePublic(
+                        id=str(msg.id),
                         senderId=msg.senderId,
                         avatarUrl=sender.avatarUrl,
                         content=msg.content,
@@ -246,4 +247,55 @@ class MessageService:
             conversation.seenIds.append(user_id)
             await conversation.save()
 
+        task = [
+            # Phát tính hiệu refresh
+            manager.broadcast_to_user(
+                user_id,
+                {
+                    "type": "conversation_seen",
+                    "payload": {"conversationId": conversation_id}
+                }
+            )
+        ]
+        await asyncio.gather(*task)
+
         return conversation
+    
+    @staticmethod
+    async def recall_message(message_id: str, user_id: str):
+        """
+        Thu hồi một tin nhắn đã gửi.
+        """
+        message = await Message.get(message_id)
+        if not message:
+            raise ValueError("Không tìm thấy tin nhắn.")
+
+        if message.senderId != user_id:
+            raise PermissionError("Bạn không có quyền thu hồi tin nhắn này.")
+
+        # Thay đổi nội dung tin nhắn
+        message.content['type'] = 'delete'
+        await message.save()
+
+        # Kiểm tra và cập nhật lastMessage trong conversation
+        conversation = await Conversation.get(message.conversationId)
+        if conversation and conversation.lastMessage and conversation.lastMessage.createdAt == message.createdAt:
+            conversation.lastMessage.content = message.content
+            await conversation.save()
+
+        # Phát broadcast tin nhắn đã thu hồi
+        message_data = map_message_to_public_dict(message)
+        
+        tasks = [
+            manager.broadcast_to_user(
+                uid,
+                {
+                    "type": "recalled_message",
+                    "payload": {"message": message_data}
+                }
+            )
+            for uid in [p.userId for p in conversation.participants]
+        ]
+        await asyncio.gather(*tasks)
+
+        return message

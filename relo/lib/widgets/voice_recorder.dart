@@ -2,9 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
+<<<<<<< HEAD
 import 'package:relo/utils/permission_handler_util.dart';
 import 'package:relo/utils/show_alert_dialog.dart';
 import 'package:relo/utils/show_toast.dart';
+=======
+import 'package:relo/utils/show_notification.dart';
+>>>>>>> origin/master
 
 class VoiceRecorderWidget extends StatefulWidget {
   final void Function(String path) onSend;
@@ -25,7 +29,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   String? _path;
   Timer? _timer;
   int _seconds = 0;
-  double _amplitude = 0.0; // 👈 giả lập biên độ sóng
+  double _amplitude = 0.0;
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   }
 
   Future<void> _startRecording() async {
+<<<<<<< HEAD
     // Kiểm tra quyền trước khi ghi âm
     final hasPermission = await PermissionHandlerUtil.requestMicrophonePermission(context);
     if (!hasPermission) {
@@ -53,27 +58,75 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
     final dir = await getTemporaryDirectory();
     _path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';
     await _recorder.startRecorder(toFile: _path!, codec: Codec.aacADTS);
+=======
+    try {
+      // 1️⃣ Kiểm tra và xin quyền micro
+      final micStatus = await Permission.microphone.request();
+>>>>>>> origin/master
 
-    // Timer biên độ sóng
-    _timer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      setState(() {
-        _amplitude = (0.3 + (0.7 * (DateTime.now().millisecond % 1000) / 1000));
-      });
-    });
+      if (!micStatus.isGranted) {
+        final openSettings = await ShowNotification.showCustomAlertDialog(
+          context,
+          message: "Ứng dụng cần quyền truy cập micro để ghi âm",
+          buttonText: "Mở cài đặt",
+          buttonColor: const Color(0xFF7A2FC0),
+        );
 
-    // Timer đếm thời gian riêng
-    Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!_isRecording) {
-        t.cancel();
-      } else {
-        setState(() => _seconds++);
+        if (openSettings == true) {
+          await openAppSettings(); // ⚙️ Mở Settings
+          await Future.delayed(const Duration(seconds: 1));
+
+          // Kiểm tra lại sau khi quay lại app
+          final micAfter = await Permission.microphone.status;
+          if (!micAfter.isGranted) {
+            if (context.mounted) {
+              await ShowNotification.showCustomAlertDialog(
+                context,
+                message: "Vẫn chưa có quyền micro, không thể ghi âm.",
+              );
+              Navigator.pop(context); // 🚪 Thoát khỏi màn ghi âm
+            }
+            return;
+          }
+        } else {
+          if (context.mounted) Navigator.pop(context);
+          return;
+        }
       }
-    });
 
-    setState(() {
-      _isRecording = true;
-      _isRecorded = false;
-    });
+      final dir = await getTemporaryDirectory();
+      _path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';
+
+      await _recorder.startRecorder(toFile: _path!, codec: Codec.aacADTS);
+
+      // Timer cập nhật biên độ sóng
+      _timer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        setState(() {
+          _amplitude =
+              (0.3 + (0.7 * (DateTime.now().millisecond % 1000) / 1000));
+        });
+      });
+
+      // Timer đếm thời gian
+      Timer.periodic(const Duration(seconds: 1), (t) {
+        if (!_isRecording) {
+          t.cancel();
+        } else {
+          setState(() => _seconds++);
+        }
+      });
+
+      setState(() {
+        _isRecording = true;
+        _isRecorded = false;
+      });
+    } catch (e) {
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: "Không thể bắt đầu ghi âm: $e",
+      );
+      if (context.mounted) Navigator.pop(context);
+    }
   }
 
   Future<void> _stopRecording() async {
@@ -89,7 +142,10 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   Future<void> _togglePlay() async {
     if (_path == null) return;
     if (_seconds < 1) {
-      await _showAlertDialog();
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: "Ghi âm quá ngắn, vui lòng thử lại",
+      );
       return;
     }
 
@@ -108,6 +164,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
     }
   }
 
+<<<<<<< HEAD
   Future<bool?> _showConfirmDialog(BuildContext context) {
     return showAlertDialog(
       context,
@@ -120,6 +177,8 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
     );
   }
 
+=======
+>>>>>>> origin/master
   @override
   void dispose() {
     _recorder.closeRecorder();
@@ -133,7 +192,14 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
     return WillPopScope(
       onWillPop: () async {
         if (_isRecorded) {
-          final result = await _showConfirmDialog(context);
+          final result = await ShowNotification.showConfirmDialog(
+            context,
+            title: 'Hủy bỏ bản ghi ?',
+            cancelText: 'Quay lại',
+            confirmText: 'Xác nhận',
+            confirmColor: Color(0xFF7A2FC0),
+          );
+          ;
           if (result == true) {
             setState(() {
               _isRecorded = false;
@@ -281,7 +347,10 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
             label: const Text("Gửi", style: TextStyle(color: Colors.white)),
             onPressed: () async {
               if (_seconds < 1) {
-                await _showAlertDialog();
+                await ShowNotification.showCustomAlertDialog(
+                  context,
+                  message: "Ghi âm quá ngắn, vui lòng thử lại",
+                );
                 return;
               }
               if (_path != null) widget.onSend(_path!);
@@ -310,7 +379,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
               style: TextStyle(color: Color(0xFF7A2FC0)),
             ),
             onPressed: () async {
-              final result = await _showConfirmDialog(context);
+              final result = await ShowNotification.showConfirmDialog(context);
               if (result == true) {
                 setState(() {
                   _isRecorded = false;
@@ -325,10 +394,13 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
     );
   }
 
+<<<<<<< HEAD
   Future<void> _showAlertDialog() async {
     await showToast(context, 'Ghi âm quá ngắn, vui lòng thử lại');
   }
 
+=======
+>>>>>>> origin/master
   String _formatDuration(int seconds) {
     final m = (seconds ~/ 60).toString().padLeft(2, '0');
     final s = (seconds % 60).toString().padLeft(2, '0');

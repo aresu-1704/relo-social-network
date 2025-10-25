@@ -15,7 +15,7 @@ class MessageComposer extends StatefulWidget {
 class _MessageComposerState extends State<MessageComposer> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
-  String? _activeInput; // 'gallery', 'voice', or null
+  String? _activeInput;
 
   @override
   void initState() {
@@ -41,6 +41,7 @@ class _MessageComposerState extends State<MessageComposer> {
     final content = {'type': 'text', 'text': _textController.text.trim()};
     _textController.clear();
     widget.onSend(content);
+    _focusNode.unfocus();
   }
 
   void _toggleInput(String type) {
@@ -90,10 +91,7 @@ class _MessageComposerState extends State<MessageComposer> {
                             _activeInput = null;
                           });
                         },
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Color(0xFF7C3AED),
-                        ),
+                        icon: const Icon(Icons.arrow_back, color: Colors.grey),
                       ),
                       const SizedBox(width: 8),
                     ],
@@ -102,7 +100,7 @@ class _MessageComposerState extends State<MessageComposer> {
                     children: [
                       const Icon(
                         Icons.emoji_emotions_outlined,
-                        color: Color(0xFF7C3AED),
+                        color: Colors.grey,
                       ),
                       const SizedBox(width: 8),
                       IconButton(
@@ -110,7 +108,7 @@ class _MessageComposerState extends State<MessageComposer> {
                           _activeInput == 'gallery'
                               ? Icons.keyboard
                               : Icons.photo_outlined,
-                          color: const Color(0xFF7C3AED),
+                          color: Colors.grey,
                         ),
                         onPressed: () => _toggleInput('gallery'),
                       ),
@@ -119,6 +117,7 @@ class _MessageComposerState extends State<MessageComposer> {
                         child: TextField(
                           controller: _textController,
                           focusNode: _focusNode,
+                          autofocus: false,
                           decoration: const InputDecoration.collapsed(
                             hintText: 'Tin nhắn',
                           ),
@@ -130,12 +129,12 @@ class _MessageComposerState extends State<MessageComposer> {
                           _activeInput == 'voice'
                               ? Icons.keyboard
                               : Icons.mic_none_rounded,
-                          color: const Color(0xFF7C3AED),
+                          color: Colors.grey,
                         ),
                         onPressed: () => _toggleInput('voice'),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.send, color: Color(0xFF7C3AED)),
+                        icon: const Icon(Icons.send, color: Colors.grey),
                         onPressed: _sendMessage,
                       ),
                     ],

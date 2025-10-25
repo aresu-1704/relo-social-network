@@ -84,123 +84,135 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 90),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: Image.asset(
-                  'assets/icons/app_logo.png',
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'ĐĂNG NHẬP',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.lato(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Trường nhập tên đăng nhập
-              _buildTextField(
-                controller: _usernameController,
-                hint: 'Tên đăng nhập',
-                icon: Icons.person_outline,
-                validatorMsg: 'Tên đăng nhập không được để trống',
-              ),
-              const SizedBox(height: 16),
-
-              // Trường nhập mật khẩu
-              _buildTextField(
-                controller: _passwordController,
-                hint: 'Mật khẩu',
-                icon: Icons.lock_outline,
-                obscure: true,
-                validatorMsg: 'Mật khẩu không được để trống',
-              ),
-
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          // TODO: Implement forgot password functionality
-                        },
-                  child: Text(
-                    'Quên mật khẩu ?',
-                    style: GoogleFonts.lato(color: primaryColor),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFFF3E8FF), // tím nhạt
+              Color(0xFFFFFFFF), // trắng
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 90),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: Image.asset(
+                    'assets/icons/app_logo.png',
+                    width: 150,
+                    height: 150,
+                    fit: BoxFit.cover,
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 1),
-
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                const SizedBox(height: 20),
+                Text(
+                  'MẠNG XÃ HỘI RELO, NHẮN TIN TRỰC TUYẾN VÀ CHIA SẼ CẢM XÚC',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'Đăng nhập',
-                          style: GoogleFonts.lato(
-                            fontSize: 20,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
-              ),
+                const SizedBox(height: 32),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Không có tài khoản ?', style: GoogleFonts.lato()),
-                  TextButton(
+                // Trường nhập tên đăng nhập
+                _buildTextField(
+                  controller: _usernameController,
+                  hint: 'Tên đăng nhập',
+                  icon: Icons.person_outline,
+                  validatorMsg: 'Tên đăng nhập không được để trống',
+                ),
+                const SizedBox(height: 16),
+
+                // Trường nhập mật khẩu
+                _buildTextField(
+                  controller: _passwordController,
+                  hint: 'Mật khẩu',
+                  icon: Icons.lock_outline,
+                  obscure: true,
+                  validatorMsg: 'Mật khẩu không được để trống',
+                ),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
                     onPressed: _isLoading
                         ? null
                         : () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            );
+                            // TODO: Implement forgot password functionality
                           },
                     child: Text(
-                      'Đăng ký',
-                      style: GoogleFonts.lato(
-                        fontWeight: FontWeight.bold,
-                        color: primaryColor,
-                      ),
+                      'Quên mật khẩu ?',
+                      style: GoogleFonts.lato(color: primaryColor),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 32),
-            ],
+                ),
+
+                const SizedBox(height: 1),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'Đăng nhập',
+                            style: GoogleFonts.lato(
+                              fontSize: 20,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Không có tài khoản ?', style: GoogleFonts.lato()),
+                    TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              );
+                            },
+                      child: Text(
+                        'Đăng ký',
+                        style: GoogleFonts.lato(
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
           ),
         ),
       ),

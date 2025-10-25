@@ -14,6 +14,7 @@ class ConversationCreate(BaseModel):
 
 # Schema for simplified message response
 class SimpleMessagePublic(BaseModel):
+    id: str
     senderId: str
     avatarUrl: Optional[str]
     content: Dict

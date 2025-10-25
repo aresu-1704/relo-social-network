@@ -8,11 +8,12 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:relo/widgets/audio_message_bubble.dart';
-import 'package:relo/widgets/media_message_bubble.dart';
-import 'package:relo/widgets/text_message_bubble.dart';
+import 'package:relo/widgets/message_list.dart';
 import 'package:relo/widgets/message_composer.dart';
 import 'package:relo/utils/message_utils.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:flutter/services.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -93,6 +94,20 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) {
           setState(() {
             _messages.insert(0, newMsg);
+          });
+        }
+      } else if (data['type'] == 'recalled_message') {
+        final msgData = data['payload']?['message'];
+        if (msgData == null) return;
+
+        final messageId = msgData['id'];
+        final index = _messages.indexWhere((m) => m.id == messageId);
+
+        if (index != -1) {
+          setState(() {
+            _messages[index] = _messages[index].copyWith(
+              content: {'type': 'delete'},
+            );
           });
         }
       }
@@ -202,6 +217,108 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _recallMessage(Message message) async {
+    try {
+      // Call the service to recall the message
+      await _messageService.recallMessage(message);
+
+      // Update UI based on message status
+      if (message.status == 'pending' || message.status == 'failed') {
+        // If the message was pending or failed, it was deleted locally.
+        // Remove it from the list to update the UI instantly.
+        setState(() {
+          _messages.removeWhere((m) => m.id == message.id);
+        });
+      } else {
+        // If the message was sent, the websocket event will update the UI for all users.
+        // For the current user, we can update it immediately.
+        final index = _messages.indexWhere((m) => m.id == message.id);
+        if (index != -1) {
+          setState(() {
+            _messages[index] = _messages[index].copyWith(
+              content: {'type': 'delete'},
+            );
+          });
+        }
+      }
+    } catch (e) {
+      await ShowNotification.showToast(
+        context,
+        'Thu hồi tin nhắn thất bại: ${e.toString()}',
+      );
+    }
+  }
+
+  void _showMessageActions(Message message) {
+    final isMe = message.senderId == _currentUserId;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, -3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              if (message.content['type'] == 'text')
+                // Nút sao chép
+                _ActionButton(
+                  icon: LucideIcons.copy,
+                  label: 'Sao chép',
+                  color: const Color(0xFF4CAF50),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    Clipboard.setData(
+                      ClipboardData(text: message.content['text']),
+                    );
+                    await ShowNotification.showToast(
+                      context,
+                      'Đã sao chép văn bản vào bộ nhớ tạm',
+                    );
+                  },
+                ),
+
+              // Nút chuyển tiếp
+              _ActionButton(
+                icon: LucideIcons.share2, // icon mới gọn, đẹp hơn
+                label: 'Chuyển tiếp',
+                color: const Color(0xFF2979FF),
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: logic chuyển tiếp
+                },
+              ),
+
+              // Nút thu hồi (chỉ hiện với tin nhắn của mình)
+              if (isMe)
+                _ActionButton(
+                  icon: LucideIcons.trash2,
+                  label: 'Thu hồi',
+                  color: const Color(0xFFFF5252),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _recallMessage(message);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -253,87 +370,129 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
 
       backgroundColor: const Color.fromARGB(255, 232, 233, 235),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _messages.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.message_outlined,
-                              size: 80,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 20),
-                            Text("Chưa có tin nhắn nào, hãy gửi một lời chào"),
-                          ],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _messages.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.message_outlined,
+                                size: 80,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 20),
+                              Text(
+                                "Chưa có tin nhắn nào, hãy gửi một lời chào",
+                              ),
+                            ],
+                          ),
+                        )
+                      : MessageList(
+                          messages: _messages,
+                          currentUserId: _currentUserId!,
+                          isLoadingMore: _isLoadingMore,
+                          hasMore: _hasMore,
+                          scrollController: _scrollController,
+                          currentlyPlayingUrl: _currentlyPlayingUrl,
+                          onPlayAudio: _playAudio,
+                          onMessageLongPress: _showMessageActions,
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.all(8.0),
-                        itemCount: _messages.length + (_isLoadingMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (_isLoadingMore && index == _messages.length) {
-                            return const Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Center(child: CircularProgressIndicator()),
-                            );
-                          }
-
-                          final message = _messages[index];
-                          final isMe = message.senderId == _currentUserId;
-
-                          final messageType = message.content['type'];
-
-                          if (messageType == 'audio') {
-                            final url = message.content['url'];
-                            final isPlaying = _currentlyPlayingUrl == url;
-
-                            return AudioMessageBubble(
-                              message: message,
-                              isMe: isMe,
-                              isPlaying: isPlaying,
-                              onPlay: () => _playAudio(url),
-                            );
-                          } else if (messageType == 'media') {
-                            return MediaMessageBubble(
-                              message: message,
-                              isMe: isMe,
-                            );
-                          } else {
-                            return TextMessageBubble(
-                              message: message,
-                              isMe: isMe,
-                            );
-                          }
-                        },
-                      ),
-              ),
-              MessageComposer(
-                onSend: (content) => MessageUtils.performSend(
-                  context,
-                  _messageService,
-                  _uuid,
-                  _messages,
-                  _conversationId!,
-                  _currentUserId!,
-                  content,
-                  (updatedMessages) => setState(() {
-                    _messages
-                      ..clear()
-                      ..addAll(updatedMessages);
-                  }),
                 ),
+                MessageComposer(
+                  onSend: (content) => MessageUtils.performSend(
+                    context,
+                    _messageService,
+                    _uuid,
+                    _messages,
+                    _conversationId!,
+                    _currentUserId!,
+                    content,
+                    (updatedMessages) => setState(() {
+                      _messages
+                        ..clear()
+                        ..addAll(updatedMessages);
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Widget nút với hiệu ứng scale khi nhấn
+class _ActionButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton>
+    with SingleTickerProviderStateMixin {
+  double _scale = 1.0;
+
+  void _onTapDown(TapDownDetails details) {
+    setState(() => _scale = 0.9);
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    setState(() => _scale = 1.0);
+    widget.onTap();
+  }
+
+  void _onTapCancel() {
+    setState(() => _scale = 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedScale(
+            scale: _scale,
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOut,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: widget.color.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-            ],
+              child: Icon(widget.icon, size: 28, color: widget.color),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.label,
+            style: TextStyle(color: widget.color, fontWeight: FontWeight.w500),
           ),
         ],
       ),

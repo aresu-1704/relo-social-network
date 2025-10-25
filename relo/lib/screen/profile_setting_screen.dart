@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:relo/screen/login_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/models/user.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/auth_service.dart';
+<<<<<<< HEAD
 import 'default_screen.dart';
 import 'profile_screen.dart';
 import 'privacy_settings_screen.dart';
+=======
+>>>>>>> origin/master
 
 class ProfileSettingScreen extends StatefulWidget {
   const ProfileSettingScreen({super.key});
@@ -119,7 +123,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                                         ).pushAndRemoveUntil(
                                           MaterialPageRoute(
                                             builder: (context) =>
-                                                DefaultScreen(),
+                                                LoginScreen(),
                                           ),
                                           (route) => false,
                                         );
