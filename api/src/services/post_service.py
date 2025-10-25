@@ -2,10 +2,10 @@ import asyncio
 import base64
 import tempfile
 from cloudinary.uploader import upload as cloudinary_upload, destroy as cloudinary_destroy
-from ..models import Post, AuthorInfo, Reaction
+from ..models import Post, AuthorInfo, Reaction, Comment
 from ..models import User
 from ..websocket import manager
-from ..schemas import PostPublic, MediaItem
+from ..schemas import PostPublic, MediaItem, CommentPublic
 
 class PostService:
 
@@ -164,3 +164,81 @@ class PostService:
         # Xóa bài đăng
         await post.delete()
         return {"message": "Bài đăng đã được xóa thành công"}
+
+    @staticmethod
+    async def create_comment(post_id: str, user_id: str, content: str):
+        """
+        Tạo một bình luận mới cho bài đăng.
+        """
+        # Kiểm tra bài đăng có tồn tại không
+        post = await Post.get(post_id)
+        if not post:
+            raise ValueError("Không tìm thấy bài đăng.")
+        
+        # Lấy thông tin người dùng
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Tạo comment
+        new_comment = Comment(
+            postId=post_id,
+            userId=user_id,
+            content=content
+        )
+        await new_comment.save()
+        
+        # Tăng comment count của bài đăng
+        post.commentCount += 1
+        await post.save()
+        
+        # Trả về comment với thông tin user
+        return CommentPublic(
+            id=str(new_comment.id),
+            postId=post_id,
+            userId=user_id,
+            userDisplayName=user.displayName,
+            userAvatarUrl=user.avatarUrl,
+            content=content,
+            createdAt=new_comment.createdAt.isoformat()
+        )
+
+    @staticmethod
+    async def get_comments(post_id: str, skip: int = 0, limit: int = 50):
+        """
+        Lấy danh sách bình luận của một bài đăng.
+        """
+        # Kiểm tra bài đăng có tồn tại không
+        post = await Post.get(post_id)
+        if not post:
+            raise ValueError("Không tìm thấy bài đăng.")
+        
+        # Lấy comments
+        comments = await Comment.find(
+            {"postId": post_id},
+            sort="createdAt",
+            skip=skip,
+            limit=limit
+        ).to_list()
+        
+        # Lấy thông tin users
+        user_ids = list(set(comment.userId for comment in comments))
+        users = await User.find({"_id": {"$in": [await User.get(uid) for uid in user_ids]}}).to_list()
+        user_map = {str(u.id): u for u in users if u}
+        
+        # Map comments với user info
+        result = []
+        for comment in comments:
+            user = user_map.get(comment.userId)
+            if user:
+                result.append(CommentPublic(
+                    id=str(comment.id),
+                    postId=comment.postId,
+                    userId=comment.userId,
+                    userDisplayName=user.displayName,
+                    userAvatarUrl=user.avatarUrl,
+                    content=comment.content,
+                    createdAt=comment.createdAt.isoformat()
+                ))
+        
+        return result

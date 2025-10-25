@@ -4,6 +4,7 @@ import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 import 'profile_setting_screen.dart';
+import 'newsfeed_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class MainScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class MainScreenState extends State<MainScreen> {
     // Cập nhật lại body để sử dụng _buildProfileScreen cho tab cá nhân
     final List<Widget> currentScreens = [
       MessagesScreen(),
-      Center(child: Text('TODO: Tường nhà')),
+      const NewsFeedScreen(),
       const FriendsScreen(),
       Center(child: Text('TODO: Thông báo')),
       ProfileSettingScreen(),

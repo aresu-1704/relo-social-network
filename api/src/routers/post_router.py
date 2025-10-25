@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from ..services import PostService
-from ..schemas import PostCreate, PostPublic, ReactionCreate
+from ..schemas import PostCreate, PostPublic, ReactionCreate, CommentCreate, CommentPublic
 from ..models import User
 from ..security import get_current_user
 
 router = APIRouter(tags=["Post"])
 
-@router.post("/posts", response_model=PostPublic, status_code=201)
+@router.post("", response_model=PostPublic, status_code=201)
 async def create_post(
     post_data: PostCreate,
     current_user: User = Depends(get_current_user)
@@ -16,7 +16,7 @@ async def create_post(
     try:
         # Gọi service để tạo bài đăng một cách bất đồng bộ
         new_post = await PostService.create_post(
-            author_id=str(current_user.id), # Sử dụng str(current_user.id) thay vì _id
+            author_id=str(current_user.id),
             content=post_data.content,
             media_base_64=post_data.mediaBase64
         )
@@ -34,7 +34,7 @@ async def create_post(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/posts/feed", response_model=List[PostPublic])
+@router.get("/feed", response_model=List[PostPublic])
 async def get_post_feed(skip: int = 0, limit: int = 20):
     """Lấy một nguồn cấp dữ liệu (feed) các bài đăng, không yêu cầu xác thực."""
     # Lấy danh sách bài đăng một cách bất đồng bộ
@@ -42,7 +42,7 @@ async def get_post_feed(skip: int = 0, limit: int = 20):
     # Ánh xạ danh sách kết quả sang schema PostPublic
     return posts
 
-@router.post("/posts/{post_id}/react", response_model=PostPublic)
+@router.post("/{post_id}/react", response_model=PostPublic)
 async def react_to_post(
     post_id: str,
     reaction_data: ReactionCreate,
@@ -70,7 +70,7 @@ async def react_to_post(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-@router.delete("/posts/{post_id}", status_code=200)
+@router.delete("/{post_id}", status_code=200)
 async def delete_post(
     post_id: str,
     current_user: User = Depends(get_current_user)
@@ -84,3 +84,29 @@ async def delete_post(
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+@router.post("/{post_id}/comments", response_model=CommentPublic, status_code=201)
+async def create_comment(
+    post_id: str,
+    comment_data: CommentCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Tạo bình luận cho một bài đăng."""
+    try:
+        new_comment = await PostService.create_comment(
+            post_id=post_id,
+            user_id=str(current_user.id),
+            content=comment_data.content
+        )
+        return new_comment
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/{post_id}/comments", response_model=List[CommentPublic])
+async def get_comments(post_id: str, skip: int = 0, limit: int = 50):
+    """Lấy danh sách bình luận của một bài đăng."""
+    try:
+        comments = await PostService.get_comments(post_id=post_id, skip=skip, limit=limit)
+        return comments
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
