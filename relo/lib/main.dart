@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/firebase_options.dart';
-import 'package:relo/screen/default_screen.dart';
 import 'package:relo/screen/main_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/websocket_service.dart';
+import 'package:relo/screen/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +19,7 @@ void main() async {
   webSocketService.setAuthErrorHandler(() {
     // Navigate to login screen on auth failure
     ServiceLocator.navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const DefaultScreen()),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
       (route) => false,
     );
   });
@@ -63,7 +63,7 @@ class MyApp extends StatelessWidget {
       theme: theme.copyWith(
         textTheme: GoogleFonts.robotoTextTheme(theme.textTheme),
       ),
-      home: isLoggedIn ? const MainScreen() : const DefaultScreen(),
+      home: isLoggedIn ? const MainScreen() : const LoginScreen(),
     );
   }
 }

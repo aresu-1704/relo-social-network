@@ -5,7 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/edit_image.dart';
 import 'package:video_player/video_player.dart';
-import 'package:relo/utils/show_toast.dart';
+import 'package:relo/utils/show_notification.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ReviewScreen extends StatefulWidget {
@@ -40,7 +40,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
       if (Platform.isAndroid) {
         final status = await Permission.storage.request();
         if (!status.isGranted) {
-          await showToast(context, 'Không có quyền lưu tệp');
+          await ShowNotification.showToast(context, 'Không có quyền lưu tệp');
           return;
         }
       }
@@ -79,10 +79,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
       }
 
       // 4️⃣ Hiển thị toast thành công
-      await showToast(context, 'Đã lưu vào thư mục Tải xuống');
+      await ShowNotification.showToast(context, 'Đã lưu vào thư mục Tải xuống');
     } catch (e) {
       debugPrint("Error saving file: $e");
-      await showToast(context, 'Lỗi khi tải xuống');
+      await ShowNotification.showToast(context, 'Lỗi khi tải xuống');
     } finally {
       setState(() => _isDownloading = false);
     }

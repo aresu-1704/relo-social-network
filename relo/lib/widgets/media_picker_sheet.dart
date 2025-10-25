@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:relo/screen/camera_screen.dart';
-import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class MediaPickerSheet extends StatefulWidget {
   final void Function(List<File> files) onPicked;
@@ -30,7 +30,7 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
       final permitted = await PhotoManager.requestPermissionExtend();
 
       if (!permitted.isAuth) {
-        final openSettings = await showCustomAlertDialog(
+        final openSettings = await ShowNotification.showCustomAlertDialog(
           context,
           message: "Ứng dụng cần quyền truy cập ảnh và video để gửi tệp",
           buttonText: "Mở cài đặt",
@@ -44,7 +44,7 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
           final after = await PhotoManager.requestPermissionExtend();
           if (!after.isAuth) {
             if (context.mounted) {
-              await showCustomAlertDialog(
+              await ShowNotification.showCustomAlertDialog(
                 context,
                 message: "Vẫn chưa có quyền truy cập ảnh/video.",
               );
@@ -75,7 +75,7 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
         });
       }
     } catch (e) {
-      await showCustomAlertDialog(
+      await ShowNotification.showCustomAlertDialog(
         context,
         message: "Không thể tải ảnh/video: $e",
       );
@@ -100,7 +100,7 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
 
     const maxSize = 150 * 1024 * 1024; // 150 MB in bytes
     if (totalSize > maxSize) {
-      await showCustomAlertDialog(
+      await ShowNotification.showCustomAlertDialog(
         context,
         message: "Tổng dung lượng file vượt quá 150MB, vui lòng chọn ít hơn",
       );
@@ -117,7 +117,7 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
       });
     } else {
       if (_selectedAssets.length >= 30) {
-        await showCustomAlertDialog(
+        await ShowNotification.showCustomAlertDialog(
           context,
           message: "Chỉ được chọn tối đa 30 mục",
         );

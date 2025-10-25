@@ -2,13 +2,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'message.g.dart';
 
-enum MessageType {
-  text,
-  image,
-  video,
-  audio,
-  unsupported,
-}
+enum MessageType { text, image, video, audio, unsupported }
 
 @JsonSerializable()
 class Message {
@@ -54,7 +48,6 @@ class Message {
   String get url => content['url'] ?? '';
   String get fileName => content['fileName'] ?? '';
 
-
   /// ✅ Dành cho dữ liệu từ SQLite hoặc file JSON local
   factory Message.fromJson(Map<String, dynamic> json) {
     final rawContent = json['content'];
@@ -85,19 +78,18 @@ class Message {
   /// ✅ Dành riêng cho dữ liệu từ backend API
   factory Message.fromServerJson(Map<String, dynamic> json) {
     final rawContent = json['content'];
-     Map<String, dynamic> parsedContent;
+    Map<String, dynamic> parsedContent;
     if (rawContent is Map<String, dynamic>) {
       parsedContent = rawContent;
     } else if (rawContent is String) {
-       // Should not happen with new backend, but for safety
+      // Should not happen with new backend, but for safety
       parsedContent = {'type': 'text', 'text': rawContent};
-    }
-    else {
+    } else {
       parsedContent = {'type': 'unsupported'};
     }
 
     return Message(
-      id: json['_id']?.toString() ?? '',
+      id: json['id']?.toString() ?? '',
       content: parsedContent,
       senderId: json['senderId'] ?? '',
       conversationId: json['conversationId'] ?? '',

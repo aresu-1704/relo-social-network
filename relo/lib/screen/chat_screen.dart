@@ -13,7 +13,7 @@ import 'package:relo/widgets/message_composer.dart';
 import 'package:relo/utils/message_utils.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter/services.dart';
-import 'package:relo/utils/show_toast.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -94,6 +94,20 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) {
           setState(() {
             _messages.insert(0, newMsg);
+          });
+        }
+      } else if (data['type'] == 'recalled_message') {
+        final msgData = data['payload']?['message'];
+        if (msgData == null) return;
+
+        final messageId = msgData['id'];
+        final index = _messages.indexWhere((m) => m.id == messageId);
+
+        if (index != -1) {
+          setState(() {
+            _messages[index] = _messages[index].copyWith(
+              content: {'type': 'delete'},
+            );
           });
         }
       }
@@ -203,6 +217,38 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _recallMessage(Message message) async {
+    try {
+      // Call the service to recall the message
+      await _messageService.recallMessage(message);
+
+      // Update UI based on message status
+      if (message.status == 'pending' || message.status == 'failed') {
+        // If the message was pending or failed, it was deleted locally.
+        // Remove it from the list to update the UI instantly.
+        setState(() {
+          _messages.removeWhere((m) => m.id == message.id);
+        });
+      } else {
+        // If the message was sent, the websocket event will update the UI for all users.
+        // For the current user, we can update it immediately.
+        final index = _messages.indexWhere((m) => m.id == message.id);
+        if (index != -1) {
+          setState(() {
+            _messages[index] = _messages[index].copyWith(
+              content: {'type': 'delete'},
+            );
+          });
+        }
+      }
+    } catch (e) {
+      await ShowNotification.showToast(
+        context,
+        'Thu hồi tin nhắn thất bại: ${e.toString()}',
+      );
+    }
+  }
+
   void _showMessageActions(Message message) {
     final isMe = message.senderId == _currentUserId;
 
@@ -237,7 +283,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     Clipboard.setData(
                       ClipboardData(text: message.content['text']),
                     );
-                    await showToast(
+                    await ShowNotification.showToast(
                       context,
                       'Đã sao chép văn bản vào bộ nhớ tạm',
                     );
@@ -263,7 +309,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: const Color(0xFFFF5252),
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: logic thu hồi
+                    _recallMessage(message);
                   },
                 ),
             ],

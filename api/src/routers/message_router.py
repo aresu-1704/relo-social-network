@@ -106,3 +106,20 @@ async def mark_conversation_as_seen(
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+@router.post("/messages/{message_id}/recall", status_code=200)
+async def recall_message(
+    message_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Thu hồi một tin nhắn đã gửi."""
+    try:
+        await MessageService.recall_message(
+            message_id=message_id,
+            user_id=str(current_user.id)
+        )
+        return {"message": "Tin nhắn đã được thu hồi thành công."}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
