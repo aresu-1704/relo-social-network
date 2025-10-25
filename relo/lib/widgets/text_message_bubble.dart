@@ -18,17 +18,26 @@ class TextMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPending = message.status == 'pending';
     final isFailed = message.status == 'failed';
+    final isRecalled =
+        message.content['type'] == 'delete' ||
+        message.content['type'] == 'recalled_message';
 
     // 🎨 Màu bong bóng
-    final bubbleColor = isMe
+    final bubbleColor = isRecalled
+        ? Colors.grey[300]
+        : isMe
         ? (isPending
-              ? Color(0xFFA555F0).withOpacity(0.2)
+              ? const Color(0xFFA555F0).withOpacity(0.2)
               : isFailed
-              ? Colors.grey[400]
-              : Color(0xFFA555F0))
+              ? Colors.grey[700]
+              : const Color(0xFFA555F0))
         : Colors.white;
 
-    final textColor = isMe ? Colors.white : Colors.black87;
+    final textColor = isRecalled
+        ? Colors.grey[700]
+        : isMe
+        ? Colors.white
+        : Colors.black87;
 
     // 🕓 Giờ gửi
     final timeString =
@@ -83,11 +92,14 @@ class TextMessageBubble extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      message.content['text'] ?? '',
+                      isRecalled
+                          ? 'Tin nhắn đã bị thu hồi'
+                          : message.content['text'] ?? '',
                       style: TextStyle(
                         color: textColor,
                         fontSize: 15,
                         height: 1.3,
+                        fontStyle: isRecalled ? FontStyle.italic : null,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -97,7 +109,11 @@ class TextMessageBubble extends StatelessWidget {
                         Text(
                           timeString,
                           style: TextStyle(
-                            color: isMe ? Colors.white70 : Colors.grey[600],
+                            color: isRecalled
+                                ? Colors.grey[700]
+                                : isMe
+                                ? Colors.white70
+                                : Colors.grey[600],
                             fontSize: 11,
                           ),
                         ),
@@ -106,7 +122,7 @@ class TextMessageBubble extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isMe && isLastFromMe)
+              if (isMe && isLastFromMe && !isRecalled)
                 Padding(
                   padding: const EdgeInsets.only(top: 1, right: 0),
                   child: MessageStatusWidget(message: message),
