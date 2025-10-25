@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:relo/models/user.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
@@ -12,14 +11,17 @@ import 'package:shimmer/shimmer.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:relo/utils/permission_handler_util.dart';
+import 'package:relo/utils/show_toast.dart';
+import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/screen/privacy_settings_screen.dart';
 import 'dart:convert';
 import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // Null means current user
   
-  const ProfileScreen({Key? key, this.userId}) : super(key: key);
+  const ProfileScreen({super.key, this.userId});
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -45,7 +47,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   int _friendCount = 0;
   int _postCount = 0;
   bool _isFriend = false;
-  bool _isBlocked = false;
   bool _hasPendingRequest = false;
   
   // Temporary image storage for preview
@@ -112,7 +113,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         _isLoading = false;
       });
       _refreshController.refreshFailed();
-      _showError('Không thể tải thông tin người dùng');
+      if (mounted) {
+        await showToast(context, 'Không thể tải thông tin người dùng');
+      }
     }
   }
   
@@ -153,84 +156,102 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     try {
       // Check permission for camera
       if (source == ImageSource.camera) {
-        final status = await Permission.camera.request();
-        if (!status.isGranted) {
-          _showError('Cần cấp quyền camera để chụp ảnh');
+        final hasPermission = await PermissionHandlerUtil.requestCameraPermission(context);
+        if (!hasPermission) {
           return;
         }
       }
       
-      // Pick image
+      // Pick image with optimized settings (như message_service.py)
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        maxWidth: 1024,  // Tối ưu size cho avatar
+        maxHeight: 1024,
+        imageQuality: 90, // Chất lượng cao hơn
       );
       
       if (image == null) return;
       
-      // Store temp path for preview
+      // Store temp path for instant preview
       setState(() {
         _tempAvatarPath = image.path;
       });
       
       _showLoadingDialog('Đang tải ảnh lên Cloudinary...');
       
-      // Read image bytes
-      final bytes = await File(image.path).readAsBytes();
+      // Optimize image before upload (giống message_service.py)
+      final File imageFile = File(image.path);
+      final bytes = await imageFile.readAsBytes();
       
-      // Create proper base64 string
-      final base64String = base64Encode(bytes);
-      final base64Image = 'data:image/jpeg;base64,$base64String';
-      
-      // Clear cache of old image first
-      if (_user?.avatarUrl != null) {
-        await CachedNetworkImage.evictFromCache(_user!.avatarUrl!);
-        PaintingBinding.instance.imageCache.clear();
-        PaintingBinding.instance.imageCache.clearLiveImages();
+      // Check file size
+      if (bytes.lengthInBytes > 5 * 1024 * 1024) { // 5MB limit
+        Navigator.pop(context);
+        if (mounted) {
+          await showToast(context, 'Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB');
+        }
+        setState(() {
+          _tempAvatarPath = null;
+        });
+        return;
       }
       
-      // Upload to server and get updated user
+      // Create proper base64 string with MIME type
+      final String mimeType = image.path.toLowerCase().endsWith('.png') 
+          ? 'image/png' 
+          : 'image/jpeg';
+      final base64String = base64Encode(bytes);
+      final base64Image = 'data:$mimeType;base64,$base64String';
+      
+      // Clear all image caches before upload
+      if (_user?.avatarUrl != null) {
+        await CachedNetworkImage.evictFromCache(_user!.avatarUrl!);
+      }
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      
+      // Upload to server using optimized method
       final updatedUser = await _userService.updateAvatar(base64Image);
       
-      // Give Cloudinary some time to process
-      await Future.delayed(Duration(milliseconds: 1500));
+      // Wait for Cloudinary processing
+      await Future.delayed(Duration(seconds: 1));
       
       Navigator.pop(context); // Close loading
       
       if (updatedUser != null) {
-        // Clear cache of new URL to force reload
-        if (updatedUser.avatarUrl != null) {
-          await CachedNetworkImage.evictFromCache(updatedUser.avatarUrl!);
-          PaintingBinding.instance.imageCache.clear();
-          PaintingBinding.instance.imageCache.clearLiveImages();
-        }
+        // Force refresh cache với timestamp
+        final newUrl = '${updatedUser.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}';
         
         setState(() {
           _user = updatedUser;
           _tempAvatarPath = null;
         });
         
-        // Wait a bit then precache new image
-        await Future.delayed(Duration(milliseconds: 300));
+        // Prefetch new image với retry
         if (updatedUser.avatarUrl != null && mounted) {
-          try {
-            await precacheImage(
-              CachedNetworkImageProvider(updatedUser.avatarUrl!),
-              context,
-            );
-          } catch (e) {
-            print('Precache failed: $e');
+          for (int i = 0; i < 3; i++) {
+            try {
+              await precacheImage(
+                CachedNetworkImageProvider(newUrl),
+                context,
+              );
+              break;
+            } catch (e) {
+              if (i == 2) print('Precache failed after 3 attempts: $e');
+              await Future.delayed(Duration(milliseconds: 500));
+            }
           }
         }
         
-        _showSuccess('Ảnh đại diện đã được cập nhật!');
+        if (mounted) {
+          await showToast(context, 'Ảnh đại diện đã được cập nhật!');
+        }
       } else {
         setState(() {
           _tempAvatarPath = null;
         });
-        _showError('Không thể cập nhật ảnh đại diện');
+        if (mounted) {
+          await showToast(context, 'Không thể cập nhật ảnh đại diện');
+        }
       }
       
     } catch (e) {
@@ -238,9 +259,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         _tempAvatarPath = null;
       });
       if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context); // Close loading if still open
+        Navigator.pop(context);
       }
-      _showError('Lỗi: ${e.toString()}');
+      if (mounted) {
+        await showToast(context, 'Đã xảy ra lỗi, vui lòng thử lại');
+      }
     }
   }
 
@@ -248,84 +271,104 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     try {
       // Check permission for camera
       if (source == ImageSource.camera) {
-        final status = await Permission.camera.request();
-        if (!status.isGranted) {
-          _showError('Cần cấp quyền camera để chụp ảnh');
+        final hasPermission = await PermissionHandlerUtil.requestCameraPermission(context);
+        if (!hasPermission) {
           return;
         }
       }
       
-      // Pick image
+      // Pick image with optimized settings for cover photo
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1200,
-        maxHeight: 600,
-        imageQuality: 85,
+        maxWidth: 1920,  // HD width for cover
+        maxHeight: 1080, // HD height
+        imageQuality: 85, // Balance quality and size
       );
       
       if (image == null) return;
       
-      // Store temp path for preview
+      // Store temp path for instant preview
       setState(() {
         _tempBackgroundPath = image.path;
       });
       
-      _showLoadingDialog('Đang tải ảnh lên Cloudinary...');
+      _showLoadingDialog('Đang tải ảnh bìa lên Cloudinary...');
       
-      // Read image bytes
-      final bytes = await File(image.path).readAsBytes();
+      // Optimize image before upload
+      final File imageFile = File(image.path);
+      final bytes = await imageFile.readAsBytes();
       
-      // Create proper base64 string
-      final base64String = base64Encode(bytes);
-      final base64Image = 'data:image/jpeg;base64,$base64String';
-      
-      // Clear cache of old image first
-      if (_user?.backgroundUrl != null) {
-        await CachedNetworkImage.evictFromCache(_user!.backgroundUrl!);
-        PaintingBinding.instance.imageCache.clear();
-        PaintingBinding.instance.imageCache.clearLiveImages();
+      // Check file size (larger limit for cover)
+      if (bytes.lengthInBytes > 8 * 1024 * 1024) { // 8MB limit for cover
+        Navigator.pop(context);
+        if (mounted) {
+          await showToast(context, 'Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 8MB');
+        }
+        setState(() {
+          _tempBackgroundPath = null;
+        });
+        return;
       }
       
-      // Upload to server and get updated user
+      // Create proper base64 string with MIME type
+      final String mimeType = image.path.toLowerCase().endsWith('.png') 
+          ? 'image/png' 
+          : 'image/jpeg';
+      final base64String = base64Encode(bytes);
+      final base64Image = 'data:$mimeType;base64,$base64String';
+      
+      // Clear all image caches before upload
+      if (_user?.backgroundUrl != null) {
+        await CachedNetworkImage.evictFromCache(_user!.backgroundUrl!);
+      }
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      
+      // Upload to server using optimized method
       final updatedUser = await _userService.updateBackground(base64Image);
       
-      // Give Cloudinary some time to process
-      await Future.delayed(Duration(milliseconds: 1500));
+      // Wait for Cloudinary processing
+      await Future.delayed(Duration(seconds: 1));
       
       Navigator.pop(context); // Close loading
       
       if (updatedUser != null) {
-        // Clear cache of new URL to force reload
-        if (updatedUser.backgroundUrl != null) {
-          await CachedNetworkImage.evictFromCache(updatedUser.backgroundUrl!);
-          PaintingBinding.instance.imageCache.clear();
-          PaintingBinding.instance.imageCache.clearLiveImages();
-        }
+        // Force refresh cache với timestamp
+        final newUrl = updatedUser.backgroundUrl != null
+            ? '${updatedUser.backgroundUrl}?t=${DateTime.now().millisecondsSinceEpoch}'
+            : null;
         
         setState(() {
           _user = updatedUser;
           _tempBackgroundPath = null;
         });
         
-        // Wait a bit then precache new image
-        await Future.delayed(Duration(milliseconds: 300));
-        if (updatedUser.backgroundUrl != null && mounted) {
-          try {
-            await precacheImage(
-              CachedNetworkImageProvider(updatedUser.backgroundUrl!),
-              context,
-            );
-          } catch (e) {
-            print('Precache failed: $e');
+        // Prefetch new image với retry
+        if (newUrl != null && mounted) {
+          for (int i = 0; i < 3; i++) {
+            try {
+              await precacheImage(
+                CachedNetworkImageProvider(newUrl),
+                context,
+              );
+              break;
+            } catch (e) {
+              if (i == 2) print('Precache failed after 3 attempts: $e');
+              await Future.delayed(Duration(milliseconds: 500));
+            }
           }
         }
         
-        _showSuccess('Ảnh bìa đã được cập nhật!');
+        if (mounted) {
+          await showToast(context, 'Ảnh bìa đã được cập nhật thành công!');
+        }
       } else {
         setState(() {
           _tempBackgroundPath = null;
         });
-        _showError('Không thể cập nhật ảnh bìa');
+        if (mounted) {
+          await showToast(context, 'Không thể cập nhật ảnh bìa');
+        }
       }
       
     } catch (e) {
@@ -333,9 +376,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         _tempBackgroundPath = null;
       });
       if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context); // Close loading if still open
+        Navigator.pop(context);
       }
-      _showError('Lỗi: ${e.toString()}');
+      if (mounted) {
+        await showToast(context, 'Đã xảy ra lỗi, vui lòng thử lại');
+      }
     }
   }
 
@@ -452,10 +497,14 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       
       Navigator.pop(context); // Close loading
       await _loadUserProfile();
-      _showSuccess('Cập nhật thông tin thành công');
+      if (mounted) {
+        await showToast(context, 'Cập nhật thông tin thành công');
+      }
     } catch (e) {
       Navigator.pop(context); // Close loading
-      _showError('Không thể cập nhật thông tin');
+      if (mounted) {
+        await showToast(context, 'Không thể cập nhật thông tin');
+      }
     }
   }
 
@@ -574,9 +623,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     child: Text('Đóng'),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
                       // TODO: Share QR code
-                      _showSuccess('Tính năng chia sẻ đang phát triển');
+                      if (mounted) {
+                        await showToast(context, 'Tính năng chia sẻ đang phát triển');
+                      }
                     },
                     icon: Icon(Icons.share, color: Colors.white),
                     label: Text('Chia sẻ', style: TextStyle(color: Colors.white)),
@@ -606,9 +657,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             actions: [
               IconButton(
                 icon: Icon(Icons.download),
-                onPressed: () {
+                onPressed: () async {
                   // TODO: Download image
-                  _showSuccess('Tính năng tải ảnh đang phát triển');
+                  if (mounted) {
+                    await showToast(context, 'Tính năng tải ảnh đang phát triển');
+                  }
                 },
               ),
             ],
@@ -653,21 +706,15 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
-    );
+    if (mounted) {
+      showToast(context, message);
+    }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+    if (mounted) {
+      showToast(context, message);
+    }
   }
 
   @override
@@ -985,6 +1032,37 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     ],
                   ),
                 ),
+                
+                // Privacy settings button (only for own profile)
+                if (_isOwnProfile) ...[
+                  SizedBox(height: 15),
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 15),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PrivacySettingsScreen(),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.privacy_tip, color: Colors.white),
+                      label: Text(
+                        'Quyền riêng tư & Bảo mật',
+                        style: TextStyle(color: Colors.white, fontSize: 15),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF7C3AED),
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: Size(double.infinity, 50),
+                      ),
+                    ),
+                  ),
+                ],
 
                 // Action buttons (if not own profile)
                 if (!_isOwnProfile) ...[
@@ -998,7 +1076,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             onPressed: () async {
                               try {
                                 // Create or get conversation with the user
-                                final newConversation = await _messageService.getOrCreateConversation([_user!.id]);
+                                final newConversation = await _messageService.getOrCreateConversation([_user!.id], false, null);
                                 
                                 // Navigate to chat screen
                                 Navigator.push(
@@ -1012,7 +1090,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                   ),
                                 );
                               } catch (e) {
-                                _showError('Không thể mở cuộc trò chuyện: ${e.toString()}');
+                                if (mounted) {
+                                  await showToast(context, 'Không thể mở cuộc trò chuyện');
+                                }
                               }
                             },
                             icon: Icon(Icons.message, color: Colors.white),
@@ -1191,9 +1271,13 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             setState(() {
               _hasPendingRequest = true;
             });
-            _showSuccess('Đã gửi lời mời kết bạn');
+            if (mounted) {
+              await showToast(context, 'Đã gửi lời mời kết bạn');
+            }
           } catch (e) {
-            _showError('Không thể gửi lời mời');
+            if (mounted) {
+              await showToast(context, 'Không thể gửi lời mời');
+            }
           }
         },
         icon: Icon(Icons.person_add),
@@ -1227,32 +1311,27 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               title: Text('Chặn người dùng'),
               onTap: () async {
                 Navigator.pop(context);
-                bool? confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text('Chặn người dùng'),
-                    content: Text('Bạn có chắc muốn chặn ${_user!.displayName}?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: Text('Hủy'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
-                        child: Text('Chặn'),
-                      ),
-                    ],
-                  ),
+                bool? confirm = await showAlertDialog(
+                  context,
+                  title: 'Chặn người dùng',
+                  message: 'Bạn có chắc muốn chặn ${_user!.displayName}?',
+                  confirmText: 'Chặn',
+                  cancelText: 'Hủy',
+                  showCancel: true,
+                  confirmColor: Colors.red,
                 );
                 
                 if (confirm == true) {
                   try {
                     await _userService.blockUser(_user!.id);
-                    _showSuccess('Đã chặn người dùng');
-                    Navigator.pop(context);
+                    if (mounted) {
+                      await showToast(context, 'Đã chặn người dùng');
+                      Navigator.pop(context);
+                    }
                   } catch (e) {
-                    _showError('Không thể chặn người dùng');
+                    if (mounted) {
+                      await showToast(context, 'Không thể chặn người dùng');
+                    }
                   }
                 }
               },
@@ -1260,10 +1339,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ListTile(
               leading: Icon(Icons.person_remove, color: Colors.orange),
               title: Text('Hủy kết bạn'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
                 // TODO: Implement unfriend
-                _showSuccess('Tính năng đang phát triển');
+                if (mounted) {
+                  await showToast(context, 'Tính năng đang phát triển');
+                }
               },
             ),
             ListTile(

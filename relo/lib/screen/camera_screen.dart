@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:relo/screen/review_screen.dart';
+import 'package:relo/utils/permission_handler_util.dart';
+import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/utils/show_toast.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -30,37 +33,32 @@ class _CameraScreenState extends State<CameraScreen> {
     _initCamera();
   }
 
-  Future<void> _showAlertDialog(String message) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        content: Text(message, textAlign: TextAlign.center),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text("OK", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+  Future<void> _showErrorAndExit(String message) async {
+    await showCustomAlertDialog(
+      context,
+      message: message,
+      buttonText: 'Đóng',
+      buttonColor: const Color(0xFF7C3AED),
     );
-
     if (mounted) Navigator.pop(context);
   }
 
   Future<void> _initCamera() async {
     try {
-      final cameraStatus = await Permission.camera.request();
-      final micStatus = await Permission.microphone.request();
+      // Yêu cầu cả hai quyền cùng lúc
+      final hasPermissions = await PermissionHandlerUtil.requestMultiplePermissions(
+        context,
+        [Permission.camera, Permission.microphone],
+      );
 
-      if (!cameraStatus.isGranted || !micStatus.isGranted) {
-        await _showAlertDialog("Cần quyền camera và micro để chụp/quay.");
+      if (!hasPermissions) {
+        if (mounted) Navigator.pop(context);
         return;
       }
 
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
-        await _showAlertDialog("Không tìm thấy camera nào trên thiết bị này.");
+        await _showErrorAndExit("Không tìm thấy camera nào trên thiết bị này.");
         return;
       }
 
@@ -74,7 +72,7 @@ class _CameraScreenState extends State<CameraScreen> {
       await _controller!.setFlashMode(FlashMode.off);
       if (mounted) setState(() => _isInitialized = true);
     } catch (e) {
-      await _showAlertDialog("Không thể khởi tạo camera: $e");
+      await _showErrorAndExit("Không thể khởi tạo camera: $e");
     }
   }
 

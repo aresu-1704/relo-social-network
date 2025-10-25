@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class ActivityLogScreen extends StatefulWidget {
-  const ActivityLogScreen({Key? key}) : super(key: key);
+  const ActivityLogScreen({super.key});
 
   @override
   _ActivityLogScreenState createState() => _ActivityLogScreenState();
@@ -208,13 +208,13 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
               icon: Icon(Icons.more_vert, color: Colors.grey[600]),
               itemBuilder: (context) => [
                 PopupMenuItem(
-                  child: Text('Xem chi tiết'),
                   value: 'details',
+                  child: Text('Xem chi tiết'),
                 ),
                 if (activity.type == ActivityType.login)
                   PopupMenuItem(
-                    child: Text('Đánh dấu nghi ngờ'),
                     value: 'report',
+                    child: Text('Đánh dấu nghi ngờ'),
                   ),
               ],
               onSelected: (value) {

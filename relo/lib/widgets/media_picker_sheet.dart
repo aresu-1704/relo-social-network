@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:relo/screen/camera_screen.dart';
+import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/utils/show_toast.dart';
 
 class MediaPickerSheet extends StatefulWidget {
   final void Function(List<File> files) onPicked;
@@ -26,9 +28,21 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
   Future<void> _fetchAssets() async {
     final permitted = await PhotoManager.requestPermissionExtend();
     if (!permitted.isAuth) {
-      // Handle permission denial
-      // Maybe show a message to the user
-      PhotoManager.openSetting();
+      // Hiển thị dialog với option mở Settings
+      if (mounted) {
+        final shouldOpenSettings = await showAlertDialog(
+          context,
+          title: 'Quyền Thư viện ảnh',
+          message: 'Bạn cần cấp quyền thư viện ảnh để chọn ảnh/video. Vui lòng mở Cài đặt để cấp quyền.',
+          confirmText: 'Mở Cài đặt',
+          cancelText: 'Hủy',
+          showCancel: true,
+        );
+        
+        if (shouldOpenSettings == true) {
+          await PhotoManager.openSetting();
+        }
+      }
       return;
     }
 
@@ -76,39 +90,11 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
   }
 
   Future<void> _showAlertDialog(String message) async {
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-        content: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16),
-        ),
-        actionsPadding: EdgeInsets.zero,
-        actions: [
-          const SizedBox(height: 18),
-          Divider(height: 1, thickness: 1, color: Colors.grey[400]),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "Ok",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    await showCustomAlertDialog(
+      context,
+      message: message,
+      buttonText: 'Đồng ý',
+      buttonColor: const Color(0xFF7C3AED),
     );
   }
 

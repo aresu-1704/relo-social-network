@@ -12,14 +12,14 @@ class ProfileStatistics extends StatelessWidget {
   final VoidCallback? onFollowersClick;
 
   const ProfileStatistics({
-    Key? key,
+    super.key,
     required this.friendCount,
     required this.postCount,
     this.followerCount = 0,
     this.onFriendsClick,
     this.onPostsClick,
     this.onFollowersClick,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -111,12 +111,12 @@ class ProfileAvatar extends StatelessWidget {
   final double radius;
 
   const ProfileAvatar({
-    Key? key,
+    super.key,
     this.avatarUrl,
     this.isOwnProfile = false,
     this.onEditPressed,
     this.radius = 50,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +171,7 @@ class ProfileAvatar extends StatelessWidget {
 
 /// Loading Shimmer for Profile
 class ProfileShimmer extends StatelessWidget {
-  const ProfileShimmer({Key? key}) : super(key: key);
+  const ProfileShimmer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -295,13 +295,13 @@ class ProfileActionButton extends StatelessWidget {
   final Color? textColor;
 
   const ProfileActionButton({
-    Key? key,
+    super.key,
     required this.label,
     required this.icon,
     required this.onPressed,
     this.backgroundColor,
     this.textColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -331,11 +331,11 @@ class ProfileInfoRow extends StatelessWidget {
   final Color? iconColor;
 
   const ProfileInfoRow({
-    Key? key,
+    super.key,
     required this.icon,
     required this.text,
     this.iconColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -372,12 +372,12 @@ class EmptyStateWidget extends StatelessWidget {
   final Widget? action;
 
   const EmptyStateWidget({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     this.subtitle,
     this.action,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
