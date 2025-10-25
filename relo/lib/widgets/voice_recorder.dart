@@ -4,6 +4,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:relo/utils/permision_util.dart';
 
 class VoiceRecorderWidget extends StatefulWidget {
   final void Function(String path) onSend;
@@ -40,38 +41,8 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
 
   Future<void> _startRecording() async {
     try {
-      // 1️⃣ Kiểm tra và xin quyền micro
-      final micStatus = await Permission.microphone.request();
-
-      if (!micStatus.isGranted) {
-        final openSettings = await ShowNotification.showCustomAlertDialog(
-          context,
-          message: "Ứng dụng cần quyền truy cập micro để ghi âm",
-          buttonText: "Mở cài đặt",
-          buttonColor: const Color(0xFF7A2FC0),
-        );
-
-        if (openSettings == true) {
-          await openAppSettings(); // ⚙️ Mở Settings
-          await Future.delayed(const Duration(seconds: 1));
-
-          // Kiểm tra lại sau khi quay lại app
-          final micAfter = await Permission.microphone.status;
-          if (!micAfter.isGranted) {
-            if (context.mounted) {
-              await ShowNotification.showCustomAlertDialog(
-                context,
-                message: "Vẫn chưa có quyền micro, không thể ghi âm.",
-              );
-              Navigator.pop(context); // 🚪 Thoát khỏi màn ghi âm
-            }
-            return;
-          }
-        } else {
-          if (context.mounted) Navigator.pop(context);
-          return;
-        }
-      }
+      final micAllowed = await PermissionUtils.ensureMicroPermission(context);
+      if (!micAllowed) return;
 
       final dir = await getTemporaryDirectory();
       _path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';

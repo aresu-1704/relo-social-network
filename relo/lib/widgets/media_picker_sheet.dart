@@ -4,6 +4,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:relo/screen/camera_screen.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:relo/utils/permision_util.dart';
 
 class MediaPickerSheet extends StatefulWidget {
   final void Function(List<File> files) onPicked;
@@ -26,39 +27,9 @@ class _MediaPickerSheetState extends State<MediaPickerSheet> {
 
   Future<void> _fetchAssets() async {
     try {
-      // 1️⃣ Xin quyền truy cập ảnh & video
-      final permitted = await PhotoManager.requestPermissionExtend();
+      final allowed = await PermissionUtils.ensurePhotoPermission(context);
+      if (!allowed) return;
 
-      if (!permitted.isAuth) {
-        final openSettings = await ShowNotification.showCustomAlertDialog(
-          context,
-          message: "Ứng dụng cần quyền truy cập ảnh và video để gửi tệp",
-          buttonText: "Mở cài đặt",
-          buttonColor: const Color(0xFF7A2FC0),
-        );
-
-        if (openSettings == true) {
-          await PhotoManager.openSetting(); // ⚙️ Mở Settings
-          await Future.delayed(const Duration(seconds: 1));
-
-          final after = await PhotoManager.requestPermissionExtend();
-          if (!after.isAuth) {
-            if (context.mounted) {
-              await ShowNotification.showCustomAlertDialog(
-                context,
-                message: "Vẫn chưa có quyền truy cập ảnh/video.",
-              );
-              Navigator.pop(context); // 🚪 Thoát hoặc đóng sheet
-            }
-            return;
-          }
-        } else {
-          if (context.mounted) Navigator.pop(context);
-          return;
-        }
-      }
-
-      // 2️⃣ Nếu đã có quyền → lấy album & assets
       final albums = await PhotoManager.getAssetPathList(
         type: RequestType.common,
       );
