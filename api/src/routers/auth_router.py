@@ -45,17 +45,25 @@ async def login_for_access_token(login_data: UserLogin):
     - Trả về token truy cập và loại token.
     - Ném lỗi HTTP 401 nếu thông tin đăng nhập không chính xác.
     """
-    # Xác thực người dùng bằng username và mật khẩu
-    user = await AuthService.login_user(
-        username=login_data.username,
-        password=login_data.password,
-        device_token=login_data.device_token
-    )
-    if not user:
-        # Nếu không tìm thấy người dùng hoặc mật khẩu sai, trả về lỗi 401
+    try:
+        # Xác thực người dùng bằng username và mật khẩu
+        user = await AuthService.login_user(
+            username=login_data.username,
+            password=login_data.password,
+            device_token=login_data.device_token
+        )
+        if not user:
+            # Nếu không tìm thấy người dùng hoặc mật khẩu sai, trả về lỗi 401
+            raise HTTPException(
+                status_code=401,
+                detail="Tên đăng nhập hoặc mật khẩu không chính xác",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except ValueError as e:
+        # Xử lý trường hợp tài khoản bị xóa
         raise HTTPException(
-            status_code=401,
-            detail="Tên đăng nhập hoặc mật khẩu không chính xác",
+            status_code=403,
+            detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -105,6 +113,16 @@ async def refresh_access_token(payload: RefreshTokenRequest):
                 detail="User không tồn tại",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        
+        # Kiểm tra nếu tài khoản đã bị xóa
+        if user.status == 'deleted':
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản đã bị xóa. Vui lòng liên hệ hỗ trợ nếu cần khôi phục.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(
             status_code=401,

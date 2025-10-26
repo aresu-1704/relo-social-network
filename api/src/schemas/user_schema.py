@@ -12,9 +12,9 @@ class UserPublic(BaseModel):
     username: str
     email: EmailStr
     displayName: str
-    avatarUrl: str | None = None
-    backgroundUrl: str | None = None
-    bio: str | None = None
+    avatarUrl: str | None = ""
+    backgroundUrl: str | None = ""
+    bio: str | None = ""
 
 class FriendRequestPublic(BaseModel):
     id: str

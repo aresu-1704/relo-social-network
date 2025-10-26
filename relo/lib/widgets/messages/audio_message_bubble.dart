@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:relo/models/message.dart';
-import 'package:relo/widgets/message_status.dart';
+import 'package:relo/widgets/messages/message_status.dart';
 
 class AudioMessageBubble extends StatelessWidget {
   final Message message;
@@ -141,11 +141,12 @@ class AudioMessageBubble extends StatelessWidget {
             ),
           ],
         ),
-        if (isMe && isLastFromMe)
-          Padding(
-            padding: const EdgeInsets.only(top: 1, right: 0),
-            child: MessageStatusWidget(message: message),
-          ),
+        isMe && isLastFromMe
+            ? Padding(
+                padding: const EdgeInsets.only(top: 1, right: 0),
+                child: MessageStatusWidget(message: message),
+              )
+            : const SizedBox(height: 4),
       ],
     );
   }

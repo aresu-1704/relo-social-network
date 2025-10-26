@@ -46,6 +46,12 @@ dependencies:
   extended_image: ^8.2.1
   camera: ^0.10.6
   video_thumbnail: ^0.5.0
+  flutter_local_notifications: ^17.2.3
+  qr_flutter: ^4.1.0
+  flutter_animate: ^4.5.0
+  pull_to_refresh: ^2.0.0
+  timeago: ^3.7.0
+  filesize: ^2.0.1
 
 dev_dependencies:
   flutter_test:

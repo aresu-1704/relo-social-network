@@ -3,9 +3,10 @@ class User {
   final String username;
   final String email;
   final String displayName;
-  // Placeholder for avatar, as it's not in the API response.
-  // We can use a default icon or a generative avatar based on the name.
   final String? avatarUrl;
+  final String? backgroundUrl;
+  final String? bio;
+  final String? status;
 
   User({
     required this.id,
@@ -13,6 +14,9 @@ class User {
     required this.email,
     required this.displayName,
     this.avatarUrl,
+    this.backgroundUrl,
+    this.bio,
+    this.status,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -22,6 +26,9 @@ class User {
       email: json['email'],
       displayName: json['displayName'],
       avatarUrl: json['avatarUrl'],
+      backgroundUrl: json['backgroundUrl'],
+      bio: json['bio'],
+      status: json['status'],
     );
   }
 }

@@ -1,7 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:relo/widgets/voice_recorder.dart';
-import 'package:relo/widgets/media_picker_sheet.dart';
+import 'package:relo/widgets/messages/voice_recorder.dart';
+import 'package:relo/widgets/messages/media_picker_sheet.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:relo/utils/show_notification.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class MessageComposer extends StatefulWidget {
   final void Function(Map<String, dynamic> content) onSend;
@@ -23,7 +27,7 @@ class _MessageComposerState extends State<MessageComposer> {
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         setState(() {
-          _activeInput = null; // ẩn phần dưới khi đang gõ
+          _activeInput = null;
         });
       }
     });
@@ -51,6 +55,45 @@ class _MessageComposerState extends State<MessageComposer> {
       // Ẩn bàn phím nếu đang mở
       if (_focusNode.hasFocus) _focusNode.unfocus();
       setState(() => _activeInput = type);
+    }
+  }
+
+  Future<void> _pickAndSendFiles() async {
+    try {
+      final isStorageAllowed = await PermissionUtils.ensureStoragePermission(
+        context,
+      );
+      if (!isStorageAllowed) return;
+
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        for (var file in result.files) {
+          if (file.path == null) continue;
+          final pickedFile = File(file.path!);
+          final sizeInMB = pickedFile.lengthSync() / (1024 * 1024);
+
+          if (sizeInMB > 150) {
+            ShowNotification.showCustomAlertDialog(
+              context,
+              message: 'Tệp "${file.name}" vượt quá giới hạn 150MB',
+            );
+            continue;
+          }
+
+          // Gửi từng file
+          final content = {'type': 'file', 'path': pickedFile.path};
+
+          widget.onSend(content);
+        }
+      }
+    } catch (e) {
+      ShowNotification.showCustomAlertDialog(
+        context,
+        message: 'Đã xảy ra lỗi khi chọn tệp: $e',
+      );
     }
   }
 
@@ -98,11 +141,6 @@ class _MessageComposerState extends State<MessageComposer> {
                   )
                 : Row(
                     children: [
-                      const Icon(
-                        Icons.emoji_emotions_outlined,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 8),
                       IconButton(
                         icon: Icon(
                           _activeInput == 'gallery'
@@ -112,16 +150,23 @@ class _MessageComposerState extends State<MessageComposer> {
                         ),
                         onPressed: () => _toggleInput('gallery'),
                       ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
+                          maxLength: 2000,
+                          autocorrect: true,
                           controller: _textController,
                           focusNode: _focusNode,
                           autofocus: false,
-                          decoration: const InputDecoration.collapsed(
+                          decoration: const InputDecoration(
+                            counterText: '',
+                            border: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                            ),
                             hintText: 'Tin nhắn',
                           ),
                           textCapitalization: TextCapitalization.sentences,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendMessage(),
                         ),
                       ),
                       IconButton(
@@ -134,8 +179,10 @@ class _MessageComposerState extends State<MessageComposer> {
                         onPressed: () => _toggleInput('voice'),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.send, color: Colors.grey),
-                        onPressed: _sendMessage,
+                        onPressed: () async {
+                          await _pickAndSendFiles();
+                        },
+                        icon: Icon(LucideIcons.paperclip, color: Colors.grey),
                       ),
                     ],
                   ),
