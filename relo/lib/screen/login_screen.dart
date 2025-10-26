@@ -126,14 +126,17 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFFF3E8FF), // tím nhạt
-              Color(0xFFFFFFFF), // trắng
-            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF7A2FC0), // tím đậm
+              Color(0xFF9B57D3), // tím vừa
+              Color(0xFFCDA9EC), // tím nhạt
+              Colors.white, // trắng
+            ],
           ),
         ),
+
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 90),
           child: Form(
@@ -142,11 +145,20 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(30),
-                  child: Image.asset(
-                    'assets/icons/app_logo.png',
-                    width: 150,
-                    height: 150,
-                    fit: BoxFit.cover,
+                  child: Container(
+                    color: Colors.white.withOpacity(
+                      0.8,
+                    ), // hoặc Colors.black.withOpacity(0.1)
+                    padding: const EdgeInsets.all(2),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: Image.asset(
+                        'assets/icons/app_logo.png',
+                        width: 150,
+                        height: 150,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -156,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: primaryColor,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -189,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                     child: Text(
                       'Quên mật khẩu ?',
-                      style: GoogleFonts.lato(color: primaryColor),
+                      style: GoogleFonts.poppins(color: primaryColor),
                     ),
                   ),
                 ),
@@ -198,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 50,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
@@ -215,7 +227,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           )
                         : Text(
                             'Đăng nhập',
-                            style: GoogleFonts.lato(
+                            style: GoogleFonts.poppins(
                               fontSize: 20,
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -227,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Không có tài khoản ?', style: GoogleFonts.lato()),
+                    Text('Không có tài khoản ?', style: GoogleFonts.poppins()),
                     TextButton(
                       onPressed: _isLoading
                           ? null
@@ -241,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                       child: Text(
                         'Đăng ký',
-                        style: GoogleFonts.lato(
+                        style: GoogleFonts.poppins(
                           fontWeight: FontWeight.bold,
                           color: primaryColor,
                         ),
@@ -271,10 +283,10 @@ class _LoginScreenState extends State<LoginScreen> {
       cursorColor: const Color(0xFF7A2FC0),
       validator: (value) =>
           (value == null || value.trim().isEmpty) ? validatorMsg : null,
-      style: GoogleFonts.lato(),
+      style: GoogleFonts.poppins(),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: GoogleFonts.lato(),
+        hintStyle: GoogleFonts.poppins(),
         prefixIcon: Icon(icon, color: const Color(0xFF7A2FC0)),
         filled: true,
         fillColor: Colors.white,
@@ -288,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   OutlineInputBorder _buildBorder({Color? color, double width = 1}) {
     return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(100),
       borderSide: BorderSide(
         color: color ?? const Color(0xFF7A2FC0),
         width: width,

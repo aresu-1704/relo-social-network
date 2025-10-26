@@ -30,7 +30,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
   @override
   void dispose() {
     _tabController.dispose();
-    super.initState();
+    super.dispose();
   }
 
   Future<void> _loadNotifications() async {

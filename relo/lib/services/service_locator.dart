@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:relo/screen/login_screen.dart';
+import 'package:relo/services/app_connectivity_service.dart';
 import 'package:relo/services/connectivity_service.dart';
 import 'package:relo/services/dio_api_service.dart';
 import 'package:relo/services/user_service.dart';
@@ -20,6 +21,7 @@ class ServiceLocator {
   static late final MessageService messageService;
   static late final PostService postService;
   static late final ConnectivityService connectivityService;
+  static late final AppConnectivityService appConnectivityService;
 
   /// Initializes all the services.
   static void init() {
@@ -31,7 +33,7 @@ class ServiceLocator {
         (route) => false,
       );
     }
-    
+
     // This function will be called when account is deleted
     void onAccountDeleted(String message) {
       final context = navigatorKey.currentContext;
@@ -51,10 +53,7 @@ class ServiceLocator {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  message,
-                  style: const TextStyle(fontSize: 16),
-                ),
+                Text(message, style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 12),
                 const Text(
                   'Tài khoản của bạn đã bị xóa và không thể tiếp tục sử dụng.\n\n'
@@ -81,16 +80,20 @@ class ServiceLocator {
       }
     }
 
-    // Create the core DioApiService with callbacks
+    // Initialize the app connectivity service
+    appConnectivityService = AppConnectivityService();
+
+    // Create the core DioApiService with the session expiration callback
     dioApiService = DioApiService(
       onSessionExpired: onSessionExpired,
+      appConnectivityService: appConnectivityService,
       onAccountDeleted: onAccountDeleted,
     );
     dio = dioApiService.dio;
 
     // Create other services that depend on the central Dio instance
     // Note: AuthService uses its own Dio instance for non-intercepted calls like login/register
-    authService = AuthService(); 
+    authService = AuthService();
     userService = UserService(dio);
     messageService = MessageService(dio);
     postService = PostService(dio);

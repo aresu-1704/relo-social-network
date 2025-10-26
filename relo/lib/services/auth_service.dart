@@ -7,7 +7,7 @@ import 'package:relo/services/websocket_service.dart';
 class AccountDeletedException implements Exception {
   final String message;
   AccountDeletedException(this.message);
-  
+
   @override
   String toString() => message;
 }
@@ -57,7 +57,8 @@ class AuthService {
         throw Exception('Tên đăng nhập hoặc mật khẩu không chính xác.');
       } else if (e.response?.statusCode == 403) {
         // Tài khoản đã bị xóa
-        final errorMessage = e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
+        final errorMessage =
+            e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
         throw AccountDeletedException(errorMessage);
       }
       throw Exception('Đã xảy ra lỗi mạng.');
@@ -113,7 +114,9 @@ class AuthService {
     try {
       final refreshToken = await _storageService.getRefreshToken();
       if (refreshToken == null) {
-        throw Exception('No refresh token available.');
+        // This isn't a network error, but a state error. No token, so can't refresh.
+        await logout();
+        return null;
       }
 
       final response = await _dio.post(
@@ -125,17 +128,21 @@ class AuthService {
         final newAccessToken = response.data['access_token'];
         await _storageService.saveTokens(
           accessToken: newAccessToken,
-          refreshToken: refreshToken,
+          refreshToken:
+              refreshToken, // The refresh token might be rotated, but the example doesn't show it
         );
         return newAccessToken;
       } else {
-        throw Exception('Failed to refresh token.');
+        // A non-200 response that isn't a DioException (unlikely but possible)
+        // should be treated as a session failure.
+        await logout();
+        return null;
       }
     } on DioException catch (e) {
-      // Check if account was deleted (403)
       if (e.response?.statusCode == 403) {
         await logout();
-        final errorMessage = e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
+        final errorMessage =
+            e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
         throw AccountDeletedException(errorMessage);
       }
       // If refresh fails, logout the user
@@ -145,8 +152,6 @@ class AuthService {
       if (e is AccountDeletedException) {
         rethrow;
       }
-      // If refresh fails, logout the user
-      await logout();
       return null;
     } finally {
       _isRefreshing = false;

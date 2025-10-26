@@ -97,7 +97,7 @@ class MessageService {
           'type': content['type'],
           'text': content['text'],
         });
-      } else if (content['type'] == 'audio') {
+      } else if (content['type'] == 'audio' || content['type'] == 'file') {
         formData = FormData.fromMap({
           'type': content['type'],
           'files': await MultipartFile.fromFile(content['path']),
@@ -110,7 +110,7 @@ class MessageService {
         formData = FormData.fromMap({'type': content['type'], 'files': files});
       }
 
-      // 🚀 Gửi form-data lên server
+      // Gửi form-data lên server
       final response = await _dio.post(
         'messages/conversations/$conversationId/messages',
         data: formData,
@@ -119,7 +119,6 @@ class MessageService {
         ),
       );
 
-      // ✅ Cập nhật trạng thái thành sent
       final sentMessage = Message.fromJson(response.data);
 
       // Create a new message with the final ID but with the original content
@@ -173,5 +172,10 @@ class MessageService {
         throw Exception('An unknown error occurred: $e');
       }
     }
+  }
+
+  //Xóa cuộc trò chuyện
+  Future<void> deleteConversation(String conversationId) async {
+    //TODO: Gọi API xóa cuộc trò chuyện trên server nếu cần thiết
   }
 }

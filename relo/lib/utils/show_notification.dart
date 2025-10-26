@@ -12,7 +12,7 @@ class ShowNotification {
       context: context,
       builder: (_) => Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
+          constraints: const BoxConstraints(maxWidth: 340), // 👈 Giới hạn ngang
           child: AlertDialog(
             contentPadding: const EdgeInsets.fromLTRB(24, 20, 50, 0),
             content: Text(
@@ -114,7 +114,7 @@ class ShowNotification {
     final overlay = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        bottom: 100, // cách đáy màn hình
+        bottom: 120, // cách đáy màn hình
         left: 50,
         right: 50,
         child: Material(

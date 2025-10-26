@@ -51,6 +51,7 @@ dependencies:
   flutter_animate: ^4.5.0
   pull_to_refresh: ^2.0.0
   timeago: ^3.7.0
+  filesize: ^2.0.1
 
 dev_dependencies:
   flutter_test:

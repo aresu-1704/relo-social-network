@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/edit_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class ReviewScreen extends StatefulWidget {
   final File file;
@@ -36,14 +36,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
     setState(() => _isDownloading = true);
 
     try {
-      // 1️⃣ Yêu cầu quyền ghi bộ nhớ (Android 13 trở xuống)
-      if (Platform.isAndroid) {
-        final status = await Permission.storage.request();
-        if (!status.isGranted) {
-          await ShowNotification.showToast(context, 'Không có quyền lưu tệp');
-          return;
-        }
-      }
+      final isStorageAllowed = await PermissionUtils.ensureStoragePermission(
+        context,
+      );
+      if (!isStorageAllowed) return;
 
       // 2️⃣ Lấy đường dẫn thư mục "Download" của hệ thống
       Directory? dir;

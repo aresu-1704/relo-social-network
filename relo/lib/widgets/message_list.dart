@@ -3,6 +3,7 @@ import 'package:relo/models/message.dart';
 import 'package:relo/widgets/audio_message_bubble.dart';
 import 'package:relo/widgets/media_message_bubble.dart';
 import 'package:relo/widgets/text_message_bubble.dart';
+import 'package:relo/widgets/file_message_bubble.dart';
 
 class MessageList extends StatelessWidget {
   final List<Message> messages;
@@ -109,6 +110,14 @@ class MessageList extends StatelessWidget {
               isLastFromMe: _isLastFromUser(messages, index, currentUserId),
             ),
           );
+        } else if (messageType == 'file') {
+          widgets.add(
+            FileMessageBubble(
+              message: message,
+              isMe: isMe,
+              isLastFromMe: _isLastFromUser(messages, index, currentUserId),
+            ),
+          );
         } else {
           widgets.add(
             TextMessageBubble(
@@ -145,7 +154,6 @@ class MessageList extends StatelessWidget {
   }
 
   bool _isLastFromUser(List<Message> messages, int index, String userId) {
-    return messages[index].senderId == userId &&
-        (index == 0 || messages[index - 1].senderId != userId);
+    return messages[index].senderId == userId && index == 0;
   }
 }

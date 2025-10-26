@@ -1,4 +1,4 @@
-// Màn hình chính với AppBar có thanh tìm kiếm và Bottom Bar được tùy chỉnh
+// Màn hình chính với AppBar có thanh tìm kiếm, Bottom Bar, và banner mất kết nối
 import 'package:flutter/material.dart';
 import 'package:relo/screen/profile_screen.dart';
 import 'package:relo/screen/profile_setting_screen.dart';
@@ -6,6 +6,8 @@ import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,16 +18,24 @@ class MainScreen extends StatefulWidget {
 
 class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  int _notificationCount = 3; // TODO: Lấy số thông báo thực tế
+  int _notificationCount = 3;
+  bool _isOffline = false;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
+    _initConnectivityListener();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  void _initConnectivityListener() {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      ConnectivityResult result,
+    ) {
+      setState(() {
+        _isOffline = result == ConnectivityResult.none;
+      });
+    });
   }
 
   void changeTab(int index) {
@@ -35,11 +45,16 @@ class MainScreenState extends State<MainScreen> {
   }
 
   @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Cập nhật lại body để sử dụng _buildProfileScreen cho tab cá nhân
     final List<Widget> currentScreens = [
-      MessagesScreen(),
-      Center(child: Text('TODO: Tường nhà')),
+      const MessagesScreen(),
+      const Center(child: Text('TODO: Tường nhà')),
       const FriendsScreen(),
       Center(child: Text('TODO: Thông báo')),
       const ProfileScreen(),
@@ -49,7 +64,7 @@ class MainScreenState extends State<MainScreen> {
       appBar: AppBar(
         shadowColor: Colors.black,
         automaticallyImplyLeading: false,
-        backgroundColor: Color(0xFF7A2FC0),
+        backgroundColor: const Color(0xFF7A2FC0),
         elevation: 0,
         title: Row(
           children: [
@@ -91,69 +106,106 @@ class MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
-      body: currentScreens[_selectedIndex],
+
+      // Dùng Stack để banner nằm trên nội dung
+      body: Stack(
+        children: [
+          currentScreens[_selectedIndex],
+
+          // Banner cảnh báo mất mạng
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: _isOffline ? 1.0 : 0.0,
+            child: _isOffline
+                ? Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      color: Colors.red.shade600,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 16,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.wifi_off, color: Colors.white, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Không có kết nối Internet',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.grey[100], // Màu nền xám
-          border: Border(
-            top: BorderSide(
-              color: Colors.grey[300]!,
-              width: 0.5,
-            ), // Viền trên mỏng
-          ),
+          color: Colors.grey[100],
+          border: Border(top: BorderSide(color: Colors.grey[300]!, width: 0.5)),
         ),
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          selectedItemColor: Color(0xFF7A2FC0),
-          unselectedItemColor: Colors.grey, // Màu icon chưa chọn là xám
-          backgroundColor: Colors
-              .transparent, // Nền trong suốt để màu của container hiển thị
-          elevation: 0, // Bỏ shadow mặc định
-          type: BottomNavigationBarType.fixed, // Giữ các item cố định
+          selectedItemColor: const Color(0xFF7A2FC0),
+          unselectedItemColor: Colors.grey,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
           showSelectedLabels: true,
           showUnselectedLabels: false,
           onTap: (int i) {
             setState(() {
               _selectedIndex = i;
-              if (i == 3) {
-                _notificationCount = 0;
-              }
+              if (i == 3) _notificationCount = 0;
             });
           },
           items: [
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(LucideIcons.messageCircle),
               label: 'Tin nhắn',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(LucideIcons.layoutGrid),
               label: 'Tường nhà',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(LucideIcons.users),
               label: 'Bạn bè',
             ),
             BottomNavigationBarItem(
               icon: Stack(
                 children: [
-                  Icon(LucideIcons.bell),
+                  const Icon(LucideIcons.bell),
                   if (_notificationCount > 0)
                     Positioned(
                       top: 0,
                       right: 4,
                       child: Container(
-                        padding: EdgeInsets.all(2),
+                        padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        constraints: BoxConstraints(
+                        constraints: const BoxConstraints(
                           minWidth: 16,
                           minHeight: 16,
                         ),
                         child: Text(
                           '$_notificationCount',
-                          style: TextStyle(color: Colors.white, fontSize: 10),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -162,7 +214,7 @@ class MainScreenState extends State<MainScreen> {
               ),
               label: 'Thông báo',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(LucideIcons.user),
               label: 'Cá nhân',
             ),

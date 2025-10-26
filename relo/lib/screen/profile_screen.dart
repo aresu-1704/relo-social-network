@@ -15,7 +15,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:relo/utils/show_toast.dart';
 import 'package:relo/utils/show_alert_dialog.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:relo/screen/privacy_settings_screen.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -754,18 +753,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  void _showSuccess(String message) {
-    if (mounted) {
-      showToast(context, message);
-    }
-  }
-
-  void _showError(String message) {
-    if (mounted) {
-      showToast(context, message);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -1103,7 +1090,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                     builder: (context) => ChatScreen(
                                       conversationId: newConversation['_id'] ?? newConversation['id'],
                                       isGroup: false,
-                                      friendName: _user!.displayName,
+                                      chatName: _user!.displayName,
                                     ),
                                   ),
                                 );

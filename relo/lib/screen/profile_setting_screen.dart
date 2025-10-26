@@ -29,11 +29,29 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
   Future<void> _loadCurrentUser() async {
     _currentUserId = await storage.getUserId();
     if (_currentUserId != null) {
-      User? user = await userService.getUserById(_currentUserId!);
+      try {
+        User? user = await userService.getUserById(_currentUserId!);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _currentUser = user;
+          });
+        }
+      } catch (e) {
+        print('Failed to load user data: $e');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            // Optionally, set user to null or handle the error state in the UI
+            _currentUser = null;
+          });
+        }
+      }
+    } else {
+      // Handle case where user ID is not found in storage
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _currentUser = user;
         });
       }
     }

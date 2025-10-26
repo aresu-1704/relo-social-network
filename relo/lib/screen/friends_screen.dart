@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:relo/services/service_locator.dart';
-import '../services/user_service.dart';
-import '../models/user.dart';
-import 'dart:collection';
+import 'package:relo/services/user_service.dart';
+import 'package:relo/models/user.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/services/message_service.dart';
 
@@ -146,13 +145,21 @@ class _FriendsScreenState extends State<FriendsScreen> {
             }
             if (snapshot.hasError) {
               return Center(
-                child: Text(
-                  snapshot.error.toString().replaceFirst('Exception: ', ''),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Text(
+                      'Bạn chưa có người bạn nào',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Không thể tải danh sách bạn bè',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  ],
                 ),
               );
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('Bạn chưa có người bạn nào.'));
             }
 
             final friends = snapshot.data!;
@@ -221,7 +228,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
               builder: (context) => ChatScreen(
                 conversationId: conversation['id'],
                 isGroup: false,
-                friendName: friend.displayName,
+                chatName: friend.displayName,
                 memberIds: participants.isNotEmpty
                     ? participants
                           .map((p) => p['id']?.toString() ?? '')

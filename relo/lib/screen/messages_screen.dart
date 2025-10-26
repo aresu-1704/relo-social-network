@@ -53,10 +53,36 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         // Assuming the server sends an event type
         if (data['type'] == 'new_message' ||
-            data['type'] == 'conversation_seen' ) {
+            data['type'] == 'conversation_seen') {
           // A new message has arrived, refresh the conversation list
           // A more optimized approach would be to update the specific conversation
           fetchConversations();
+        }
+
+        if (data['type'] == 'delete_conversation') {
+          // Handle conversation deletion
+          setState(() {
+            conversations.removeWhere(
+              (conv) => conv['id'] == data['payload']['conversationId'],
+            );
+          });
+        }
+
+        if (data['type'] == 'recalled_message' &&
+            data['payload']['conversation']['lastMessage']['content']['type'] ==
+                'delete') {
+          setState(() {
+            final convoId = data['payload']['conversation']['id'];
+            final updatedLastMessage =
+                data['payload']['conversation']['lastMessage'];
+
+            final index = conversations.indexWhere(
+              (conv) => conv['id'] == convoId,
+            );
+            if (index != -1) {
+              conversations[index]['lastMessage'] = updatedLastMessage;
+            }
+          });
         }
       },
       onError: (error) {
@@ -121,7 +147,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
             icon: Icon(Icons.add),
             label: Text('Hãy thử tìm vài người bạn để trò chuyện nhé'),
             onPressed: () {
-              // Find the MainScreenState and call the method to change the tab
               context.findAncestorStateOfType<MainScreenState>()?.changeTab(2);
             },
             style: ElevatedButton.styleFrom(
@@ -187,6 +212,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
               break;
             case 'media':
               lastMessage = '${prefix}[Đa phương tiện]';
+              break;
+            case 'file':
+              lastMessage = '${prefix}[Tệp tin]';
               break;
             case 'delete':
               lastMessage = '${prefix}[Tin nhắn đã bị thu hồi]';
@@ -277,7 +305,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     builder: (context) => ChatScreen(
                       conversationId: conversation['id'],
                       isGroup: conversation['isGroup'],
-                      friendName: title,
+                      chatName: title,
                       memberIds: participants
                           .map((p) => p['id']?.toString() ?? '')
                           .where((id) => id.isNotEmpty)

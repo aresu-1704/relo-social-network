@@ -13,6 +13,12 @@ class Reaction(BaseModel):
     userId: str
     type: str
 
+class Comment(BaseModel):
+    """Đại diện cho một bình luận trên bài đăng."""
+    userId: str
+    content: str
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+
 class Post(Document):
     """
     Đại diện cho một bài đăng trong collection 'posts'.
@@ -24,6 +30,7 @@ class Post(Document):
     reactions: List[Reaction] = Field(default_factory=list, description="Danh sách các phản ứng.")
     reactionCounts: Dict[str, int] = Field(default_factory=dict, description="Số lượng của mỗi loại phản ứng.")
     commentCount: int = Field(default=0, description="Tổng số bình luận.")
+    comments: List[Comment] = Field(default_factory=dict, description="Danh sách các bình luận.")
     createdAt: datetime = Field(default_factory=datetime.utcnow, description="Thời điểm bài đăng được tạo.")
 
     class Settings:
