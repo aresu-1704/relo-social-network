@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from typing import List
 from ..services import UserService
-from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate, UserSearchResult
-from ..schemas.block_schema import BlockUserRequest
-from ..schemas import FriendRequestPublic
-from ..models import User
+from ..schemas import UserUpdate, FriendRequestCreate, FriendRequestResponse, FriendRequestPublic, UserPublic, UserSearchResult, ChangePassword
+from ..services import UserService, AuthService
 from ..security import get_current_user
+from ..models.user import User
+from ..schemas import BlockUserRequest
 
 router = APIRouter(tags=["User"])
 
@@ -236,6 +236,25 @@ async def debug_current_user(current_user: User = Depends(get_current_user)):
         "avatarPublicId": getattr(current_user, "avatarPublicId", None),
         "backgroundPublicId": getattr(current_user, "backgroundPublicId", None),
     }
+
+# Đổi mật khẩu
+@router.post("/change-password", status_code=200)
+async def change_password(
+    password_data: ChangePassword,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Đổi mật khẩu người dùng hiện tại.
+    """
+    try:
+        result = await AuthService.change_password(
+            user_id=str(current_user.id),
+            current_password=password_data.current_password,
+            new_password=password_data.new_password
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Xóa tài khoản (soft delete)
 @router.delete("/me", status_code=200)

@@ -199,6 +199,24 @@ class UserService {
     }
   }
 
+  // Đổi mật khẩu
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post('users/change-password', data: {
+        'current_password': currentPassword,
+        'new_password': newPassword,
+      });
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data['detail'] ?? 'Không thể đổi mật khẩu';
+      throw Exception(errorMessage);
+    } catch (e) {
+      throw Exception('Không thể đổi mật khẩu: $e');
+    }
+  }
+
   // Xóa tài khoản (soft delete)
   Future<void> deleteAccount() async {
     try {

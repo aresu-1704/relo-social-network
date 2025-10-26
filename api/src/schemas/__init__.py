@@ -1,4 +1,4 @@
-from .auth_schema import UserCreate, UserLogin, UserPublic, RefreshTokenRequest
+from .auth_schema import UserCreate, UserPublic, UserLogin, RefreshTokenRequest, ChangePassword
 from .message_schema import (
     ConversationCreate,
     MessageCreate,

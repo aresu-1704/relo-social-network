@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:relo/utils/show_toast.dart';
 import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/services/service_locator.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -14,6 +15,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _userService = ServiceLocator.userService;
   
   bool _isCurrentPasswordVisible = false;
   bool _isNewPasswordVisible = false;
@@ -120,14 +122,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Gọi API đổi mật khẩu khi có backend
-      // await _userService.changePassword(
-      //   currentPassword: _currentPasswordController.text,
-      //   newPassword: _newPasswordController.text,
-      // );
-      
-      // Simulate API call
-      await Future.delayed(Duration(seconds: 2));
+      // Gọi API đổi mật khẩu
+      await _userService.changePassword(
+        currentPassword: _currentPasswordController.text,
+        newPassword: _newPasswordController.text,
+      );
       
       setState(() => _isLoading = false);
       
@@ -136,7 +135,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         await showAlertDialog(
           context,
           title: 'Đổi mật khẩu thành công',
-          message: 'Mật khẩu của bạn đã được cập nhật.\n\nVui lòng đăng nhập lại với mật khẩu mới.',
+          message: 'Mật khẩu của bạn đã được cập nhật.\n\nBạn có thể sử dụng mật khẩu mới để đăng nhập.',
           confirmText: 'Đồng ý',
           confirmColor: Colors.green,
         );
@@ -148,7 +147,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _isLoading = false);
       
       if (mounted) {
-        await showToast(context, 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+        // Extract error message
+        String errorMessage = e.toString().replaceFirst('Exception: ', '');
+        await showAlertDialog(
+          context,
+          title: 'Đổi mật khẩu thất bại',
+          message: errorMessage,
+          confirmText: 'Đóng',
+          confirmColor: Colors.red,
+        );
       }
     }
   }

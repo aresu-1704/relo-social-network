@@ -52,6 +52,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   // Temporary image storage for preview
   String? _tempAvatarPath;
   String? _tempBackgroundPath;
+  
+  // Key to force image refresh after upload
+  int _imageRefreshKey = 0;
 
   @override
   void initState() {
@@ -242,12 +245,18 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       Navigator.pop(context); // Close loading
       
       if (updatedUser != null) {
+        // Clear cache for new URL
+        if (updatedUser.avatarUrl != null) {
+          await CachedNetworkImage.evictFromCache(updatedUser.avatarUrl!);
+        }
+        
         // Force refresh cache với timestamp
         final newUrl = '${updatedUser.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}';
         
         setState(() {
           _user = updatedUser;
           _tempAvatarPath = null;
+          _imageRefreshKey++; // Force rebuild with new key
         });
         
         // Prefetch new image với retry
@@ -381,6 +390,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       Navigator.pop(context); // Close loading
       
       if (updatedUser != null) {
+        // Clear cache for new URL
+        if (updatedUser.backgroundUrl != null) {
+          await CachedNetworkImage.evictFromCache(updatedUser.backgroundUrl!);
+        }
+        
         // Force refresh cache với timestamp
         final newUrl = updatedUser.backgroundUrl != null
             ? '${updatedUser.backgroundUrl}?t=${DateTime.now().millisecondsSinceEpoch}'
@@ -389,6 +403,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         setState(() {
           _user = updatedUser;
           _tempBackgroundPath = null;
+          _imageRefreshKey++; // Force rebuild with new key
         });
         
         // Prefetch new image với retry
@@ -801,7 +816,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   GestureDetector(
                     onTap: _isOwnProfile ? () => _showImageOptions(false) : null,
                     child: Container(
-                      key: ValueKey('background_${_user!.backgroundUrl}'),
+                      key: ValueKey('background_${_user!.backgroundUrl}_$_imageRefreshKey'),
                       height: 200,
                       decoration: BoxDecoration(
                         image: _tempBackgroundPath != null
@@ -811,7 +826,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                               )
                             : (_user!.backgroundUrl != null && _user!.backgroundUrl!.isNotEmpty
                                 ? DecorationImage(
-                                    image: CachedNetworkImageProvider(_user!.backgroundUrl!),
+                                    image: CachedNetworkImageProvider('${_user!.backgroundUrl!}?v=$_imageRefreshKey'),
                                     fit: BoxFit.cover,
                                   )
                                 : null),
@@ -877,7 +892,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                 Hero(
                                   tag: 'avatar_${_user!.id}',
                                   child: CircleAvatar(
-                                    key: ValueKey('avatar_${_user!.avatarUrl}'),
+                                    key: ValueKey('avatar_${_user!.avatarUrl}_$_imageRefreshKey'),
                                     radius: 45,
                                     backgroundColor: Colors.white,
                                     child: CircleAvatar(
@@ -885,7 +900,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                       backgroundImage: _tempAvatarPath != null
                                           ? FileImage(File(_tempAvatarPath!))
                                           : (_user!.avatarUrl != null && _user!.avatarUrl!.isNotEmpty
-                                              ? CachedNetworkImageProvider(_user!.avatarUrl!)
+                                              ? CachedNetworkImageProvider('${_user!.avatarUrl!}?v=$_imageRefreshKey')
                                               : null) as ImageProvider?,
                                       child: (_tempAvatarPath == null && (_user!.avatarUrl == null || _user!.avatarUrl!.isEmpty))
                                           ? Icon(

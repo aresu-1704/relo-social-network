@@ -69,3 +69,27 @@ class AuthService:
             user.deviceToken = device_token
             await user.save()
         return user
+    
+    @staticmethod
+    async def change_password(user_id: str, current_password: str, new_password: str):
+        """
+        Đổi mật khẩu người dùng.
+        Xác thực mật khẩu hiện tại, băm và lưu mật khẩu mới.
+        """
+        # Tìm người dùng
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Xác minh mật khẩu hiện tại
+        if not AuthService.verify_password(current_password, user.hashedPassword):
+            raise ValueError("Mật khẩu hiện tại không chính xác.")
+        
+        # Băm mật khẩu mới
+        new_hashed_password = AuthService.get_password_hash(new_password)
+        
+        # Cập nhật mật khẩu
+        user.hashedPassword = new_hashed_password
+        await user.save()
+        
+        return {"message": "Đổi mật khẩu thành công."}

@@ -28,3 +28,7 @@ class UserPublic(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str

@@ -35,7 +35,7 @@ void main() async {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Phiên đăng nhập hết hạn 🥺',
+                'Phiên đăng nhập hết hạn',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

@@ -6,6 +6,7 @@ import 'package:relo/services/user_service.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'chat_screen.dart';
+import 'profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -187,13 +188,18 @@ class _UserSearchResultItem extends StatelessWidget {
     }
   }
 
+  void _navigateToProfile(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(userId: user.id),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {
-        // TODO: Điều hướng đến trang cá nhân của người dùng
-        print('Navigate to profile of ${user.displayName}');
-      },
+      onTap: () => _navigateToProfile(context),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         child: Row(
@@ -228,12 +234,21 @@ class _UserSearchResultItem extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(
+                Icons.info_outline,
+                color: Color(0xFF7C3AED),
+              ),
+              tooltip: 'Xem trang cá nhân',
+              onPressed: () => _navigateToProfile(context),
+            ),
             IconButton(
               icon: const Icon(
                 Icons.message_outlined,
                 color: Color(0xFF7C3AED),
               ),
+              tooltip: 'Nhắn tin',
               onPressed: () => _navigateToChat(context),
             ),
           ],
