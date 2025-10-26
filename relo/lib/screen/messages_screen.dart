@@ -122,7 +122,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
             icon: Icon(Icons.add),
             label: Text('Hãy thử tìm vài người bạn để trò chuyện nhé'),
             onPressed: () {
-              // Find the MainScreenState and call the method to change the tab
               context.findAncestorStateOfType<MainScreenState>()?.changeTab(2);
             },
             style: ElevatedButton.styleFrom(
@@ -188,6 +187,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
               break;
             case 'media':
               lastMessage = '${prefix}[Đa phương tiện]';
+              break;
+            case 'file':
+              lastMessage = '${prefix}[Tệp tin]';
               break;
             case 'delete':
               lastMessage = '${prefix}[Tin nhắn đã bị thu hồi]';

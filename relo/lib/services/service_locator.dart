@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:relo/screen/login_screen.dart';
+import 'package:relo/services/app_connectivity_service.dart';
 import 'package:relo/services/connectivity_service.dart';
 import 'package:relo/services/dio_api_service.dart';
 import 'package:relo/services/user_service.dart';
@@ -18,6 +19,7 @@ class ServiceLocator {
   static late final UserService userService;
   static late final MessageService messageService;
   static late final ConnectivityService connectivityService;
+  static late final AppConnectivityService appConnectivityService;
 
   /// Initializes all the services.
   static void init() {
@@ -30,13 +32,19 @@ class ServiceLocator {
       );
     }
 
+    // Initialize the app connectivity service
+    appConnectivityService = AppConnectivityService();
+
     // Create the core DioApiService with the session expiration callback
-    dioApiService = DioApiService(onSessionExpired: onSessionExpired);
+    dioApiService = DioApiService(
+      onSessionExpired: onSessionExpired,
+      appConnectivityService: appConnectivityService,
+    );
     dio = dioApiService.dio;
 
     // Create other services that depend on the central Dio instance
     // Note: AuthService uses its own Dio instance for non-intercepted calls like login/register
-    authService = AuthService(); 
+    authService = AuthService();
     userService = UserService(dio);
     messageService = MessageService(dio);
 

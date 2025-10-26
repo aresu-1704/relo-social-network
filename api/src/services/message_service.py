@@ -67,7 +67,7 @@ class MessageService:
             raise PermissionError("Người gửi không thuộc cuộc trò chuyện này.");
 
         if files:
-            if content['type'] == 'audio':
+            if content['type'] == 'audio' or content['type'] == 'file':
                 upload_tasks = [upload_to_cloudinary(f) for f in files]    
                 results = await asyncio.gather(*upload_tasks)
                 content["url"] = results[0]["url"]
@@ -184,14 +184,14 @@ class MessageService:
         result = []
 
         for convo in convos:
-            # 🔍 Lấy participant info của current_user trong conversation này
+            # Lấy participant info của current_user trong conversation này
             participant_info = next(
                 (p for p in convo.participants if p.userId == str(user_id)),
                 None
             )
             delete_time = participant_info.lastMessageDelete if participant_info else None
 
-            # 📦 Lấy thông tin chi tiết của người tham gia
+            # Lấy thông tin chi tiết của người tham gia
             participants = await UserService.get_users_by_ids([p.userId for p in convo.participants])
 
             participant_publics = [

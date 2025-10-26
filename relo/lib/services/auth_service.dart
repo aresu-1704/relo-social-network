@@ -98,7 +98,9 @@ class AuthService {
     try {
       final refreshToken = await _storageService.getRefreshToken();
       if (refreshToken == null) {
-        throw Exception('No refresh token available.');
+        // This isn't a network error, but a state error. No token, so can't refresh.
+        await logout();
+        return null;
       }
 
       final response = await _dio.post(
@@ -110,15 +112,28 @@ class AuthService {
         final newAccessToken = response.data['access_token'];
         await _storageService.saveTokens(
           accessToken: newAccessToken,
-          refreshToken: refreshToken,
+          refreshToken: refreshToken, // The refresh token might be rotated, but the example doesn't show it
         );
         return newAccessToken;
       } else {
-        throw Exception('Failed to refresh token.');
+        // A non-200 response that isn't a DioException (unlikely but possible)
+        // should be treated as a session failure.
+        await logout();
+        return null;
       }
+    } on DioException catch (e) {
+      // If refresh fails with 401/403, it means the refresh token is invalid/expired.
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        await logout();
+      }
+      // For other Dio errors (like network issues), we don't logout.
+      // The interceptor in the main Dio instance will handle setting the offline status.
+      // We just return null to signal that the refresh failed.
+      return null;
     } catch (e) {
-      // If refresh fails, logout the user
-      await logout();
+      // Catch any other unexpected errors, but don't logout.
+      // This could be a parsing error or something else.
+      print('An unexpected error occurred during token refresh: $e');
       return null;
     } finally {
       _isRefreshing = false;

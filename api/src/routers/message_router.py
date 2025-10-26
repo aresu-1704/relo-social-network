@@ -61,6 +61,8 @@ async def send_message(
         content = {"type": type, "text": text}
     elif type == "audio": #Tin nhắn thoại
         content = {"type": type, "url": None}
+    elif type == "file": #Tin nhắn file
+        content = {"type": type, "url": None}
     else: #Tin nhắn hình ảnh, video
         content = {"type": type, "urls": None}
 

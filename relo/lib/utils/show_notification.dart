@@ -114,7 +114,7 @@ class ShowNotification {
     final overlay = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        bottom: 100, // cách đáy màn hình
+        bottom: 120, // cách đáy màn hình
         left: 50,
         right: 50,
         child: Material(

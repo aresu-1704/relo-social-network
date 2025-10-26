@@ -4,7 +4,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:relo/screen/camera_screen.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:relo/utils/permision_util.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class MediaPickerSheet extends StatefulWidget {
   final void Function(List<File> files) onPicked;

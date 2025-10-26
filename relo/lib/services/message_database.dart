@@ -31,7 +31,7 @@ class MessageDatabase {
     await db.execute('''
 CREATE TABLE messages (
   id TEXT PRIMARY KEY,
-  content $textType,         -- JSON string {"type": "text"|"file", "content": "..."/{...}}
+  content $textType,
   senderId $textType,
   conversationId $textType,
   timestamp $textType,
@@ -41,7 +41,7 @@ CREATE TABLE messages (
 ''');
   }
 
-  /// 🟢 Tạo mới message
+  // Tạo mới message
   Future<Message> create(Message message) async {
     final db = await instance.database;
 
@@ -104,13 +104,13 @@ CREATE TABLE messages (
     );
   }
 
-  /// 🔴 Xóa message theo id
+  // Xóa message theo id
   Future<int> delete(String id) async {
     final db = await instance.database;
     return db.delete('messages', where: 'id = ?', whereArgs: [id]);
   }
 
-  /// ⚫ Đóng database
+  // Đóng database
   Future close() async {
     final db = await _database;
     if (db != null) await db.close();

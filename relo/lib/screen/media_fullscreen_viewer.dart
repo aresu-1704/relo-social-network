@@ -5,7 +5,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:relo/utils/permision_util.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class MediaFullScreenViewer extends StatefulWidget {
   final List<String> mediaUrls;

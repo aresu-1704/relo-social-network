@@ -96,7 +96,7 @@ class PermissionUtils {
         if (!status.isGranted) {
           await ShowNotification.showToast(
             context,
-            'Không có quyền lưu tệp. Vui lòng bật quyền trong Cài đặt.',
+            'Không có quyền truy cập thư mục. Vui lòng cấp quyền trong Cài đặt.',
           );
           return false;
         }

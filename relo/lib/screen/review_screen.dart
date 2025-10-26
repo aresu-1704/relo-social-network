@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/edit_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:relo/utils/permision_util.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class ReviewScreen extends StatefulWidget {
   final File file;

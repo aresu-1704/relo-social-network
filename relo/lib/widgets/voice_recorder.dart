@@ -4,7 +4,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:relo/utils/permision_util.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class VoiceRecorderWidget extends StatefulWidget {
   final void Function(String path) onSend;
