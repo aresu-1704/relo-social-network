@@ -236,3 +236,16 @@ async def debug_current_user(current_user: User = Depends(get_current_user)):
         "avatarPublicId": getattr(current_user, "avatarPublicId", None),
         "backgroundPublicId": getattr(current_user, "backgroundPublicId", None),
     }
+
+# Xóa tài khoản (soft delete)
+@router.delete("/me", status_code=200)
+async def delete_account(current_user: User = Depends(get_current_user)):
+    """
+    Xóa tài khoản người dùng (soft delete).
+    Đổi status thành 'deleted' thay vì xóa khỏi database.
+    """
+    try:
+        result = await UserService.delete_account(str(current_user.id))
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -10,9 +10,14 @@ class DioApiService {
 
   // Callback to navigate to login screen on session expiration
   final Function() onSessionExpired;
+  
+  // Callback when account is deleted
+  final Function(String message)? onAccountDeleted;
 
-  DioApiService({required this.onSessionExpired})
-      : _dio = Dio(BaseOptions(baseUrl: baseUrl)),
+  DioApiService({
+    required this.onSessionExpired,
+    this.onAccountDeleted,
+  })  : _dio = Dio(BaseOptions(baseUrl: baseUrl)),
         _storageService = const SecureStorageService(),
         _authService = AuthService() {
     _dio.interceptors.add(_createDioInterceptor());
@@ -48,6 +53,14 @@ class DioApiService {
               _handleSessionExpired();
               return handler.reject(e);
             }
+          } on AccountDeletedException catch (deletedError) {
+            // Account was deleted - show specific dialog
+            if (onAccountDeleted != null) {
+              onAccountDeleted!(deletedError.message);
+            } else {
+              _handleSessionExpired();
+            }
+            return handler.reject(e);
           } catch (_) {
             // Any error during refresh token flow means session is expired
             _handleSessionExpired();

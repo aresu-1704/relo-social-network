@@ -6,6 +6,7 @@ class User {
   final String? avatarUrl;
   final String? backgroundUrl;
   final String? bio;
+  final String? status;
 
   User({
     required this.id,
@@ -15,6 +16,7 @@ class User {
     this.avatarUrl,
     this.backgroundUrl,
     this.bio,
+    this.status,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class User {
       avatarUrl: json['avatarUrl'],
       backgroundUrl: json['backgroundUrl'],
       bio: json['bio'],
+      status: json['status'],
     );
   }
 }

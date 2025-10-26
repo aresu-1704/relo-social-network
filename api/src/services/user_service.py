@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import datetime
 from ..models import User
 from ..models import FriendRequest
 from ..schemas import UserUpdate
@@ -446,3 +447,24 @@ class UserService:
                     pass
             
             raise ValueError(f"Lỗi cập nhật thông tin: {str(e)}")
+
+    @staticmethod
+    async def delete_account(user_id: str):
+        """
+        Xóa tài khoản người dùng (soft delete) bằng cách đổi status thành 'deleted'.
+        Không xóa khỏi database.
+        """
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Kiểm tra xem tài khoản đã bị xóa chưa
+        if user.status == 'deleted':
+            raise ValueError("Tài khoản này đã bị xóa trước đó.")
+        
+        # Đổi status thành deleted
+        user.status = 'deleted'
+        user.updatedAt = datetime.utcnow()
+        await user.save()
+        
+        return {"message": "Tài khoản đã được xóa thành công."}

@@ -2,13 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
-<<<<<<< HEAD
-import 'package:relo/utils/permission_handler_util.dart';
-import 'package:relo/utils/show_alert_dialog.dart';
-import 'package:relo/utils/show_toast.dart';
-=======
 import 'package:relo/utils/show_notification.dart';
->>>>>>> origin/master
+import 'package:permission_handler/permission_handler.dart';
 
 class VoiceRecorderWidget extends StatefulWidget {
   final void Function(String path) onSend;
@@ -39,30 +34,14 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
   }
 
   Future<void> _initRecorder() async {
-    final hasPermission = await PermissionHandlerUtil.requestMicrophonePermission(context);
-    if (!hasPermission) {
-      // Quyền bị từ chối, người dùng đã được hiển thị dialog
-      return;
-    }
+    await Permission.microphone.request();
     await _recorder.openRecorder();
   }
 
   Future<void> _startRecording() async {
-<<<<<<< HEAD
-    // Kiểm tra quyền trước khi ghi âm
-    final hasPermission = await PermissionHandlerUtil.requestMicrophonePermission(context);
-    if (!hasPermission) {
-      return;
-    }
-    
-    final dir = await getTemporaryDirectory();
-    _path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';
-    await _recorder.startRecorder(toFile: _path!, codec: Codec.aacADTS);
-=======
     try {
       // 1️⃣ Kiểm tra và xin quyền micro
       final micStatus = await Permission.microphone.request();
->>>>>>> origin/master
 
       if (!micStatus.isGranted) {
         final openSettings = await ShowNotification.showCustomAlertDialog(
@@ -164,21 +143,6 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
     }
   }
 
-<<<<<<< HEAD
-  Future<bool?> _showConfirmDialog(BuildContext context) {
-    return showAlertDialog(
-      context,
-      title: 'Xác nhận',
-      message: 'Bạn có muốn xóa ghi âm này không?',
-      confirmText: 'Xóa ghi âm',
-      cancelText: 'Quay lại',
-      showCancel: true,
-      confirmColor: const Color(0xFF7A2FC0),
-    );
-  }
-
-=======
->>>>>>> origin/master
   @override
   void dispose() {
     _recorder.closeRecorder();
@@ -394,13 +358,6 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget> {
     );
   }
 
-<<<<<<< HEAD
-  Future<void> _showAlertDialog() async {
-    await showToast(context, 'Ghi âm quá ngắn, vui lòng thử lại');
-  }
-
-=======
->>>>>>> origin/master
   String _formatDuration(int seconds) {
     final m = (seconds ~/ 60).toString().padLeft(2, '0');
     final s = (seconds % 60).toString().padLeft(2, '0');

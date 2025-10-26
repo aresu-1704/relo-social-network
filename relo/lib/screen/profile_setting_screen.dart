@@ -5,12 +5,9 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/models/user.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/auth_service.dart';
-<<<<<<< HEAD
-import 'default_screen.dart';
+
 import 'profile_screen.dart';
 import 'privacy_settings_screen.dart';
-=======
->>>>>>> origin/master
 
 class ProfileSettingScreen extends StatefulWidget {
   const ProfileSettingScreen({super.key});
@@ -51,8 +48,13 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Color(0xFF7A2FC0),
+        title: Text('Cài đặt', style: TextStyle(color: Colors.white)),
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: Color(0xFF7A2FC0)))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -141,7 +143,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                           },
                           icon: Icon(
                             Icons.logout_outlined,
-                            color: Color(0xFF7C3AED),
+                            color: Color(0xFF7A2FC0),
                           ),
                         ),
                       ],
@@ -154,44 +156,9 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                   height: 1,
                 ),
 
-                // Các tùy chọn cài đặt
-                InkWell(
-                  onTap: () {
-                    // TODO: Mở trang "Tài khoản và bảo mật"
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 18.0,
-                      horizontal: 20.0,
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.lock_outline, color: Color(0xFF7C3AED)),
-                        SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tài khoản và bảo mật',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Đổi mật khẩu, quản lý thiết bị đăng nhập',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                SizedBox(height: 10),
 
-                const Divider(height: 1),
-
+                // Quyền riêng tư & Bảo mật
                 InkWell(
                   onTap: () {
                     Navigator.push(
@@ -210,25 +177,35 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                       children: const [
                         Icon(
                           Icons.privacy_tip_outlined,
-                          color: Color(0xFF7C3AED),
+                          color: Color(0xFF7A2FC0),
                         ),
                         SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Quyền riêng tư',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Quản lý danh sách chặn người dùng',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Quyền riêng tư & Bảo mật',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                          ],
+                              SizedBox(height: 4),
+                              Text(
+                                'Đổi mật khẩu, danh sách chặn, quản lý thiết bị',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.grey,
                         ),
                       ],
                     ),
@@ -237,10 +214,11 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
 
                 const Divider(height: 1),
 
+                SizedBox(height: 20),
+
+                // Xóa tài khoản
                 InkWell(
-                  onTap: () {
-                    // TODO: Mở trang "Cài đặt ứng dụng"
-                  },
+                  onTap: () => _showDeleteAccountDialog(),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: 18.0,
@@ -248,24 +226,38 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                     ),
                     child: Row(
                       children: const [
-                        Icon(Icons.settings_outlined, color: Color(0xFF7C3AED)),
+                        Icon(
+                          Icons.delete_forever_outlined,
+                          color: Colors.red,
+                        ),
                         SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Cài đặt ứng dụng',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Thết lập thông báo, font chữ',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Xóa tài khoản',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.red,
+                                ),
                               ),
-                            ),
-                          ],
+                              SizedBox(height: 4),
+                              Text(
+                                'Xóa vĩnh viễn tài khoản của bạn',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.red,
                         ),
                       ],
                     ),
@@ -276,5 +268,144 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
               ],
             ),
     );
+  }
+
+  Future<void> _showDeleteAccountDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+              SizedBox(width: 10),
+              Text('Xóa tài khoản'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'Bạn có chắc chắn muốn xóa tài khoản?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '⚠️ Hành động này sẽ:\n'
+                '• Xóa tất cả dữ liệu của bạn\n'
+                '• Xóa tất cả bài viết và tin nhắn\n'
+                '• Không thể khôi phục lại',
+                style: TextStyle(fontSize: 14, height: 1.5),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.red,
+              ),
+              child: const Text('Xóa tài khoản'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _deleteAccount();
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: const [
+            CircularProgressIndicator(color: Color(0xFF7A2FC0)),
+            SizedBox(width: 20),
+            Expanded(child: Text('Đang xóa tài khoản...')),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      await userService.deleteAccount();
+      
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        // Show success dialog
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.green, size: 28),
+                SizedBox(width: 10),
+                Text('Thành công'),
+              ],
+            ),
+            content: const Text(
+              'Tài khoản của bạn đã được xóa.\n\n'
+              'Bạn sẽ được đăng xuất ngay bây giờ.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+
+        // Logout and navigate to login screen
+        if (mounted) {
+          authService.logout();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+            (route) => false,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        // Show error dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: const [
+                Icon(Icons.error_outline, color: Colors.red, size: 28),
+                SizedBox(width: 10),
+                Text('Lỗi'),
+              ],
+            ),
+            content: Text('Không thể xóa tài khoản.\n\nLỗi: ${e.toString()}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 }

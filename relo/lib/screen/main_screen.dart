@@ -1,9 +1,10 @@
 // Màn hình chính với AppBar có thanh tìm kiếm và Bottom Bar được tùy chỉnh
 import 'package:flutter/material.dart';
+import 'package:relo/screen/profile_screen.dart';
+import 'package:relo/screen/profile_setting_screen.dart';
 import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
-import 'profile_setting_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class MainScreen extends StatefulWidget {
@@ -41,7 +42,7 @@ class MainScreenState extends State<MainScreen> {
       Center(child: Text('TODO: Tường nhà')),
       const FriendsScreen(),
       Center(child: Text('TODO: Thông báo')),
-      ProfileSettingScreen(),
+      const ProfileScreen(),
     ];
 
     return Scaffold(
@@ -74,10 +75,19 @@ class MainScreenState extends State<MainScreen> {
                 ),
               ),
             ),
-            IconButton(
-              onPressed: () => {},
-              icon: Icon(Icons.settings, color: Colors.white70),
-            ),
+            // Settings button - Only show in Profile tab
+            if (_selectedIndex == 4)
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProfileSettingScreen(),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.settings, color: Colors.white70),
+              ),
           ],
         ),
       ),

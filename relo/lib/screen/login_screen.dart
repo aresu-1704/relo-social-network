@@ -58,6 +58,45 @@ class _LoginScreenState extends State<LoginScreen> {
             (route) => false,
           );
         }
+      } on AccountDeletedException catch (e) {
+        // Hiển thị dialog cho tài khoản đã bị xóa
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: Row(
+                children: const [
+                  Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                  SizedBox(width: 10),
+                  Text('Tài khoản đã bị xóa'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.message,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Tài khoản của bạn đã bị xóa và không thể đăng nhập.\n\n'
+                    'Vui lòng liên hệ bộ phận hỗ trợ nếu bạn cho rằng đây là lỗi.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Đóng'),
+                ),
+              ],
+            ),
+          );
+        }
       } catch (e) {
         // Hiển thị lỗi cho người dùng
         if (mounted) {

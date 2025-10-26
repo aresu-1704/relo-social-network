@@ -3,6 +3,14 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/constants.dart';
 import 'package:relo/services/websocket_service.dart';
 
+/// Custom exception cho tài khoản đã bị xóa
+class AccountDeletedException implements Exception {
+  final String message;
+  AccountDeletedException(this.message);
+  
+  @override
+  String toString() => message;
+}
 
 class AuthService {
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
@@ -44,12 +52,19 @@ class AuthService {
         throw Exception('Login failed: Invalid response from server.');
       }
     } on DioException catch (e) {
-      // Handle Dio-specific errors, e.g., 401 Unauthorized
+      // Handle Dio-specific errors
       if (e.response?.statusCode == 401) {
         throw Exception('Tên đăng nhập hoặc mật khẩu không chính xác.');
+      } else if (e.response?.statusCode == 403) {
+        // Tài khoản đã bị xóa
+        final errorMessage = e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
+        throw AccountDeletedException(errorMessage);
       }
       throw Exception('Đã xảy ra lỗi mạng.');
     } catch (e) {
+      if (e is AccountDeletedException) {
+        rethrow;
+      }
       throw Exception('Đã xảy ra lỗi không xác định.');
     }
   }
@@ -116,7 +131,20 @@ class AuthService {
       } else {
         throw Exception('Failed to refresh token.');
       }
+    } on DioException catch (e) {
+      // Check if account was deleted (403)
+      if (e.response?.statusCode == 403) {
+        await logout();
+        final errorMessage = e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
+        throw AccountDeletedException(errorMessage);
+      }
+      // If refresh fails, logout the user
+      await logout();
+      return null;
     } catch (e) {
+      if (e is AccountDeletedException) {
+        rethrow;
+      }
       // If refresh fails, logout the user
       await logout();
       return null;

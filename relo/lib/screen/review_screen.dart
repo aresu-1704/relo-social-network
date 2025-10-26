@@ -208,7 +208,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF7C3AED),
+              backgroundColor: Color(0xFF7A2FC0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -305,14 +305,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
         children: [
           Icon(
             icon,
-            color: active ? Color(0xFF7C3AED) : Colors.white,
+            color: active ? Color(0xFF7A2FC0) : Colors.white,
             size: 26,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: active ? Color(0xFF7C3AED) : Colors.white70,
+              color: active ? Color(0xFF7A2FC0) : Colors.white70,
               fontSize: 12,
             ),
           ),
@@ -457,7 +457,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
               bottom: 35,
               right: 20,
               child: FloatingActionButton(
-                backgroundColor: const Color(0xFF7C3AED),
+                backgroundColor: const Color(0xFF7A2FC0),
                 onPressed: _onSend,
                 child: const Icon(Icons.send, color: Colors.white),
               ),

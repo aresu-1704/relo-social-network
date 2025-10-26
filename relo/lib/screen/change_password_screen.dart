@@ -86,12 +86,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (value == _currentPasswordController.text) {
       return 'Mật khẩu mới phải khác mật khẩu hiện tại';
     }
-    if (!value.contains(RegExp(r'[A-Z]'))) {
-      return 'Mật khẩu phải có ít nhất 1 chữ hoa';
-    }
-    if (!value.contains(RegExp(r'[0-9]'))) {
-      return 'Mật khẩu phải có ít nhất 1 chữ số';
-    }
     return null;
   }
 
@@ -118,7 +112,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       confirmText: 'Đổi mật khẩu',
       cancelText: 'Hủy',
       showCancel: true,
-      confirmColor: Color(0xFF7C3AED),
+      confirmColor: Color(0xFF7A2FC0),
     );
 
     if (confirm != true) return;
@@ -166,7 +160,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: Color(0xFF7C3AED),
+        backgroundColor: Color(0xFF7A2FC0),
         title: Text('Đổi mật khẩu', style: TextStyle(color: Colors.white)),
         iconTheme: IconThemeData(color: Colors.white),
       ),
@@ -193,7 +187,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Mật khẩu mới phải có ít nhất 8 ký tự, bao gồm chữ hoa và số.',
+                            'Mật khẩu mới phải có ít nhất 8 ký tự.',
                             style: TextStyle(
                               color: Colors.blue[900],
                               fontSize: 14,
@@ -224,7 +218,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       hintText: 'Nhập mật khẩu hiện tại',
                       filled: true,
                       fillColor: Colors.white,
-                      prefixIcon: Icon(Icons.lock_outline, color: Color(0xFF7C3AED)),
+                      prefixIcon: Icon(Icons.lock_outline, color: Color(0xFF7A2FC0)),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _isCurrentPasswordVisible ? Icons.visibility_off : Icons.visibility,
@@ -244,7 +238,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Color(0xFF7C3AED), width: 2),
+                        borderSide: BorderSide(color: Color(0xFF7A2FC0), width: 2),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -278,7 +272,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       hintText: 'Nhập mật khẩu mới',
                       filled: true,
                       fillColor: Colors.white,
-                      prefixIcon: Icon(Icons.lock, color: Color(0xFF7C3AED)),
+                      prefixIcon: Icon(Icons.lock, color: Color(0xFF7A2FC0)),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _isNewPasswordVisible ? Icons.visibility_off : Icons.visibility,
@@ -298,7 +292,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Color(0xFF7C3AED), width: 2),
+                        borderSide: BorderSide(color: Color(0xFF7A2FC0), width: 2),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -362,7 +356,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       hintText: 'Nhập lại mật khẩu mới',
                       filled: true,
                       fillColor: Colors.white,
-                      prefixIcon: Icon(Icons.lock_clock, color: Color(0xFF7C3AED)),
+                      prefixIcon: Icon(Icons.lock_clock, color: Color(0xFF7A2FC0)),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility,
@@ -382,7 +376,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Color(0xFF7C3AED), width: 2),
+                        borderSide: BorderSide(color: Color(0xFF7A2FC0), width: 2),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -404,7 +398,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _changePassword,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF7C3AED),
+                        backgroundColor: Color(0xFF7A2FC0),
                         disabledBackgroundColor: Colors.grey[400],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -446,7 +440,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.security, color: Color(0xFF7C3AED), size: 20),
+                            Icon(Icons.security, color: Color(0xFF7A2FC0), size: 20),
                             SizedBox(width: 8),
                             Text(
                               'Mẹo bảo mật',
@@ -458,8 +452,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           ],
                         ),
                         SizedBox(height: 12),
+                        _buildSecurityTip('Sử dụng mật khẩu dài ít nhất 8 ký tự'),
                         _buildSecurityTip('Không sử dụng mật khẩu dễ đoán'),
-                        _buildSecurityTip('Kết hợp chữ hoa, chữ thường, số và ký tự đặc biệt'),
                         _buildSecurityTip('Không chia sẻ mật khẩu với người khác'),
                         _buildSecurityTip('Đổi mật khẩu định kỳ để bảo mật tài khoản'),
                       ],
@@ -483,7 +477,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(color: Color(0xFF7C3AED)),
+                        CircularProgressIndicator(color: Color(0xFF7A2FC0)),
                         SizedBox(height: 16),
                         Text('Đang đổi mật khẩu...'),
                       ],

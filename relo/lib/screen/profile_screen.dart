@@ -11,9 +11,10 @@ import 'package:shimmer/shimmer.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:relo/utils/permission_handler_util.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:relo/utils/show_toast.dart';
 import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/utils/show_notification.dart';
 import 'package:relo/screen/privacy_settings_screen.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -156,9 +157,33 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     try {
       // Check permission for camera
       if (source == ImageSource.camera) {
-        final hasPermission = await PermissionHandlerUtil.requestCameraPermission(context);
-        if (!hasPermission) {
-          return;
+        final cameraStatus = await Permission.camera.request();
+        
+        if (!cameraStatus.isGranted) {
+          final openSettings = await ShowNotification.showCustomAlertDialog(
+            context,
+            message: "Cần quyền camera để chụp ảnh",
+            buttonText: "Mở cài đặt",
+            buttonColor: Color(0xFF7A2FC0),
+          );
+          
+          if (openSettings == true) {
+            await openAppSettings();
+            await Future.delayed(Duration(seconds: 1));
+            
+            final cameraAfter = await Permission.camera.status;
+            if (!cameraAfter.isGranted) {
+              if (mounted) {
+                await ShowNotification.showCustomAlertDialog(
+                  context,
+                  message: "Vẫn chưa có quyền camera, không thể chụp ảnh.",
+                );
+              }
+              return;
+            }
+          } else {
+            return;
+          }
         }
       }
       
@@ -271,9 +296,33 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     try {
       // Check permission for camera
       if (source == ImageSource.camera) {
-        final hasPermission = await PermissionHandlerUtil.requestCameraPermission(context);
-        if (!hasPermission) {
-          return;
+        final cameraStatus = await Permission.camera.request();
+        
+        if (!cameraStatus.isGranted) {
+          final openSettings = await ShowNotification.showCustomAlertDialog(
+            context,
+            message: "Cần quyền camera để chụp ảnh",
+            buttonText: "Mở cài đặt",
+            buttonColor: Color(0xFF7A2FC0),
+          );
+          
+          if (openSettings == true) {
+            await openAppSettings();
+            await Future.delayed(Duration(seconds: 1));
+            
+            final cameraAfter = await Permission.camera.status;
+            if (!cameraAfter.isGranted) {
+              if (mounted) {
+                await ShowNotification.showCustomAlertDialog(
+                  context,
+                  message: "Vẫn chưa có quyền camera, không thể chụp ảnh.",
+                );
+              }
+              return;
+            }
+          } else {
+            return;
+          }
         }
       }
       
@@ -425,7 +474,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  prefixIcon: Icon(Icons.person, color: Color(0xFF7C3AED)),
+                  prefixIcon: Icon(Icons.person, color: Color(0xFF7A2FC0)),
                 ),
               ),
               SizedBox(height: 15),
@@ -438,7 +487,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  prefixIcon: Icon(Icons.info_outline, color: Color(0xFF7C3AED)),
+                  prefixIcon: Icon(Icons.info_outline, color: Color(0xFF7A2FC0)),
                   helperText: 'Tối đa 150 ký tự',
                 ),
               ),
@@ -466,7 +515,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     child: ElevatedButton(
                       onPressed: _updateProfile,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF7C3AED),
+                        backgroundColor: Color(0xFF7A2FC0),
                         padding: EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -525,7 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ),
             SizedBox(height: 20),
             ListTile(
-              leading: Icon(Icons.photo_library, color: Color(0xFF7C3AED)),
+              leading: Icon(Icons.photo_library, color: Color(0xFF7A2FC0)),
               title: Text('Chọn từ thư viện'),
               onTap: () {
                 Navigator.pop(context);
@@ -537,7 +586,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               },
             ),
             ListTile(
-              leading: Icon(Icons.camera_alt, color: Color(0xFF7C3AED)),
+              leading: Icon(Icons.camera_alt, color: Color(0xFF7A2FC0)),
               title: Text('Chụp ảnh mới'),
               onTap: () {
                 Navigator.pop(context);
@@ -550,7 +599,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ),
             if (_user?.avatarUrl != null && isAvatar || _user?.backgroundUrl != null && !isAvatar)
               ListTile(
-                leading: Icon(Icons.visibility, color: Color(0xFF7C3AED)),
+                leading: Icon(Icons.visibility, color: Color(0xFF7A2FC0)),
                 title: Text('Xem ảnh hiện tại'),
                 onTap: () {
                   Navigator.pop(context);
@@ -588,7 +637,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Color(0xFF7C3AED), width: 2),
+                  border: Border.all(color: Color(0xFF7A2FC0), width: 2),
                 ),
                 child: QrImageView(
                   data: 'relo://profile/${_user!.id}',
@@ -596,11 +645,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   size: 200.0,
                   eyeStyle: QrEyeStyle(
                     eyeShape: QrEyeShape.square,
-                    color: Color(0xFF7C3AED),
+                    color: Color(0xFF7A2FC0),
                   ),
                   dataModuleStyle: QrDataModuleStyle(
                     dataModuleShape: QrDataModuleShape.square,
-                    color: Color(0xFF7C3AED),
+                    color: Color(0xFF7A2FC0),
                   ),
                 ),
               ),
@@ -632,7 +681,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     icon: Icon(Icons.share, color: Colors.white),
                     label: Text('Chia sẻ', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF7C3AED),
+                      backgroundColor: Color(0xFF7A2FC0),
                     ),
                   ),
                 ],
@@ -674,7 +723,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             loadingBuilder: (context, event) => Center(
               child: CircularProgressIndicator(
                 value: event == null ? 0 : event.cumulativeBytesLoaded / (event.expectedTotalBytes ?? 1),
-                color: Color(0xFF7C3AED),
+                color: Color(0xFF7A2FC0),
               ),
             ),
           ),
@@ -696,7 +745,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       builder: (context) => AlertDialog(
         content: Row(
           children: [
-            CircularProgressIndicator(color: Color(0xFF7C3AED)),
+            CircularProgressIndicator(color: Color(0xFF7A2FC0)),
             SizedBox(width: 20),
             Expanded(child: Text(message)),
           ],
@@ -728,7 +777,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     if (_user == null) {
       return Scaffold(
         appBar: AppBar(
-          backgroundColor: Color(0xFF7C3AED),
+          backgroundColor: Color(0xFF7A2FC0),
           title: Text('Trang cá nhân', style: TextStyle(color: Colors.white)),
           iconTheme: IconThemeData(color: Colors.white),
         ),
@@ -755,7 +804,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: Color(0xFF7C3AED),
+            backgroundColor: Color(0xFF7A2FC0),
             iconTheme: IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
@@ -785,7 +834,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   Color(0xFF9B59B6),
-                                  Color(0xFF7C3AED),
+                                  Color(0xFF7A2FC0),
                                 ],
                               )
                             : null,
@@ -868,7 +917,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                     child: Container(
                                       padding: EdgeInsets.all(4),
                                       decoration: BoxDecoration(
-                                        color: Color(0xFF7C3AED),
+                                        color: Color(0xFF7A2FC0),
                                         shape: BoxShape.circle,
                                         border: Border.all(
                                           color: Colors.white,
@@ -956,7 +1005,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         children: [
                           Icon(
                             Icons.info_outline,
-                            color: Color(0xFF7C3AED),
+                            color: Color(0xFF7A2FC0),
                             size: 20,
                           ),
                           SizedBox(width: 10),
@@ -1012,7 +1061,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         children: [
                           Icon(
                             Icons.account_circle,
-                            color: Color(0xFF7C3AED),
+                            color: Color(0xFF7A2FC0),
                             size: 20,
                           ),
                           SizedBox(width: 10),
@@ -1033,37 +1082,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   ),
                 ),
                 
-                // Privacy settings button (only for own profile)
-                if (_isOwnProfile) ...[
-                  SizedBox(height: 15),
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 15),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PrivacySettingsScreen(),
-                          ),
-                        );
-                      },
-                      icon: Icon(Icons.privacy_tip, color: Colors.white),
-                      label: Text(
-                        'Quyền riêng tư & Bảo mật',
-                        style: TextStyle(color: Colors.white, fontSize: 15),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF7C3AED),
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        minimumSize: Size(double.infinity, 50),
-                      ),
-                    ),
-                  ),
-                ],
-
                 // Action buttons (if not own profile)
                 if (!_isOwnProfile) ...[
                   SizedBox(height: 20),
@@ -1101,7 +1119,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                               style: TextStyle(color: Colors.white),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF7C3AED),
+                              backgroundColor: Color(0xFF7A2FC0),
                               padding: EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
@@ -1193,7 +1211,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               onTap: _showQRCode,
               child: Column(
                 children: [
-                  Icon(Icons.qr_code, color: Color(0xFF7C3AED)),
+                  Icon(Icons.qr_code, color: Color(0xFF7A2FC0)),
                   SizedBox(height: 5),
                   Text(
                     'Mã QR',
@@ -1239,14 +1257,14 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         onPressed: () {
           _showFriendOptions();
         },
-        icon: Icon(Icons.check, color: Color(0xFF7C3AED)),
-        label: Text('Bạn bè', style: TextStyle(color: Color(0xFF7C3AED))),
+        icon: Icon(Icons.check, color: Color(0xFF7A2FC0)),
+        label: Text('Bạn bè', style: TextStyle(color: Color(0xFF7A2FC0))),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           padding: EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: Color(0xFF7C3AED)),
+            side: BorderSide(color: Color(0xFF7A2FC0)),
           ),
         ),
       );
@@ -1284,11 +1302,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         label: Text('Kết bạn'),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF7C3AED),
+          foregroundColor: Color(0xFF7A2FC0),
           padding: EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: Color(0xFF7C3AED)),
+            side: BorderSide(color: Color(0xFF7A2FC0)),
           ),
         ),
       );

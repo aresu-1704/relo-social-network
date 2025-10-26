@@ -198,4 +198,16 @@ class UserService {
       throw Exception('Không thể cập nhật ảnh bìa: $e');
     }
   }
+
+  // Xóa tài khoản (soft delete)
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('users/me');
+    } on DioException catch (e) {
+      print('Error deleting account: ${e.response?.data}');
+      throw Exception('Không thể xóa tài khoản: ${e.message}');
+    } catch (e) {
+      throw Exception('Không thể xóa tài khoản: $e');
+    }
+  }
 }

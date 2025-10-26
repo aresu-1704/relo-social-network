@@ -31,9 +31,61 @@ class ServiceLocator {
         (route) => false,
       );
     }
+    
+    // This function will be called when account is deleted
+    void onAccountDeleted(String message) {
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: Row(
+              children: const [
+                Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                SizedBox(width: 10),
+                Text('Tài khoản đã bị xóa'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Tài khoản của bạn đã bị xóa và không thể tiếp tục sử dụng.\n\n'
+                  'Vui lòng liên hệ bộ phận hỗ trợ nếu bạn cho rằng đây là lỗi.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  // Navigate to login screen
+                  navigatorKey.currentState?.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
 
-    // Create the core DioApiService with the session expiration callback
-    dioApiService = DioApiService(onSessionExpired: onSessionExpired);
+    // Create the core DioApiService with callbacks
+    dioApiService = DioApiService(
+      onSessionExpired: onSessionExpired,
+      onAccountDeleted: onAccountDeleted,
+    );
     dio = dioApiService.dio;
 
     // Create other services that depend on the central Dio instance

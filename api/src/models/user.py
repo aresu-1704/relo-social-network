@@ -22,6 +22,7 @@ class User(Document):
     bio: Optional[str] = Field(default="", description="Tiểu sử ngắn của người dùng.")
     friendIds: List[str] = Field(default_factory=list, description="Danh sách ID của bạn bè.")
     blockedUserIds: List[str] = Field(default_factory=list, description="Danh sách ID của người dùng bị chặn.")
+    status: Optional[str] = Field(default=None, description="Trạng thái tài khoản: None (mặc định), 'available', 'deleted'.")
     createdAt: datetime = Field(default_factory=datetime.utcnow, description="Thời điểm người dùng được tạo.")
     updatedAt: datetime = Field(default_factory=datetime.utcnow, description="Thời điểm thông tin người dùng được cập nhật lần cuối.")
     
