@@ -102,7 +102,6 @@ class _MessageComposerState extends State<MessageComposer> {
                         Icons.emoji_emotions_outlined,
                         color: Colors.grey,
                       ),
-                      const SizedBox(width: 8),
                       IconButton(
                         icon: Icon(
                           _activeInput == 'gallery'
@@ -112,13 +111,18 @@ class _MessageComposerState extends State<MessageComposer> {
                         ),
                         onPressed: () => _toggleInput('gallery'),
                       ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
+                          maxLength: 2000,
+                          autocorrect: true,
                           controller: _textController,
                           focusNode: _focusNode,
                           autofocus: false,
-                          decoration: const InputDecoration.collapsed(
+                          decoration: const InputDecoration(
+                            counterText: '',
+                            border: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                            ),
                             hintText: 'Tin nhắn',
                           ),
                           textCapitalization: TextCapitalization.sentences,

@@ -16,11 +16,71 @@ void main() async {
   ServiceLocator.init();
 
   // Set up WebSocket auth error handler
-  webSocketService.setAuthErrorHandler(() {
-    // Navigate to login screen on auth failure
-    ServiceLocator.navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
+  webSocketService.setAuthErrorHandler(() async {
+    final context = ServiceLocator.navigatorKey.currentContext;
+
+    if (context == null) return;
+
+    // Hiển thị BottomSheet thông báo
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Phiên đăng nhập hết hạn 🥺',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF7A2FC0),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Bạn cần đăng nhập lại',
+                style: TextStyle(fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Đóng bottom sheet
+                    // Chuyển sang màn hình Login
+                    ServiceLocator.navigatorKey.currentState
+                        ?.pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
+                          (route) => false,
+                        );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF7A2FC0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text(
+                    'Đồng ý',
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   });
 
@@ -61,7 +121,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: "Relo",
       theme: theme.copyWith(
-        textTheme: GoogleFonts.robotoTextTheme(theme.textTheme),
+        textTheme: GoogleFonts.poppinsTextTheme(theme.textTheme),
       ),
       home: isLoggedIn ? const MainScreen() : const LoginScreen(),
     );

@@ -64,6 +64,7 @@ class MediaMessageBubble extends StatelessWidget {
           ? CrossAxisAlignment.end
           : CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 4),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisAlignment: isMe
@@ -95,31 +96,35 @@ class MediaMessageBubble extends StatelessWidget {
                     child: _buildMediaLayout(context, mediaUrls),
                   ),
                   const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 1,
+                  if (isMe && isLastFromMe)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1, right: 0),
+                      child: MessageStatusWidget(message: message),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 197, 197, 197),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        timeString,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 197, 197, 197),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      timeString,
-                      style: const TextStyle(fontSize: 10, color: Colors.white),
-                    ),
-                  ),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
           ],
         ),
-
-        if (isMe && isLastFromMe)
-          Padding(
-            padding: const EdgeInsets.only(top: 1, right: 0),
-            child: MessageStatusWidget(message: message),
-          ),
       ],
     );
   }
@@ -167,6 +172,7 @@ class MediaMessageBubble extends StatelessWidget {
     }
 
     return GridView.builder(
+      padding: EdgeInsets.zero,
       itemCount: mediaUrls.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

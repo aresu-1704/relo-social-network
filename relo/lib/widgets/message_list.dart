@@ -145,7 +145,6 @@ class MessageList extends StatelessWidget {
   }
 
   bool _isLastFromUser(List<Message> messages, int index, String userId) {
-    return messages[index].senderId == userId &&
-        (index == 0 || messages[index - 1].senderId != userId);
+    return messages[index].senderId == userId && index == 0;
   }
 }
