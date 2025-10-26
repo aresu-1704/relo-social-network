@@ -38,24 +38,7 @@ class WebSocketService {
   Future<void> _handleDisconnect() async {
     if (_isManualDisconnect) return;
 
-    // 🔹 Nếu mất mạng thì KHÔNG xử lý token, chỉ chờ có mạng để reconnect
-    final connectivity = await Connectivity().checkConnectivity();
-    if (connectivity == ConnectivityResult.none) {
-      print('[WebSocket] Mất mạng, chờ có mạng sẽ tự reconnect...');
-      Connectivity().onConnectivityChanged
-          .firstWhere((status) => status != ConnectivityResult.none)
-          .then((_) {
-            if (!_isManualDisconnect) {
-              print('[WebSocket] Mạng đã trở lại, reconnect...');
-              _reconnect();
-            }
-          });
-      return;
-    }
-
-    // 🔹 Nếu vẫn có mạng → xử lý như bình thường (refresh token, reconnect, v.v.)
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print('[WebSocket] Quá số lần thử reconnect, ngắt kết nối.');
       disconnect();
       return;
     }
@@ -63,25 +46,18 @@ class WebSocketService {
     _reconnectAttempts++;
 
     try {
-      print('[WebSocket] Đang thử refresh token...');
       final newAccessToken = await _authService.refreshToken();
-
       if (newAccessToken != null) {
-        print('[WebSocket] Refresh token thành công, reconnect...');
         await _reconnect();
       } else {
-        print('[WebSocket] Refresh token thất bại, gọi onAuthError.');
-        if (onAuthError != null) onAuthError!();
+        if (onAuthError != null) {
+          onAuthError!();
+        }
         disconnect();
       }
     } catch (e) {
-      // 🔹 Nếu refresh lỗi do mất mạng (hiếm khi trùng thời điểm), bỏ qua
-      final currentConn = await Connectivity().checkConnectivity();
-      if (currentConn != ConnectivityResult.none) {
-        print('[WebSocket] Lỗi refresh token khi có mạng, gọi onAuthError.');
-        if (onAuthError != null) onAuthError!();
-      } else {
-        print('[WebSocket] Refresh token lỗi nhưng không có mạng, bỏ qua.');
+      if (onAuthError != null) {
+        onAuthError!();
       }
       disconnect();
     }

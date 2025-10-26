@@ -285,13 +285,17 @@ class MessageService:
 
         # Phát broadcast tin nhắn đã thu hồi
         message_data = map_message_to_public_dict(message)
-        
+        conversation_data = map_conversation_to_public_dict(conversation)
+
         tasks = [
             manager.broadcast_to_user(
                 uid,
                 {
                     "type": "recalled_message",
-                    "payload": {"message": message_data}
+                    "payload": {
+                        "conversation": conversation_data,
+                        "message": message_data
+                    }
                 }
             )
             for uid in [p.userId for p in conversation.participants]

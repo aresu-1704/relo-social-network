@@ -171,7 +171,7 @@ class _UserSearchResultItem extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => ChatScreen(
               conversationId: conversationId,
-              friendName: user.displayName,
+              chatName: user.displayName,
               isGroup: false,
             ),
           ),

@@ -173,4 +173,9 @@ class MessageService {
       }
     }
   }
+
+  //Xóa cuộc trò chuyện
+  Future<void> deleteConversation(String conversationId) async {
+    //TODO: Gọi API xóa cuộc trò chuyện trên server nếu cần thiết
+  }
 }

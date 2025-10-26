@@ -142,12 +142,6 @@ class _MessageComposerState extends State<MessageComposer> {
                 : Row(
                     children: [
                       IconButton(
-                        onPressed: () async {
-                          await _pickAndSendFiles();
-                        },
-                        icon: Icon(LucideIcons.paperclip, color: Colors.grey),
-                      ),
-                      IconButton(
                         icon: Icon(
                           _activeInput == 'gallery'
                               ? Icons.keyboard
@@ -171,6 +165,8 @@ class _MessageComposerState extends State<MessageComposer> {
                             hintText: 'Tin nhắn',
                           ),
                           textCapitalization: TextCapitalization.sentences,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendMessage(),
                         ),
                       ),
                       IconButton(
@@ -183,8 +179,10 @@ class _MessageComposerState extends State<MessageComposer> {
                         onPressed: () => _toggleInput('voice'),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.send, color: Colors.grey),
-                        onPressed: _sendMessage,
+                        onPressed: () async {
+                          await _pickAndSendFiles();
+                        },
+                        icon: Icon(LucideIcons.paperclip, color: Colors.grey),
                       ),
                     ],
                   ),

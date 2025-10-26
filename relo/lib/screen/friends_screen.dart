@@ -229,7 +229,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
               builder: (context) => ChatScreen(
                 conversationId: conversation['id'],
                 isGroup: false,
-                friendName: friend.displayName,
+                chatName: friend.displayName,
                 memberIds: participants.isNotEmpty
                     ? participants
                           .map((p) => p['id']?.toString() ?? '')
