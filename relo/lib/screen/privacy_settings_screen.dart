@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:relo/models/user.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
-import 'package:relo/utils/show_toast.dart';
-import 'package:relo/utils/show_alert_dialog.dart';
+import 'package:relo/utils/show_notification.dart';
 import 'package:relo/screen/change_password_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -18,7 +17,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   final UserService _userService = ServiceLocator.userService;
   final List<User> _blockedUsers = [];
   bool _isLoading = true;
-  
+
   // Privacy settings removed - not needed
 
   @override
@@ -42,13 +41,12 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   }
 
   Future<void> _unblockUser(String userId, String displayName) async {
-    bool? confirm = await showAlertDialog(
+    bool? confirm = await ShowNotification.showConfirmDialog(
       context,
-      title: 'Bỏ chặn người dùng',
-      message: 'Bạn có chắc chắn muốn bỏ chặn $displayName?',
+      title: 'Bạn có chắc chắn muốn bỏ chặn $displayName?',
       confirmText: 'Bỏ chặn',
       cancelText: 'Hủy',
-      showCancel: true,
+      confirmColor: Color(0xFF7A2FC0),
     );
 
     if (confirm == true) {
@@ -58,11 +56,11 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
           _blockedUsers.removeWhere((user) => user.id == userId);
         });
         if (mounted) {
-          await showToast(context, 'Đã bỏ chặn $displayName');
+          await ShowNotification.showToast(context, 'Đã bỏ chặn $displayName');
         }
       } catch (e) {
         if (mounted) {
-          await showToast(context, 'Không thể bỏ chặn người dùng');
+          await ShowNotification.showToast(context, 'Không thể bỏ chặn người dùng');
         }
       }
     }
@@ -110,10 +108,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                         SizedBox(height: 10),
                         Text(
                           'Những người trong danh sách chặn sẽ không thể nhắn tin hoặc xem hồ sơ của bạn',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
                         ),
                         SizedBox(height: 20),
                         if (_blockedUsers.isEmpty)
@@ -142,7 +137,8 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                         else
                           ...List.generate(
                             _blockedUsers.length,
-                            (index) => _buildBlockedUserItem(_blockedUsers[index]),
+                            (index) =>
+                                _buildBlockedUserItem(_blockedUsers[index]),
                           ),
                       ],
                     ),
@@ -176,7 +172,11 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                         ListTile(
                           leading: Icon(Icons.lock_outline, color: Colors.grey),
                           title: Text('Đổi mật khẩu'),
-                          trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                          trailing: Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
                           onTap: () {
                             Navigator.push(
                               context,
@@ -191,11 +191,18 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                         ListTile(
                           leading: Icon(Icons.devices, color: Colors.grey),
                           title: Text('Quản lý thiết bị đăng nhập'),
-                          trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                          trailing: Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
                           onTap: () async {
                             // TODO: Navigate to device management
                             if (mounted) {
-                              await showToast(context, 'Tính năng đang phát triển');
+                              await ShowNotification.showToast(
+                                context,
+                                'Tính năng đang phát triển',
+                              );
                             }
                           },
                           contentPadding: EdgeInsets.zero,
@@ -227,10 +234,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
       subtitle: Text('@${user.username}'),
       trailing: TextButton(
         onPressed: () => _unblockUser(user.id, user.displayName),
-        child: Text(
-          'Bỏ chặn',
-          style: TextStyle(color: Color(0xFF7A2FC0)),
-        ),
+        child: Text('Bỏ chặn', style: TextStyle(color: Color(0xFF7A2FC0))),
       ),
     );
   }

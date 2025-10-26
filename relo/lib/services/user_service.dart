@@ -110,7 +110,6 @@ class UserService {
   Future<User> getUserProfile(String userId) async {
     try {
       final response = await _dio.get('users/$userId');
-
       if (response.statusCode == 200) {
         return User.fromJson(response.data);
       } else {
@@ -150,7 +149,7 @@ class UserService {
       if (bio != null) data['bio'] = bio;
       if (avatarBase64 != null) data['avatarBase64'] = avatarBase64;
       if (backgroundBase64 != null) data['backgroundBase64'] = backgroundBase64;
-      
+
       await _dio.put('users/me', data: data);
     } catch (e) {
       throw Exception('Không thể cập nhật hồ sơ: $e');
@@ -158,18 +157,13 @@ class UserService {
   }
 
   // Cập nhật avatar và trả về user data mới
-  Future<User?> updateAvatar(String base64Image) async {
+  Future<User> updateAvatar(String base64Image) async {
     try {
-      final response = await _dio.put('users/me', data: {
-        'avatarBase64': base64Image,
-      });
-      
-      // Server should return updated user data
-      if (response.statusCode == 200) {
-        // Fetch updated user data
-        return await getMe();
-      }
-      return null;
+      final response = await _dio.put(
+        'users/me',
+        data: {'avatarBase64': base64Image},
+      );
+      return User.fromJson(response.data);
     } on DioException catch (e) {
       print('Error updating avatar: ${e.response?.data}');
       throw Exception('Không thể cập nhật ảnh đại diện: ${e.message}');
@@ -179,18 +173,13 @@ class UserService {
   }
 
   // Cập nhật ảnh bìa và trả về user data mới
-  Future<User?> updateBackground(String base64Image) async {
+  Future<User> updateBackground(String base64Image) async {
     try {
-      final response = await _dio.put('users/me', data: {
-        'backgroundBase64': base64Image,
-      });
-      
-      // Server should return updated user data
-      if (response.statusCode == 200) {
-        // Fetch updated user data
-        return await getMe();
-      }
-      return null;
+      final response = await _dio.put(
+        'users/me',
+        data: {'backgroundBase64': base64Image},
+      );
+      return User.fromJson(response.data);
     } on DioException catch (e) {
       print('Error updating background: ${e.response?.data}');
       throw Exception('Không thể cập nhật ảnh bìa: ${e.message}');

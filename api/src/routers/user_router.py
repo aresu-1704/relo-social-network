@@ -124,22 +124,14 @@ async def get_friends(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail=str(e))
 
 # Lấy hồ sơ công khai của người dùng
-@router.get("/{user_id}", response_model=UserPublic)
+@router.get("/{user_id}")
 async def get_user_profile(user_id: str, current_user: User = Depends(get_current_user)):
     """
     Lấy hồ sơ công khai của bất kỳ người dùng nào.
     """
     try:
-        user = await UserService.get_user_profile(user_id, str(current_user.id))
-        return UserPublic(
-            id=str(user.id),
-            username=user.username,
-            email=user.email,
-            displayName=user.displayName,
-            avatarUrl=user.avatarUrl,
-            backgroundUrl=user.backgroundUrl,
-            bio=user.bio
-        )
+        return await UserService.get_user_profile(user_id, str(current_user.id))
+    
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -203,39 +195,6 @@ async def unfriend_user(user_id: str, current_user: User = Depends(get_current_u
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-# Test endpoint để kiểm tra cập nhật profile
-@router.post("/test-update")
-async def test_update_profile(
-    test_data: dict,
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Test endpoint để kiểm tra dữ liệu cập nhật profile.
-    """
-    return {
-        "message": "Test successful",
-        "received_data": test_data,
-        "user_id": str(current_user.id)
-    }
-
-# Debug endpoint để kiểm tra dữ liệu user hiện tại
-@router.get("/debug-me")
-async def debug_current_user(current_user: User = Depends(get_current_user)):
-    """
-    Debug endpoint để kiểm tra dữ liệu user hiện tại trong database.
-    """
-    return {
-        "id": str(current_user.id),
-        "displayName": current_user.displayName,
-        "bio": current_user.bio,
-        "avatarUrl": current_user.avatarUrl,
-        "backgroundUrl": current_user.backgroundUrl,
-        "username": current_user.username,
-        "email": current_user.email,
-        "avatarPublicId": getattr(current_user, "avatarPublicId", None),
-        "backgroundPublicId": getattr(current_user, "backgroundPublicId", None),
-    }
 
 # Xóa tài khoản (soft delete)
 @router.delete("/me", status_code=200)

@@ -142,4 +142,20 @@ class ShowNotification {
     overlay.insert(overlayEntry);
     Future.delayed(const Duration(seconds: 2), () => overlayEntry.remove());
   }
+
+  static Future<void> showLoadingDialog(BuildContext context, String message) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: Color(0xFF7A2FC0)),
+            SizedBox(width: 20),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
+  }
 }

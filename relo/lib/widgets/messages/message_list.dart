@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:relo/models/message.dart';
-import 'package:relo/widgets/audio_message_bubble.dart';
-import 'package:relo/widgets/media_message_bubble.dart';
-import 'package:relo/widgets/text_message_bubble.dart';
-import 'package:relo/widgets/file_message_bubble.dart';
+import 'package:relo/widgets/messages/audio_message_bubble.dart';
+import 'package:relo/widgets/messages/media_message_bubble.dart';
+import 'package:relo/widgets/messages/text_message_bubble.dart';
+import 'package:relo/widgets/messages/file_message_bubble.dart';
 
 class MessageList extends StatelessWidget {
   final List<Message> messages;

@@ -81,9 +81,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => ProfileScreen(),
-                      ),
+                      MaterialPageRoute(builder: (context) => ProfileScreen()),
                     );
                   },
                   child: Padding(
@@ -142,8 +140,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                                           context,
                                         ).pushAndRemoveUntil(
                                           MaterialPageRoute(
-                                            builder: (context) =>
-                                                LoginScreen(),
+                                            builder: (context) => LoginScreen(),
                                           ),
                                           (route) => false,
                                         );
@@ -173,8 +170,6 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                   thickness: 1,
                   height: 1,
                 ),
-
-                SizedBox(height: 10),
 
                 // Quyền riêng tư & Bảo mật
                 InkWell(
@@ -211,7 +206,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Đổi mật khẩu, danh sách chặn, quản lý thiết bị',
+                                'Đổi mật khẩu, quản lý chặn,...',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey,
@@ -232,8 +227,6 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
 
                 const Divider(height: 1),
 
-                SizedBox(height: 20),
-
                 // Xóa tài khoản
                 InkWell(
                   onTap: () => _showDeleteAccountDialog(),
@@ -244,10 +237,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                     ),
                     child: Row(
                       children: const [
-                        Icon(
-                          Icons.delete_forever_outlined,
-                          color: Colors.red,
-                        ),
+                        Icon(Icons.delete_forever_outlined, color: Colors.red),
                         SizedBox(width: 16),
                         Expanded(
                           child: Column(
@@ -306,10 +296,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
             children: const [
               Text(
                 'Bạn có chắc chắn muốn xóa tài khoản?',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 12),
               Text(
@@ -362,10 +349,10 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
 
     try {
       await userService.deleteAccount();
-      
+
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        
+
         // Show success dialog
         await showDialog(
           context: context,
@@ -402,7 +389,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        
+
         // Show error dialog
         showDialog(
           context: context,

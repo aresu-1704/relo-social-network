@@ -167,7 +167,16 @@ class UserService:
         if user_id in current_user.blockedUserIds:
             raise ValueError("Bạn đã chặn người dùng này.")
 
-        return user
+        # Trả về trực tiếp dictionary thay vì tạo đối tượng User mới
+        return {
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "displayName": user.displayName,
+            "avatarUrl": user.avatarUrl if user.avatarUrl not in ["", None] else None,
+            "backgroundUrl": user.backgroundUrl if user.backgroundUrl not in ["", None] else None,
+            "bio": user.bio if user.bio not in ["", None] else None
+        }
 
     @staticmethod
     async def block_user(user_id: str, block_user_id: str):
@@ -330,7 +339,6 @@ class UserService:
         tmp_background_path = None
 
         try:
-            # 1️⃣ Upload Avatar lên Cloudinary
             if "avatarBase64" in update_data and update_data["avatarBase64"]:
                 print("DEBUG: Processing avatar upload...")
                 avatar_data = update_data["avatarBase64"]
@@ -342,14 +350,10 @@ class UserService:
                 else:
                     image_bytes = base64.b64decode(avatar_data)
 
-                print(f"DEBUG: Avatar decoded, size: {len(image_bytes)} bytes")
-
                 # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
                     tmp_avatar_path = tmp.name
-
-                print(f"DEBUG: Temp avatar file created at: {tmp_avatar_path}")
 
                 # Xóa ảnh cũ nếu có
                 if user.avatarPublicId:
@@ -359,12 +363,9 @@ class UserService:
                     except Exception as e:
                         print(f"WARNING: Could not delete old avatar: {e}")
 
-                # Upload lên Cloudinary
-                print("DEBUG: Uploading avatar to Cloudinary...")
                 result = cloudinary_upload(tmp_avatar_path, folder="avatars")
                 user.avatarUrl = result["secure_url"]
                 user.avatarPublicId = result["public_id"]
-                print(f"✅ Avatar uploaded successfully! URL: {user.avatarUrl}")
                 
                 # Clean up temp file
                 os.unlink(tmp_avatar_path)
@@ -399,12 +400,9 @@ class UserService:
                     except Exception as e:
                         print(f"WARNING: Could not delete old background: {e}")
 
-                # Upload lên Cloudinary
-                print("DEBUG: Uploading background to Cloudinary...")
                 result = cloudinary_upload(tmp_background_path, folder="backgrounds")
                 user.backgroundUrl = result["secure_url"]
                 user.backgroundPublicId = result["public_id"]
-                print(f"✅ Background uploaded successfully! URL: {user.backgroundUrl}")
                 
                 # Clean up temp file
                 os.unlink(tmp_background_path)
@@ -421,16 +419,10 @@ class UserService:
 
             # 4️⃣ Lưu vào database
             await user.save()
-            print(f"✅ User saved successfully!")
-            print(f"   - DisplayName: {user.displayName}")
-            print(f"   - Bio: {user.bio}")
-            print(f"   - AvatarURL: {user.avatarUrl}")
-            print(f"   - BackgroundURL: {user.backgroundUrl}")
             
             return user
 
         except Exception as e:
-            print(f"❌ ERROR in update_user: {e}")
             import traceback
             traceback.print_exc()
             

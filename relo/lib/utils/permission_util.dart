@@ -20,28 +20,16 @@ class PermissionUtils {
 
         if (openSettings == true) {
           await PhotoManager.openSetting();
-          await Future.delayed(const Duration(seconds: 1));
-
-          final after = await PhotoManager.requestPermissionExtend();
-          if (!after.isAuth) {
-            if (context.mounted) {
-              await ShowNotification.showCustomAlertDialog(
-                context,
-                message: "Vẫn chưa có quyền truy cập ảnh/video.",
-              );
-              Navigator.pop(context);
-            }
-            return false;
-          }
+          // Không delay, chờ user quay lại rồi check lại quyền
+          return false;
         } else {
-          if (context.mounted) Navigator.pop(context);
           return false;
         }
       }
 
       return true;
     } catch (e) {
-      debugPrint("Lỗi khi kiểm tra quyền ảnh/video: $e");
+      debugPrint("⚠️ Lỗi khi kiểm tra quyền ảnh/video: $e");
       return false;
     }
   }

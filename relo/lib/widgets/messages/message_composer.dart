@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:relo/widgets/voice_recorder.dart';
-import 'package:relo/widgets/media_picker_sheet.dart';
+import 'package:relo/widgets/messages/voice_recorder.dart';
+import 'package:relo/widgets/messages/media_picker_sheet.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:relo/utils/show_notification.dart';

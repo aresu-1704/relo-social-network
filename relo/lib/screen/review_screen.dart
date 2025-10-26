@@ -41,7 +41,6 @@ class _ReviewScreenState extends State<ReviewScreen> {
       );
       if (!isStorageAllowed) return;
 
-      // 2️⃣ Lấy đường dẫn thư mục "Download" của hệ thống
       Directory? dir;
       if (Platform.isAndroid) {
         dir = Directory('/storage/emulated/0/Download');

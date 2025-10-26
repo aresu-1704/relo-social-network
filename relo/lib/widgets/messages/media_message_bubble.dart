@@ -6,7 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:relo/models/message.dart';
 import 'package:relo/screen/media_fullscreen_viewer.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import 'package:relo/widgets/message_status.dart';
+import 'package:relo/widgets/messages/message_status.dart';
 
 /// =================== GLOBAL CACHES ===================
 class VideoThumbnailCache {
