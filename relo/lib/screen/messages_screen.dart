@@ -87,6 +87,17 @@ class _MessagesScreenState extends State<MessagesScreen> {
     super.dispose();
   }
 
+  Future<void> _updateSeenStatus(String conversationId) async {
+    final index = conversations.indexWhere((c) => c['id'] == conversationId);
+    if (index != -1) {
+      if(conversations[index]['seenIds'].contains(_currentUserId) == false) {
+        setState(() {
+          conversations[index]['seenIds'].add(_currentUserId!);
+        });
+      }
+    }
+  }
+
   Future<void> fetchConversations() async {
     try {
       final fetchedConversations = await messageService.fetchConversations();
@@ -301,6 +312,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           .map((p) => p['id']?.toString() ?? '')
                           .where((id) => id.isNotEmpty)
                           .toList(),
+                      onConversationSeen: _updateSeenStatus,
                     ),
                   ),
                 );

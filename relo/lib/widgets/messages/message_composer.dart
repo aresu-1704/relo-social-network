@@ -20,39 +20,43 @@ class _MessageComposerState extends State<MessageComposer> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
   String? _activeInput;
+  bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
+
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
-        setState(() {
-          _activeInput = null;
+        setState(() => _activeInput = null);
+      }
+    });
+
+    _textController.addListener(() {
+      final hasText = _textController.text.trim().isNotEmpty;
+      // 🔧 chỉ gọi setState khi trạng thái thay đổi thật sự, tránh rebuild TextField
+      if (hasText != _hasText) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _hasText = hasText);
         });
       }
     });
   }
 
-  @override
-  void dispose() {
-    _textController.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
   void _sendMessage() {
-    if (_textController.text.trim().isEmpty) return;
-    final content = {'type': 'text', 'text': _textController.text.trim()};
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+    widget.onSend({'type': 'text', 'text': text});
     _textController.clear();
-    widget.onSend(content);
-    _focusNode.unfocus();
+
+    // Giữ focus để người dùng gõ tiếp
+    FocusScope.of(context).requestFocus(_focusNode);
   }
 
   void _toggleInput(String type) {
     if (_activeInput == type) {
       setState(() => _activeInput = null);
     } else {
-      // Ẩn bàn phím nếu đang mở
       if (_focusNode.hasFocus) _focusNode.unfocus();
       setState(() => _activeInput = type);
     }
@@ -65,10 +69,7 @@ class _MessageComposerState extends State<MessageComposer> {
       );
       if (!isStorageAllowed) return;
 
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-      );
-
+      final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result != null && result.files.isNotEmpty) {
         for (var file in result.files) {
           if (file.path == null) continue;
@@ -83,10 +84,7 @@ class _MessageComposerState extends State<MessageComposer> {
             continue;
           }
 
-          // Gửi từng file
-          final content = {'type': 'file', 'path': pickedFile.path};
-
-          widget.onSend(content);
+          widget.onSend({'type': 'file', 'path': pickedFile.path});
         }
       }
     } catch (e) {
@@ -98,14 +96,11 @@ class _MessageComposerState extends State<MessageComposer> {
   }
 
   void _onFilesPicked(List<File> files) {
-    final content = {
+    widget.onSend({
       'type': 'media',
       'paths': files.map((f) => f.path).toList(),
-    };
-    widget.onSend(content);
-    setState(() {
-      _activeInput = null;
     });
+    setState(() => _activeInput = null);
   }
 
   @override
@@ -114,7 +109,7 @@ class _MessageComposerState extends State<MessageComposer> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
               boxShadow: const [
@@ -125,82 +120,85 @@ class _MessageComposerState extends State<MessageComposer> {
                 ),
               ],
             ),
-            child: _activeInput != null
-                ? Row(
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _activeInput = null;
-                          });
-                        },
-                        icon: const Icon(Icons.arrow_back, color: Colors.grey),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          _activeInput == 'gallery'
-                              ? Icons.keyboard
-                              : Icons.photo_outlined,
-                          color: Colors.grey,
-                        ),
-                        onPressed: () => _toggleInput('gallery'),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          maxLength: 2000,
-                          autocorrect: true,
-                          controller: _textController,
-                          focusNode: _focusNode,
-                          autofocus: false,
-                          decoration: const InputDecoration(
-                            counterText: '',
-                            border: OutlineInputBorder(
-                              borderSide: BorderSide.none,
-                            ),
-                            hintText: 'Tin nhắn',
-                          ),
-                          textCapitalization: TextCapitalization.sentences,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _sendMessage(),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          _activeInput == 'voice'
-                              ? Icons.keyboard
-                              : Icons.mic_none_rounded,
-                          color: Colors.grey,
-                        ),
-                        onPressed: () => _toggleInput('voice'),
-                      ),
-                      IconButton(
-                        onPressed: () async {
-                          await _pickAndSendFiles();
-                        },
-                        icon: Icon(LucideIcons.paperclip, color: Colors.grey),
-                      ),
-                    ],
+            child: Row(
+              children: [
+                if (!_hasText)
+                  IconButton(
+                    icon: Icon(
+                      _activeInput == 'gallery'
+                          ? Icons.keyboard
+                          : Icons.photo_outlined,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () => _toggleInput('gallery'),
                   ),
+                Expanded(
+                  child: TextField(
+                    controller: _textController,
+                    focusNode: _focusNode,
+                    autocorrect: true,
+                    maxLength: 2000,
+                    decoration: const InputDecoration(
+                      counterText: '',
+                      border: OutlineInputBorder(borderSide: BorderSide.none),
+                      hintText: 'Tin nhắn',
+                    ),
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendMessage(),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  transitionBuilder: (child, anim) =>
+                      ScaleTransition(scale: anim, child: child),
+                  child: _hasText
+                      ? IconButton(
+                          key: const ValueKey('send'),
+                          icon: const Icon(
+                            Icons.send_rounded,
+                            color: Color(0xFF7A2FC0),
+                          ),
+                          onPressed: _sendMessage,
+                        )
+                      : Row(
+                          key: const ValueKey('actions'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                _activeInput == 'voice'
+                                    ? Icons.keyboard
+                                    : Icons.mic_none_rounded,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () => _toggleInput('voice'),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                LucideIcons.paperclip,
+                                color: Colors.grey,
+                              ),
+                              onPressed: _pickAndSendFiles,
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
           ),
 
-          // phần dưới cùng (gallery hoặc voice)
           if (_activeInput == 'gallery')
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.45,
               child: MediaPickerSheet(onPicked: _onFilesPicked),
-            )
-          else if (_activeInput == 'voice')
+            ),
+          if (_activeInput == 'voice')
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.45,
               child: VoiceRecorderWidget(
                 onSend: (path) {
-                  final content = {'type': 'audio', 'path': path};
-                  widget.onSend(content);
+                  widget.onSend({'type': 'audio', 'path': path});
                   setState(() => _activeInput = null);
                 },
               ),

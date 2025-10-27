@@ -7,7 +7,8 @@ import 'package:relo/screen/change_password_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
-  const PrivacySettingsScreen({super.key});
+  final String userId;
+  PrivacySettingsScreen({Key? key, required this.userId}) : super(key: key);
 
   @override
   _PrivacySettingsScreenState createState() => _PrivacySettingsScreenState();
@@ -18,8 +19,6 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   final List<User> _blockedUsers = [];
   bool _isLoading = true;
 
-  // Privacy settings removed - not needed
-
   @override
   void initState() {
     super.initState();
@@ -28,22 +27,27 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
 
   Future<void> _loadBlockedUsers() async {
     try {
-      // TODO: API để lấy danh sách người dùng bị chặn
-      // Hiện tại chưa có API này, cần thêm vào backend
+      setState(() => _isLoading = true);
+      final blockedUsers = await _userService.getBlockedUsers(widget.userId);
       setState(() {
+        _blockedUsers.clear();
+        _blockedUsers.addAll(blockedUsers);
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      print(e.toString());
+      setState(() => _isLoading = false);
+      await ShowNotification.showToast(
+        context,
+        'Không thể tải danh sách người dùng bị chặn',
+      );
     }
   }
 
   Future<void> _unblockUser(String userId, String displayName) async {
     bool? confirm = await ShowNotification.showConfirmDialog(
       context,
-      title: 'Bạn có chắc chắn muốn bỏ chặn $displayName?',
+      title: 'Bỏ chặn $displayName?',
       confirmText: 'Bỏ chặn',
       cancelText: 'Hủy',
       confirmColor: Color(0xFF7A2FC0),
@@ -60,7 +64,10 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         }
       } catch (e) {
         if (mounted) {
-          await ShowNotification.showToast(context, 'Không thể bỏ chặn người dùng');
+          await ShowNotification.showToast(
+            context,
+            'Không thể bỏ chặn người dùng',
+          );
         }
       }
     }

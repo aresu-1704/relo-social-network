@@ -6,7 +6,6 @@ import 'package:relo/models/user.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:shimmer/shimmer.dart';
-import 'profile_screen.dart';
 import 'privacy_settings_screen.dart';
 
 class ProfileSettingScreen extends StatefulWidget {
@@ -78,10 +77,7 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
               children: [
                 InkWell(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProfileScreen()),
-                    );
+                    Navigator.pop(context);
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -176,7 +172,8 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PrivacySettingsScreen(),
+                        builder: (context) =>
+                            PrivacySettingsScreen(userId: _currentUserId!),
                       ),
                     );
                   },

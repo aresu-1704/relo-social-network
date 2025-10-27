@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from typing import List, Optional
-from ..models import Conversation, LastMessage, Message, ParticipantInfo
+from ..models import Conversation, LastMessage, Message, ParticipantInfo, User
 from ..websocket import manager
 from ..schemas import SimpleMessagePublic, LastMessagePublic, ConversationWithParticipants
 from ..schemas.user_schema import UserPublic
@@ -96,8 +96,18 @@ class MessageService:
         conversation.seenIds = [sender_id]
         await conversation.save()
 
+        sender = await User.get(sender_id)
+
         # Phát broadcast tin nhắn mới
-        message_data = map_message_to_public_dict(message)
+        message_data = {
+            "id": str(message.id),
+            "senderId": str(sender.id),
+            "conversationId": message.conversationId,
+            "avatarUrl": sender.avatarUrl,
+            "content": message.content,
+            "createdAt": message.createdAt.isoformat()
+        }
+
         conversation_data = map_conversation_to_public_dict(conversation)
 
         tasks = [

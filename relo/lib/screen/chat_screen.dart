@@ -15,6 +15,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:relo/widgets/action_button.dart';
+import 'package:relo/screen/profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -22,12 +23,15 @@ class ChatScreen extends StatefulWidget {
   final String? chatName;
   final List<String>? memberIds;
 
+  final void Function(String conversationId)? onConversationSeen;
+
   const ChatScreen({
     super.key,
     required this.conversationId,
     required this.isGroup,
     this.chatName,
     this.memberIds,
+    this.onConversationSeen,
   });
 
   @override
@@ -74,11 +78,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _listenToWebSocket() {
-    _webSocketSubscription = webSocketService.stream.listen((message) {
+    _webSocketSubscription = webSocketService.stream.listen((message) async {
       final data = jsonDecode(message);
       if (data['type'] == 'new_message') {
         final msgData = data['payload']?['message'];
         if (msgData == null) return;
+        if (msgData['senderId'] != _currentUserId) {
+          await _messageService.markAsSeen(_conversationId!, _currentUserId!);
+          widget.onConversationSeen?.call(_conversationId!);
+        }
         if (msgData['senderId'] == _currentUserId) return;
         if (msgData['conversationId'] != _conversationId) return;
 
@@ -87,6 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
           conversationId: msgData['conversationId'],
           senderId: msgData['senderId'],
           content: msgData['content'] ?? '',
+          avatarUrl: msgData['avatarUrl'] ?? '',
           timestamp:
               DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
           status: 'sent',
@@ -327,6 +336,26 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (_) {
         // Danh sách nút hành động động
         final actions = <ActionButton>[
+          if (!widget.isGroup)
+            ActionButton(
+              icon: LucideIcons.userCircle2,
+              label: 'Xem trang cá nhân',
+              color: const Color(0xFF2979FF),
+              onTap: () async {
+                Navigator.pop(context);
+                String friendId = widget.memberIds!.firstWhere(
+                  (id) => id != _currentUserId,
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) {
+                      return ProfileScreen(userId: friendId);
+                    },
+                  ),
+                );
+              },
+            ),
           ActionButton(
             icon: LucideIcons.bellOff,
             label: 'Tắt thông báo',

@@ -150,6 +150,21 @@ async def unblock_user(request: BlockUserRequest, current_user: User = Depends(g
         result = await UserService.unblock_user(str(current_user.id), request.user_id)
         return result
     except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+# Lấy danh sách người dùng bị chặn
+@router.get("/blocked-lists/{user_id}")
+async def get_blocked_users(user_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Lấy danh sách người dùng bị chặn của người dùng hiện tại.
+    """
+    if user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Không có quyền truy cập danh sách người dùng bị chặn của người khác.")
+    
+    try:
+        blocked_users = await UserService.get_blocked_users(user_id)
+        return blocked_users
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 # Tìm kiếm người dùng

@@ -95,7 +95,7 @@ class Message {
       conversationId: json['conversationId'] ?? '',
       timestamp: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       status: 'sent',
-      avatarUrl: json['avatarUrl'],
+      avatarUrl: json['avatarUrl'] ?? '',
     );
   }
 
