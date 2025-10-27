@@ -64,9 +64,9 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi tải bài viết: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi tải bài viết: $e')));
       }
     }
   }
@@ -113,58 +113,63 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _posts.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(LucideIcons.layoutGrid, size: 80, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Chưa có bài viết nào',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _navigateToCreatePost,
-                          icon: const Icon(LucideIcons.plus),
-                          label: const Text('Tạo bài viết đầu tiên'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF7A2FC0),
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.layoutGrid,
+                      size: 80,
+                      color: Colors.grey[400],
                     ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(top: 0),
-                    itemCount: _posts.length + 1 + (_isLoadingMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      // Composer widget at index 0
-                      if (index == 0) {
-                        return PostComposerWidget(
-                          onTap: _navigateToCreatePost,
-                        );
-                      }
-                      
-                      // Loading indicator at the end
-                      if (_isLoadingMore && index == _posts.length + 1) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
+                    const SizedBox(height: 16),
+                    Text(
+                      'Chưa có bài viết nào',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _navigateToCreatePost,
+                      icon: const Icon(LucideIcons.plus),
+                      label: const Text('Tạo bài viết đầu tiên'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7A2FC0),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(top: 0),
+                cacheExtent: 1000, // Cache 1000 pixels of off-screen content
+                addAutomaticKeepAlives: true,
+                addRepaintBoundaries: true,
+                itemCount: _posts.length + 1 + (_isLoadingMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  // Composer widget at index 0
+                  if (index == 0) {
+                    return PostComposerWidget(onTap: _navigateToCreatePost);
+                  }
 
-                      // Posts (offset by 1 because of composer)
-                      final postIndex = index - 1;
-                      return PostCard(
-                        key: ValueKey(_posts[postIndex].id),
-                        post: _posts[postIndex],
-                        onPostDeleted: _loadPosts,
-                      );
-                    },
-                  ),
+                  // Loading indicator at the end
+                  if (_isLoadingMore && index == _posts.length + 1) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  // Posts (offset by 1 because of composer)
+                  final postIndex = index - 1;
+                  return PostCard(
+                    key: ValueKey(_posts[postIndex].id),
+                    post: _posts[postIndex],
+                    onPostDeleted: _loadPosts,
+                  );
+                },
+              ),
       ),
     );
   }

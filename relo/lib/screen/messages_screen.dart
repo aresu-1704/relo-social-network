@@ -51,7 +51,30 @@ class _MessagesScreenState extends State<MessagesScreen> {
       final data = jsonDecode(message);
 
       if (data['type'] == 'new_message') {
-        fetchConversations();
+        final conversationData = data['payload']?['conversation'];
+        if (conversationData != null) {
+          final conversationId = conversationData['id'];
+          final index = conversations.indexWhere(
+            (c) => c['id'] == conversationId,
+          );
+
+          if (index != -1) {
+            // Nếu conversation đã tồn tại, cập nhật nó
+            setState(() {
+              conversations[index]['lastMessage'] =
+                  conversationData['lastMessage'];
+              conversations[index]['updatedAt'] = conversationData['updatedAt'];
+              conversations[index]['seenIds'] = conversationData['seenIds'];
+
+              // Sắp xếp lại: chuyển conversation cập nhật lên đầu
+              final updatedConv = conversations.removeAt(index);
+              conversations.insert(0, updatedConv);
+            });
+          } else {
+            // Nếu conversation mới, fetch lại
+            fetchConversations();
+          }
+        }
       } else if (data['type'] == 'delete_conversation') {
         setState(() {
           conversations.removeWhere(
@@ -90,9 +113,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Future<void> _updateSeenStatus(String conversationId) async {
     final index = conversations.indexWhere((c) => c['id'] == conversationId);
     if (index != -1) {
-      if(conversations[index]['seenIds'].contains(_currentUserId) == false) {
+      final seenIds = List<String>.from(conversations[index]['seenIds'] ?? []);
+      if (!seenIds.contains(_currentUserId)) {
         setState(() {
-          conversations[index]['seenIds'].add(_currentUserId!);
+          seenIds.add(_currentUserId!);
+          conversations[index]['seenIds'] = seenIds;
         });
       }
     }
@@ -312,6 +337,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           .map((p) => p['id']?.toString() ?? '')
                           .where((id) => id.isNotEmpty)
                           .toList(),
+                      memberCount: conversation['participants'].length,
                       onConversationSeen: _updateSeenStatus,
                     ),
                   ),

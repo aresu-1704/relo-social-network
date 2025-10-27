@@ -148,62 +148,83 @@ class MediaMessageBubble extends StatelessWidget {
             ),
           );
         },
-        child: Stack(
-          alignment: Alignment.center,
+        child: Column(
           children: [
-            _SingleMediaView(url: url, isVideo: isVideo),
-            if (message.status == 'pending')
-              const Positioned.fill(
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              ),
-            if (message.status == 'failed')
-              const Positioned.fill(
-                child: Center(
-                  child: Icon(
-                    Icons.error_outline,
-                    color: Colors.redAccent,
-                    size: 30,
+            const SizedBox(height: 2),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                _SingleMediaView(url: url, isVideo: isVideo),
+                if (message.status == 'pending')
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        color: Colors.black12,
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                if (message.status == 'failed')
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        color: Colors.black12,
+                        child: const Center(
+                          child: Icon(
+                            Icons.error_outline,
+                            color: Colors.redAccent,
+                            size: 30,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       );
     }
 
-    return GridView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: mediaUrls.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 4,
-        mainAxisSpacing: 4,
-      ),
-      itemBuilder: (context, index) {
-        final url = mediaUrls[index];
-        final isVideo = _isVideo(url);
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              PageRouteBuilder(
-                opaque: false,
-                pageBuilder: (_, __, ___) => MediaFullScreenViewer(
-                  mediaUrls: mediaUrls,
-                  initialIndex: index,
-                ),
-                transitionsBuilder: (_, anim, __, child) =>
-                    FadeTransition(opacity: anim, child: child),
-              ),
+    return Column(
+      children: [
+        GridView.builder(
+          padding: EdgeInsets.zero,
+          itemCount: mediaUrls.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+          ),
+          itemBuilder: (context, index) {
+            final url = mediaUrls[index];
+            final isVideo = _isVideo(url);
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    opaque: false,
+                    pageBuilder: (_, __, ___) => MediaFullScreenViewer(
+                      mediaUrls: mediaUrls,
+                      initialIndex: index,
+                    ),
+                    transitionsBuilder: (_, anim, __, child) =>
+                        FadeTransition(opacity: anim, child: child),
+                  ),
+                );
+              },
+              child: isVideo
+                  ? CachedVideoThumbnail(url: url)
+                  : _ImageThumbnail(url: url),
             );
           },
-          child: isVideo
-              ? CachedVideoThumbnail(url: url)
-              : _ImageThumbnail(url: url),
-        );
-      },
+        ),
+      ],
     );
   }
 
