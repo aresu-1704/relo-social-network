@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:relo/widgets/text_form_field.dart';
 import '../services/auth_service.dart'; // Import service
 
@@ -34,6 +33,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Biểu thức chính quy để validate
   final RegExp emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
   final RegExp usernameRegex = RegExp(r'^[a-zA-Z0-9_]{4,20}$');
+
+  int _passwordStrength = 0;
+
+  int _calculatePasswordStrength(String password) {
+    int strength = 0;
+    if (password.isEmpty) return 0;
+
+    if (password.length >= 8) strength += 25;
+    if (RegExp(r'[A-Z]').hasMatch(password)) strength += 15;
+    if (RegExp(r'[a-z]').hasMatch(password)) strength += 15;
+    if (RegExp(r'[0-9]').hasMatch(password)) strength += 20;
+    if (RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(password)) strength += 25;
+
+    return strength.clamp(0, 100);
+  }
+
+  Color _getPasswordStrengthColor(int strength) {
+    if (strength < 40) return Colors.red;
+    if (strength < 70) return Colors.orange;
+    return Colors.green;
+  }
+
+  String _getPasswordStrengthText(int strength) {
+    if (strength == 0) return '';
+    if (strength < 40) return 'Yếu';
+    if (strength < 70) return 'Trung bình';
+    return 'Mạnh';
+  }
 
   // Hàm xử lý đăng ký
   Future<void> _register() async {
@@ -206,6 +233,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     toggleObscure: () {
                       setState(() => _obscurePassword = !_obscurePassword);
                     },
+                    onChanged: (value) {
+                      setState(() {
+                        _passwordStrength = _calculatePasswordStrength(value);
+                      });
+                    },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Vui lòng nhập mật khẩu';
@@ -216,8 +248,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 15),
-
+                  if (_passwordController.text.isNotEmpty)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(
+                          value: _passwordStrength / 90,
+                          backgroundColor: Colors.grey[300],
+                          color: _getPasswordStrengthColor(_passwordStrength),
+                          minHeight: 6,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Độ mạnh mật khẩu: ${_getPasswordStrengthText(_passwordStrength)}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: _getPasswordStrengthColor(_passwordStrength),
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                      ],
+                    )
+                  else
+                    const SizedBox(height: 15),
                   // Trường nhập Xác nhận mật khẩu
                   BuildTextFormField.buildTextFormField(
                     controller: _confirmPasswordController,
@@ -293,11 +349,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
+                  // Security tips
+                  Container(
+                    padding: EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.security,
+                              color: Color(0xFF7A2FC0),
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Mẹo bảo mật',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 12),
+                        _buildSecurityTip(
+                          'Sử dụng mật khẩu dài ít nhất 8 ký tự',
+                        ),
+                        _buildSecurityTip('Không sử dụng mật khẩu dễ đoán'),
+                        _buildSecurityTip(
+                          'Không chia sẻ mật khẩu với người khác',
+                        ),
+                        _buildSecurityTip(
+                          'Đổi mật khẩu định kỳ để bảo mật tài khoản',
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityTip(String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle, color: Colors.green, size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
+          ),
+        ],
       ),
     );
   }

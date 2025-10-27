@@ -176,6 +176,12 @@ class MessageService {
 
   //Xóa cuộc trò chuyện
   Future<void> deleteConversation(String conversationId) async {
-    //TODO: Gọi API xóa cuộc trò chuyện trên server nếu cần thiết
+    try {
+      await _dio.delete('messages/conversations/$conversationId');
+    } on DioException catch (e) {
+      throw Exception('Failed to delete conversation: $e');
+    } catch (e) {
+      throw Exception('An unknown error occurred: $e');
+    }
   }
 }

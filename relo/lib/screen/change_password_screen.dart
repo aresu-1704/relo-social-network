@@ -18,7 +18,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
-
+  
   @override
   void dispose() {
     _currentPasswordController.dispose();

@@ -103,22 +103,21 @@ async def get_pending_friend_requests(current_user: User = Depends(get_current_u
         raise HTTPException(status_code=404, detail=str(e))
 
 # Lấy danh sách bạn bè
-@router.get("/friends", response_model=List[UserPublic])
+@router.get("/friends")
 async def get_friends(current_user: User = Depends(get_current_user)):
     """
     Lấy danh sách bạn bè cho người dùng hiện được xác thực.
     """
     try:
         friends = await UserService.get_friends(user_id=str(current_user.id))
-        # Chuyển đổi đối tượng User model thành UserPublic schema
         return [
-            UserPublic(
-                id=str(friend.id),
-                username=friend.username,
-                email=friend.email,
-                displayName=friend.displayName,
-                avatarUrl=friend.avatarUrl,
-            ) for friend in friends
+            {
+                "id": str(friend.id),
+                "username": friend.username,
+                "email": friend.email,
+                "displayName": friend.displayName,
+                "avatarUrl": friend.avatarUrl,
+            } for friend in friends
         ]
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
