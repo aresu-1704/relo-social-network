@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:relo/models/post.dart';
-import 'package:relo/widgets/enhanced_post_card.dart';
+import 'package:relo/widgets/posts/enhanced_post_card.dart';
 
 class PostCard extends StatelessWidget {
   final Post post;

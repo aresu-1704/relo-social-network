@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:relo/models/post.dart';
 import 'package:relo/services/post_service.dart';
 import 'package:relo/services/service_locator.dart';
-import 'package:relo/widgets/post_card.dart';
-import 'package:relo/widgets/post_composer_widget.dart';
+import 'package:relo/widgets/posts/post_card.dart';
+import 'package:relo/widgets/posts/post_composer_widget.dart';
 import 'package:relo/screen/create_post_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 

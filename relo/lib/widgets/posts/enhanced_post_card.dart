@@ -8,7 +8,7 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:relo/widgets/auto_play_video_widget.dart';
+import 'package:relo/widgets/posts/auto_play_video_widget.dart';
 
 class EnhancedPostCard extends StatefulWidget {
   final Post post;

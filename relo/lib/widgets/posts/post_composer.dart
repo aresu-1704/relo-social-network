@@ -9,7 +9,7 @@ import 'package:relo/services/user_service.dart';
 
 class PostComposer extends StatefulWidget {
   final VoidCallback? onPostCreated;
-  
+
   const PostComposer({super.key, this.onPostCreated});
 
   @override
@@ -22,16 +22,16 @@ class _PostComposerState extends State<PostComposer> {
   final ImagePicker _picker = ImagePicker();
   final PostService _postService = ServiceLocator.postService;
   final UserService _userService = ServiceLocator.userService;
-  
+
   bool _isPosting = false;
   User? _currentUser;
-  
+
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
   }
-  
+
   Future<void> _loadCurrentUser() async {
     try {
       final user = await _userService.getMe();
@@ -42,7 +42,7 @@ class _PostComposerState extends State<PostComposer> {
       print('Error loading user: $e');
     }
   }
-  
+
   @override
   void dispose() {
     _contentController.dispose();
@@ -57,11 +57,11 @@ class _PostComposerState extends State<PostComposer> {
         maxHeight: 1080,
         imageQuality: 90,
       );
-      
+
       if (pickedFiles.isNotEmpty) {
         setState(() {
           _selectedImages.addAll(
-            pickedFiles.map((xfile) => File(xfile.path)).toList()
+            pickedFiles.map((xfile) => File(xfile.path)).toList(),
           );
         });
       }
@@ -69,7 +69,7 @@ class _PostComposerState extends State<PostComposer> {
       print('Error picking images: $e');
     }
   }
-  
+
   // Chụp ảnh từ camera
   Future<void> _takePicture() async {
     try {
@@ -79,7 +79,7 @@ class _PostComposerState extends State<PostComposer> {
         maxHeight: 1080,
         imageQuality: 90,
       );
-      
+
       if (photo != null) {
         setState(() {
           _selectedImages.add(File(photo.path));
@@ -89,7 +89,7 @@ class _PostComposerState extends State<PostComposer> {
       print('Error taking picture: $e');
     }
   }
-  
+
   // Xóa ảnh đã chọn
   void _removeImage(int index) {
     setState(() {
@@ -108,35 +108,35 @@ class _PostComposerState extends State<PostComposer> {
       );
       return;
     }
-    
+
     setState(() {
       _isPosting = true;
     });
-    
+
     try {
-      final post = await _postService.createPost(
+      await _postService.createPost(
         content: _contentController.text,
-        mediaFiles: _selectedImages.isNotEmpty ? _selectedImages : null,
+        filePaths: _selectedImages.isNotEmpty
+            ? _selectedImages.map((file) => file.path).toList()
+            : null,
       );
-      
-      if (post != null) {
-        // Clear form
-        _contentController.clear();
-        _selectedImages.clear();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã đăng bài thành công!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Call callback if provided
-        widget.onPostCreated?.call();
-        
-        // Close composer
-        Navigator.of(context).pop();
-      }
+
+      // Clear form
+      _contentController.clear();
+      _selectedImages.clear();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã đăng bài thành công!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Call callback if provided
+      widget.onPostCreated?.call();
+
+      // Close composer
+      Navigator.of(context).pop();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -265,9 +265,9 @@ class _PostComposerState extends State<PostComposer> {
                 ],
               ),
             ),
-          
+
           Divider(height: 1),
-          
+
           // Content input
           Expanded(
             child: SingleChildScrollView(
@@ -288,13 +288,10 @@ class _PostComposerState extends State<PostComposer> {
                         ),
                         border: InputBorder.none,
                       ),
-                      style: TextStyle(
-                        fontSize: 18,
-                        height: 1.4,
-                      ),
+                      style: TextStyle(fontSize: 18, height: 1.4),
                     ),
                   ),
-                  
+
                   // Selected images grid (like Zalo)
                   if (_selectedImages.isNotEmpty)
                     Container(
@@ -330,7 +327,9 @@ class _PostComposerState extends State<PostComposer> {
                                   child: Container(
                                     padding: EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.6),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -350,14 +349,12 @@ class _PostComposerState extends State<PostComposer> {
               ),
             ),
           ),
-          
+
           // Bottom toolbar (like Zalo)
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey[300]!),
-              ),
+              border: Border(top: BorderSide(color: Colors.grey[300]!)),
             ),
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
@@ -404,7 +401,7 @@ class _PostComposerState extends State<PostComposer> {
       ),
     );
   }
-  
+
   Widget _buildToolButton({
     required IconData icon,
     required String label,
@@ -419,18 +416,11 @@ class _PostComposerState extends State<PostComposer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
+            Icon(icon, color: color, size: 24),
             SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[700],
-              ),
+              style: TextStyle(fontSize: 11, color: Colors.grey[700]),
             ),
           ],
         ),
