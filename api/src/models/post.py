@@ -29,7 +29,6 @@ class Post(Document):
     media: List[MediaItem] = Field(default_factory=list, description="Danh sách media items.")
     reactions: List[Reaction] = Field(default_factory=list, description="Danh sách các phản ứng.")
     reactionCounts: Dict[str, int] = Field(default_factory=dict, description="Số lượng của mỗi loại phản ứng.")
-    commentCount: int = Field(default=0, description="Tổng số bình luận.")
     createdAt: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(hours=7), description="Thời điểm bài đăng được tạo.")
 
     @property
@@ -43,3 +42,4 @@ class Post(Document):
             "authorId",
             "createdAt",
         ]
+        

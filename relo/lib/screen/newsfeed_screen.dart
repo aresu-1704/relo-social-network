@@ -3,6 +3,7 @@ import 'package:relo/models/post.dart';
 import 'package:relo/services/post_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/widgets/post_card.dart';
+import 'package:relo/widgets/post_composer_widget.dart';
 import 'package:relo/screen/create_post_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -137,27 +138,33 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                   )
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.only(top: 8),
-                    itemCount: _posts.length + (_isLoadingMore ? 1 : 0),
+                    padding: const EdgeInsets.only(top: 0),
+                    itemCount: _posts.length + 1 + (_isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
-                      if (_isLoadingMore && index == _posts.length) {
+                      // Composer widget at index 0
+                      if (index == 0) {
+                        return PostComposerWidget(
+                          onTap: _navigateToCreatePost,
+                        );
+                      }
+                      
+                      // Loading indicator at the end
+                      if (_isLoadingMore && index == _posts.length + 1) {
                         return const Padding(
                           padding: EdgeInsets.all(16.0),
                           child: Center(child: CircularProgressIndicator()),
                         );
                       }
 
+                      // Posts (offset by 1 because of composer)
+                      final postIndex = index - 1;
                       return PostCard(
-                        post: _posts[index],
-                        onPostUpdated: () => _loadPosts(),
+                        key: ValueKey(_posts[postIndex].id),
+                        post: _posts[postIndex],
+                        onPostDeleted: _loadPosts,
                       );
                     },
                   ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToCreatePost,
-        backgroundColor: const Color(0xFF7A2FC0),
-        child: const Icon(LucideIcons.plus, color: Colors.white),
       ),
     );
   }

@@ -11,11 +11,10 @@ from .conversation import Conversation
 from .message import Message
 from .post import Post
 from .friend_request import FriendRequest
-from .comment import Comment
 
 # Danh sách các model Beanie sẽ được khởi tạo
 # Thêm tất cả các model của bạn vào đây
-DOCUMENT_MODELS: list[Type] = [User, Conversation, Message, Post, FriendRequest, Comment]
+DOCUMENT_MODELS: list[Type] = [User, Conversation, Message, Post, FriendRequest]
 
 client = None  # 🔹 client global, dùng 1 lần suốt vòng đời app
 

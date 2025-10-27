@@ -4,9 +4,13 @@ import 'package:relo/widgets/enhanced_post_card.dart';
 
 class PostCard extends StatelessWidget {
   final Post post;
-  final VoidCallback? onPostUpdated;
+  final VoidCallback? onPostDeleted;
 
-  const PostCard({super.key, required this.post, this.onPostUpdated});
+  const PostCard({
+    super.key,
+    required this.post,
+    this.onPostDeleted,
+  });
 
   static Widget buildWidget(Post post) => PostCard(post: post);
 
@@ -15,7 +19,7 @@ class PostCard extends StatelessWidget {
     // Use the enhanced version with full features
     return EnhancedPostCard(
       post: post,
-      onPostUpdated: onPostUpdated,
+      onPostDeleted: onPostDeleted,
     );
   }
 }

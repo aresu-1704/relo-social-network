@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:relo/models/post.dart';
-import 'package:relo/models/comment.dart';
 
 class PostService {
   final Dio _dio;
@@ -32,15 +31,32 @@ class PostService {
   /// Tạo bài đăng mới
   Future<Post> createPost({
     required String content,
-    List<String>? mediaBase64,
+    List<String>? filePaths,
   }) async {
     try {
+      // Tạo FormData
+      final formData = FormData();
+      
+      // Thêm content (luôn gửi, ngay cả khi rỗng)
+      formData.fields.add(MapEntry('content', content ?? ''));
+      
+      // Thêm files nếu có
+      if (filePaths != null && filePaths.isNotEmpty) {
+        for (final path in filePaths) {
+          formData.files.add(
+            MapEntry(
+              'files',
+              await MultipartFile.fromFile(path),
+            ),
+          );
+        }
+      }
+      
+      print('📤 Sending post: content="${content ?? ''}", files count: ${filePaths?.length ?? 0}');
+      
       final response = await _dio.post(
         'posts',
-        data: {
-          'content': content,
-          'mediaBase64': mediaBase64 ?? [],
-        },
+        data: formData,
       );
 
       return Post.fromJson(response.data);
@@ -70,46 +86,45 @@ class PostService {
     }
   }
 
-  /// Tạo comment cho bài đăng
-  Future<Comment> createComment({
+  /// Cập nhật bài đăng
+  Future<Post> updatePost({
     required String postId,
     required String content,
+    List<String>? existingImageUrls,
+    List<String>? newFilePaths,
   }) async {
     try {
-      final response = await _dio.post(
-        'posts/$postId/comments',
-        data: {'content': content},
-      );
-
-      return Comment.fromJson(response.data);
-    } on DioException catch (e) {
-      throw Exception('Failed to comment: ${e.response?.data ?? e.message}');
-    } catch (e) {
-      throw Exception('An unknown error occurred: $e');
-    }
-  }
-
-  /// Lấy danh sách comments của bài đăng
-  Future<List<Comment>> getComments({
-    required String postId,
-    int skip = 0,
-    int limit = 50,
-  }) async {
-    try {
-      final response = await _dio.get(
-        'posts/$postId/comments',
-        queryParameters: {'skip': skip, 'limit': limit},
-      );
-
-      if (response.data is List) {
-        return (response.data as List)
-            .map((json) => Comment.fromJson(json))
-            .toList();
+      final formData = FormData();
+      
+      // Add content
+      formData.fields.add(MapEntry('content', content));
+      
+      // Add existing image URLs to keep
+      if (existingImageUrls != null) {
+        for (var url in existingImageUrls) {
+          formData.fields.add(MapEntry('existing_image_urls', url));
+        }
+      }
+      
+      // Add new files to upload
+      if (newFilePaths != null) {
+        for (var filePath in newFilePaths) {
+          final file = await MultipartFile.fromFile(
+            filePath,
+            filename: filePath.split('/').last,
+          );
+          formData.files.add(MapEntry('files', file));
+        }
       }
 
-      return [];
+      final response = await _dio.put(
+        'posts/$postId',
+        data: formData,
+      );
+
+      return Post.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to fetch comments: $e');
+      throw Exception('Failed to update post: ${e.response?.data ?? e.message}');
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
     }

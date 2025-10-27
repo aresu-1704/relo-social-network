@@ -1,19 +1,19 @@
 import asyncio
-import base64
-import tempfile
-from cloudinary.uploader import upload as cloudinary_upload, destroy as cloudinary_destroy
-from ..models import Post, AuthorInfo, Reaction, Comment
-from ..models import User
+from typing import List
+from cloudinary.uploader import destroy as cloudinary_destroy
+from fastapi import UploadFile
+from ..models import Post, AuthorInfo, Reaction, MediaItem, User
 from ..websocket import manager
-from ..schemas import PostPublic, MediaItem, CommentPublic
+from ..schemas import PostPublic
+from ..utils import upload_to_cloudinary
 
 class PostService:
 
     @staticmethod
-    async def create_post(author_id: str, content: str, media_base_64: list = None):
+    async def create_post(author_id: str, content: str, files: List[UploadFile] = []):
         """
         Tạo một bài đăng mới.
-        Upload ảnh (nếu có) lên Cloudinary, lưu URL và public_id.
+        Upload ảnh/video (nếu có) lên Cloudinary, lưu URL và public_id.
         """
         author = await User.get(author_id)
         if not author:
@@ -26,25 +26,16 @@ class PostService:
 
         uploaded_media = []  # Danh sách các MediaItem đã upload
         try:
-            if media_base_64:
-                for b64_str in media_base_64:
-                    if not b64_str:
-                        continue
-
-                    # Giải mã base64
-                    header, data = b64_str.split(",") if "," in b64_str else (None, b64_str)
-                    image_bytes = base64.b64decode(data)
-
-                    # Lưu tạm file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-                        tmp.write(image_bytes)
-                        tmp_path = tmp.name
-
-                    # Upload lên Cloudinary
-                    result = cloudinary_upload(tmp_path, folder="posts")
+            if files and len(files) > 0:
+                # Upload tất cả files lên Cloudinary đồng thời
+                upload_tasks = [upload_to_cloudinary(f, folder="posts") for f in files]
+                results = await asyncio.gather(*upload_tasks)
+                
+                # Chuyển đổi kết quả thành MediaItem
+                for result in results:
                     uploaded_media.append(
                         MediaItem(
-                            url=result["secure_url"],
+                            url=result["url"],
                             publicId=result["public_id"],
                             type=result.get("resource_type", "image")
                         )
@@ -82,7 +73,10 @@ class PostService:
             # Rollback: xóa media đã upload nếu có lỗi
             for media in uploaded_media:
                 if media.publicId:
-                    cloudinary_destroy(media.publicId)
+                    try:
+                        cloudinary_destroy(media.publicId)
+                    except:
+                        pass
             raise ValueError(f"Lỗi khi tạo bài đăng: {e}")
 
     @staticmethod
@@ -100,8 +94,8 @@ class PostService:
                 authorInfo=post.authorInfo,
                 content=post.content,
                 mediaUrls=post.mediaUrls,
+                reactions=post.reactions,
                 reactionCounts=post.reactionCounts,
-                commentCount=post.commentCount,
                 createdAt=post.createdAt.isoformat()
             ) for post in posts 
         ]
@@ -126,7 +120,12 @@ class PostService:
             # Nếu người dùng đã phản ứng
             old_reaction_type = post.reactions[existing_reaction_index].type
             if old_reaction_type == reaction_type:
-                # Nếu loại phản ứng giống nhau, không làm gì cả
+                # Nếu loại phản ứng giống nhau → Unreact (xóa reaction)
+                post.reactions.pop(existing_reaction_index)
+                post.reactionCounts[reaction_type] -= 1
+                if post.reactionCounts[reaction_type] == 0:
+                    del post.reactionCounts[reaction_type]
+                await post.save()
                 return post
             
             # Giảm số lượng của phản ứng cũ
@@ -136,15 +135,70 @@ class PostService:
             
             # Cập nhật phản ứng
             post.reactions[existing_reaction_index].type = reaction_type
+            # Tăng số lượng của phản ứng mới
+            post.reactionCounts[reaction_type] = post.reactionCounts.get(reaction_type, 0) + 1
         else:
             # Nếu người dùng chưa phản ứng, hãy thêm một phản ứng mới
             post.reactions.append(Reaction(userId=user_id, type=reaction_type))
-
-        # Tăng số lượng của phản ứng mới
-        post.reactionCounts[reaction_type] = post.reactionCounts.get(reaction_type, 0) + 1
+            # Tăng số lượng của phản ứng mới
+            post.reactionCounts[reaction_type] = post.reactionCounts.get(reaction_type, 0) + 1
         
         # Lưu bài đăng đã cập nhật
         await post.save()
+        return post
+
+    @staticmethod
+    async def update_post(post_id: str, user_id: str, content: str, existing_image_urls: List[str], files: List):
+        """
+        Cập nhật bài đăng: nội dung, xóa ảnh cũ, giữ ảnh còn lại, thêm ảnh mới.
+        """
+        # Lấy bài đăng
+        post = await Post.get(post_id)
+        if not post:
+            raise ValueError("Không tìm thấy bài đăng.")
+
+        # Kiểm tra quyền
+        if post.authorId != user_id:
+            raise PermissionError("Bạn không được phép chỉnh sửa bài đăng này.")
+
+        # Xác định ảnh nào bị xóa
+        current_urls = {item.url for item in post.media}
+        kept_urls = set(existing_image_urls)
+        removed_urls = current_urls - kept_urls
+        
+        # Xóa ảnh bị removed khỏi Cloudinary
+        new_media_list = []
+        for media_item in post.media:
+            if media_item.url in removed_urls:
+                # Xóa khỏi Cloudinary
+                try:
+                    cloudinary_destroy(media_item.publicId)
+                except Exception as e:
+                    print(f"Failed to delete from Cloudinary: {e}")
+            else:
+                # Giữ lại ảnh
+                new_media_list.append(media_item)
+        
+        # Upload ảnh mới
+        if files:
+            for file in files:
+                try:
+                    upload_result = await upload_to_cloudinary(file)
+                    new_media_list.append(
+                        MediaItem(
+                            url=upload_result['url'],
+                            publicId=upload_result['public_id'],
+                            type='image'
+                        )
+                    )
+                except Exception as e:
+                    print(f"Failed to upload new image: {e}")
+        
+        # Cập nhật post
+        post.content = content
+        post.media = new_media_list
+        await post.save()
+        
         return post
 
     @staticmethod
@@ -164,81 +218,3 @@ class PostService:
         # Xóa bài đăng
         await post.delete()
         return {"message": "Bài đăng đã được xóa thành công"}
-
-    @staticmethod
-    async def create_comment(post_id: str, user_id: str, content: str):
-        """
-        Tạo một bình luận mới cho bài đăng.
-        """
-        # Kiểm tra bài đăng có tồn tại không
-        post = await Post.get(post_id)
-        if not post:
-            raise ValueError("Không tìm thấy bài đăng.")
-        
-        # Lấy thông tin người dùng
-        user = await User.get(user_id)
-        if not user:
-            raise ValueError("Không tìm thấy người dùng.")
-        
-        # Tạo comment
-        new_comment = Comment(
-            postId=post_id,
-            userId=user_id,
-            content=content
-        )
-        await new_comment.save()
-        
-        # Tăng comment count của bài đăng
-        post.commentCount += 1
-        await post.save()
-        
-        # Trả về comment với thông tin user
-        return CommentPublic(
-            id=str(new_comment.id),
-            postId=post_id,
-            userId=user_id,
-            userDisplayName=user.displayName,
-            userAvatarUrl=user.avatarUrl,
-            content=content,
-            createdAt=new_comment.createdAt.isoformat()
-        )
-
-    @staticmethod
-    async def get_comments(post_id: str, skip: int = 0, limit: int = 50):
-        """
-        Lấy danh sách bình luận của một bài đăng.
-        """
-        # Kiểm tra bài đăng có tồn tại không
-        post = await Post.get(post_id)
-        if not post:
-            raise ValueError("Không tìm thấy bài đăng.")
-        
-        # Lấy comments
-        comments = await Comment.find(
-            {"postId": post_id},
-            sort="createdAt",
-            skip=skip,
-            limit=limit
-        ).to_list()
-        
-        # Lấy thông tin users
-        user_ids = list(set(comment.userId for comment in comments))
-        users = await User.find({"_id": {"$in": [await User.get(uid) for uid in user_ids]}}).to_list()
-        user_map = {str(u.id): u for u in users if u}
-        
-        # Map comments với user info
-        result = []
-        for comment in comments:
-            user = user_map.get(comment.userId)
-            if user:
-                result.append(CommentPublic(
-                    id=str(comment.id),
-                    postId=comment.postId,
-                    userId=comment.userId,
-                    userDisplayName=user.displayName,
-                    userAvatarUrl=user.avatarUrl,
-                    content=comment.content,
-                    createdAt=comment.createdAt.isoformat()
-                ))
-        
-        return result

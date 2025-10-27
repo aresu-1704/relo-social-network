@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:relo/services/post_service.dart';
 import 'package:relo/services/service_locator.dart';
+import 'package:relo/widgets/media_picker_sheet.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:io';
 
@@ -25,15 +24,28 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImages() async {
-    final ImagePicker picker = ImagePicker();
-    final List<XFile> images = await picker.pickMultiImage();
+  Future<void> _pickMedia() async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => MediaPickerSheet(
+        onPicked: (files) {
+          setState(() {
+            _selectedImages.addAll(files);
+          });
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
 
-    if (images.isNotEmpty) {
-      setState(() {
-        _selectedImages.addAll(images.map((xfile) => File(xfile.path)));
-      });
+  Future<int> _calculateTotalSize() async {
+    int totalSize = 0;
+    for (var file in _selectedImages) {
+      totalSize += await file.length();
     }
+    return totalSize;
   }
 
   void _removeImage(int index) {
@@ -42,9 +54,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     });
   }
 
+  bool _isVideoFile(File file) {
+    final path = file.path.toLowerCase();
+    return path.endsWith('.mp4') || 
+           path.endsWith('.mov') || 
+           path.endsWith('.avi') || 
+           path.endsWith('.mkv') ||
+           path.endsWith('.m4v');
+  }
+
   Future<void> _createPost() async {
     final content = _contentController.text.trim();
 
+    // Require at least content or images
     if (content.isEmpty && _selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng nhập nội dung hoặc chọn ảnh')),
@@ -52,20 +74,33 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
+    // Validate max 30 media items
+    if (_selectedImages.length > 30) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chỉ được đăng tối đa 30 ảnh/video')),
+      );
+      return;
+    }
+
+    // Validate max 150MB total size
+    final totalSize = await _calculateTotalSize();
+    const maxSize = 150 * 1024 * 1024; // 150MB in bytes
+    if (totalSize > maxSize) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tổng dung lượng không được vượt quá 150MB')),
+      );
+      return;
+    }
+
     setState(() => _isPosting = true);
 
     try {
-      // Convert images to base64
-      final List<String> mediaBase64 = [];
-      for (final image in _selectedImages) {
-        final bytes = await image.readAsBytes();
-        final base64String = base64Encode(bytes);
-        mediaBase64.add('data:image/jpeg;base64,$base64String');
-      }
+      // Lấy danh sách đường dẫn file
+      final List<String> filePaths = _selectedImages.map((file) => file.path).toList();
 
       await _postService.createPost(
         content: content,
-        mediaBase64: mediaBase64.isEmpty ? null : mediaBase64,
+        filePaths: filePaths.isEmpty ? null : filePaths,
       );
 
       if (mounted) {
@@ -90,7 +125,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF7A2FC0),
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: const Icon(LucideIcons.x, color: Colors.white, size: 24),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -132,12 +167,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   TextField(
                     controller: _contentController,
                     maxLines: null,
+                    autofocus: true,
                     decoration: const InputDecoration(
                       hintText: 'Bạn đang nghĩ gì?',
                       border: InputBorder.none,
-                      hintStyle: TextStyle(fontSize: 18),
+                      hintStyle: TextStyle(fontSize: 18, color: Colors.grey),
                     ),
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(fontSize: 18, height: 1.5),
                   ),
 
                   const SizedBox(height: 16),
@@ -162,8 +198,28 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               child: Image.file(
                                 _selectedImages[index],
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.videocam, size: 48),
+                                  );
+                                },
                               ),
                             ),
+                            // Video indicator
+                            if (_isVideoFile(_selectedImages[index]))
+                              const Positioned(
+                                bottom: 4,
+                                left: 4,
+                                child: Icon(
+                                  Icons.videocam,
+                                  color: Colors.white,
+                                  size: 24,
+                                  shadows: [
+                                    Shadow(color: Colors.black, blurRadius: 4),
+                                  ],
+                                ),
+                              ),
                             Positioned(
                               top: 4,
                               right: 4,
@@ -192,27 +248,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
           ),
 
-          // Bottom toolbar
           Container(
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
+              color: Colors.white,
               border: Border(
                 top: BorderSide(color: Colors.grey[300]!),
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                const Text(
-                  'Thêm vào bài viết',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+            child: ElevatedButton.icon(
+              onPressed: _pickMedia,
+              icon: const Icon(LucideIcons.image, size: 20),
+              label: const Text('Thêm ảnh/video', style: TextStyle(fontSize: 16)),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+                backgroundColor: const Color(0xFF7A2FC0),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const Spacer(),
-                IconButton(
-                  onPressed: _pickImages,
-                  icon: const Icon(LucideIcons.image, color: Colors.green),
-                  tooltip: 'Thêm ảnh',
-                ),
-              ],
+              ),
             ),
           ),
         ],
