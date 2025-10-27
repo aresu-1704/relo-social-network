@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:relo/utils/edit_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class ReviewScreen extends StatefulWidget {
   final File file;
@@ -36,16 +36,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
     setState(() => _isDownloading = true);
 
     try {
-      // 1️⃣ Yêu cầu quyền ghi bộ nhớ (Android 13 trở xuống)
-      if (Platform.isAndroid) {
-        final status = await Permission.storage.request();
-        if (!status.isGranted) {
-          await ShowNotification.showToast(context, 'Không có quyền lưu tệp');
-          return;
-        }
-      }
+      final isStorageAllowed = await PermissionUtils.ensureStoragePermission(
+        context,
+      );
+      if (!isStorageAllowed) return;
 
-      // 2️⃣ Lấy đường dẫn thư mục "Download" của hệ thống
       Directory? dir;
       if (Platform.isAndroid) {
         dir = Directory('/storage/emulated/0/Download');
@@ -208,7 +203,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF7C3AED),
+              backgroundColor: Color(0xFF7A2FC0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -305,14 +300,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
         children: [
           Icon(
             icon,
-            color: active ? Color(0xFF7C3AED) : Colors.white,
+            color: active ? Color(0xFF7A2FC0) : Colors.white,
             size: 26,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: active ? Color(0xFF7C3AED) : Colors.white70,
+              color: active ? Color(0xFF7A2FC0) : Colors.white70,
               fontSize: 12,
             ),
           ),
@@ -457,7 +452,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
               bottom: 35,
               right: 20,
               child: FloatingActionButton(
-                backgroundColor: const Color(0xFF7C3AED),
+                backgroundColor: const Color(0xFF7A2FC0),
                 onPressed: _onSend,
                 child: const Icon(Icons.send, color: Colors.white),
               ),

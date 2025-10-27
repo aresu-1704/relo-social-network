@@ -1,4 +1,6 @@
 import asyncio
+import os
+from datetime import datetime
 from ..models import User
 from ..models import FriendRequest
 from ..schemas import UserUpdate
@@ -165,7 +167,16 @@ class UserService:
         if user_id in current_user.blockedUserIds:
             raise ValueError("Bạn đã chặn người dùng này.")
 
-        return user
+        # Trả về trực tiếp dictionary thay vì tạo đối tượng User mới
+        return {
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "displayName": user.displayName,
+            "avatarUrl": user.avatarUrl if user.avatarUrl not in ["", None] else None,
+            "backgroundUrl": user.backgroundUrl if user.backgroundUrl not in ["", None] else None,
+            "bio": user.bio if user.bio not in ["", None] else None
+        }
 
     @staticmethod
     async def block_user(user_id: str, block_user_id: str):
@@ -245,64 +256,212 @@ class UserService:
         return users
 
     @staticmethod
+    async def check_friend_status(user_id: str, target_user_id: str):
+        """
+        Kiểm tra trạng thái kết bạn giữa hai người dùng.
+        Trả về: 'friends', 'pending_sent', 'pending_received', 'none'
+        """
+        if user_id == target_user_id:
+            return 'self'
+        
+        # Lấy thông tin người dùng hiện tại
+        current_user = await User.get(user_id)
+        if not current_user:
+            raise ValueError("Không tìm thấy người dùng hiện tại.")
+        
+        # Kiểm tra xem đã là bạn bè chưa
+        if target_user_id in current_user.friendIds:
+            return 'friends'
+        
+        # Kiểm tra lời mời kết bạn
+        # Lời mời do user_id gửi cho target_user_id
+        sent_request = await FriendRequest.find_one({
+            "fromUserId": user_id,
+            "toUserId": target_user_id,
+            "status": "pending"
+        })
+        if sent_request:
+            return 'pending_sent'
+        
+        # Lời mời do target_user_id gửi cho user_id
+        received_request = await FriendRequest.find_one({
+            "fromUserId": target_user_id,
+            "toUserId": user_id,
+            "status": "pending"
+        })
+        if received_request:
+            return 'pending_received'
+        
+        return 'none'
+
+    @staticmethod
+    async def unfriend_user(user_id: str, friend_id: str):
+        """
+        Hủy kết bạn với một người dùng.
+        """
+        if user_id == friend_id:
+            raise ValueError("Không thể hủy kết bạn với chính mình.")
+        
+        # Lấy thông tin cả hai người dùng
+        user = await User.get(user_id)
+        friend = await User.get(friend_id)
+        
+        if not user or not friend:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Kiểm tra xem có phải bạn bè không
+        if friend_id not in user.friendIds:
+            raise ValueError("Người dùng này không phải là bạn bè của bạn.")
+        
+        # Xóa khỏi danh sách bạn bè của cả hai
+        user.friendIds.remove(friend_id)
+        friend.friendIds.remove(user_id)
+        
+        # Lưu thay đổi
+        await user.save()
+        await friend.save()
+        
+        return {"message": "Đã hủy kết bạn thành công."}
+
+    @staticmethod
     async def update_user(user_id: str, user_update: UserUpdate):
         """
-        Cập nhật thông tin người dùng, bao gồm cả upload avatar lên Cloudinary.
+        Cập nhật thông tin người dùng, bao gồm cả upload avatar và background lên Cloudinary.
         """
         user = await User.get(user_id)
         if not user:
             raise ValueError("Không tìm thấy người dùng.")
 
-        update_data = user_update.dict(exclude_unset=True)
+        update_data = user_update.model_dump(exclude_unset=True)
 
-        # Ảnh đại diện
-        if "avatarBase64" in update_data and update_data["avatarBase64"]:
-            try:
-                data = update_data["avatarBase64"].split(",") if "," in update_data["avatarBase64"] else (None, update_data["avatarBase64"])
-                image_bytes = base64.b64decode(data)
+        tmp_avatar_path = None
+        tmp_background_path = None
 
+        try:
+            if "avatarBase64" in update_data and update_data["avatarBase64"]:
+                avatar_data = update_data["avatarBase64"]
+                
+                # Giải mã base64
+                if "," in avatar_data:
+                    header, data = avatar_data.split(",", 1)
+                    image_bytes = base64.b64decode(data)
+                else:
+                    image_bytes = base64.b64decode(avatar_data)
+
+                # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
-                    tmp_path = tmp.name
+                    tmp_avatar_path = tmp.name
 
-                # Xóa ảnh cũ nếu có (tùy chọn)
-                if getattr(user, "avatarPublicId", None):
+                # Xóa ảnh cũ nếu có
+                if user.avatarPublicId:
                     destroy(user.avatarPublicId)
 
-                result = cloudinary_upload(tmp_path, folder="avatars")
+
+                result = cloudinary_upload(tmp_avatar_path, folder="avatars")
                 user.avatarUrl = result["secure_url"]
                 user.avatarPublicId = result["public_id"]
+                
+                # Clean up temp file
+                os.unlink(tmp_avatar_path)
+                tmp_avatar_path = None
 
-            except Exception as e:
-                raise ValueError(f"Lỗi xử lý ảnh: {e}")
-            
-        # Ảnh bìa
-        if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
-            try:
-                data = update_data["backgroundBase64"].split(",") if "," in update_data["backgroundBase64"] else (None, update_data["backgroundBase64"])
-                image_bytes = base64.b64decode(data)
+            # 2️⃣ Upload Background lên Cloudinary
+            if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
+                background_data = update_data["backgroundBase64"]
+                
+                # Giải mã base64
+                if "," in background_data:
+                    header, data = background_data.split(",", 1)
+                    image_bytes = base64.b64decode(data)
+                else:
+                    image_bytes = base64.b64decode(background_data)
 
+                # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
-                    tmp_path = tmp.name
+                    tmp_background_path = tmp.name
 
-                # Xóa ảnh cũ nếu có (tùy chọn)
-                if getattr(user, "backgroundPublicId", None):
+                # Xóa ảnh cũ nếu có
+                if user.backgroundPublicId:
                     destroy(user.backgroundPublicId)
 
-                result = cloudinary_upload(tmp_path, folder="backgrounds")
+                result = cloudinary_upload(tmp_background_path, folder="backgrounds")
                 user.backgroundUrl = result["secure_url"]
                 user.backgroundPublicId = result["public_id"]
+                
+                # Clean up temp file
+                os.unlink(tmp_background_path)
+                tmp_background_path = None
 
-            except Exception as e:
-                raise ValueError(f"Lỗi xử lý ảnh: {e}")
+            # 3️⃣ Cập nhật các trường text
+            if "displayName" in update_data and update_data["displayName"]:
+                user.displayName = update_data["displayName"]
+                
+            if "bio" in update_data:
+                user.bio = update_data["bio"] if update_data["bio"] else ""
 
-        # 2️⃣ Cập nhật các trường text
-        if "displayName" in update_data:
-            user.displayName = update_data["displayName"]
-        if "bio" in update_data:
-            user.bio = update_data["bio"]
+            # 4️⃣ Lưu vào database
+            await user.save()
+            
+            return user
 
-        # 3️⃣ Lưu lại
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            
+            # Clean up temp files on error
+            if tmp_avatar_path and os.path.exists(tmp_avatar_path):
+                try:
+                    os.unlink(tmp_avatar_path)
+                except:
+                    pass
+            if tmp_background_path and os.path.exists(tmp_background_path):
+                try:
+                    os.unlink(tmp_background_path)
+                except:
+                    pass
+            
+            raise ValueError(f"Lỗi cập nhật thông tin: {str(e)}")
+
+    @staticmethod
+    async def delete_account(user_id: str):
+        """
+        Xóa tài khoản người dùng (soft delete) bằng cách đổi status thành 'deleted'.
+        Không xóa khỏi database.
+        """
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Kiểm tra xem tài khoản đã bị xóa chưa
+        if user.status == 'deleted':
+            raise ValueError("Tài khoản này đã bị xóa trước đó.")
+        
+        # Đổi status thành deleted
+        user.status = 'deleted'
+        user.updatedAt = datetime.utcnow()
         await user.save()
-        return user
+        
+        return {"message": "Tài khoản đã được xóa thành công."}
+
+    @staticmethod
+    async def get_blocked_users(user_id: str):
+        """
+        Lấy danh sách người dùng bị chặn bởi người dùng hiện tại.
+        """
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+
+        # Lấy danh sách người dùng bị chặn
+        blocked_users = await User.find({"_id": {"$in": [ObjectId(uid) for uid in user.blockedUserIds]}}).to_list()
+        return [
+            {
+                "id": str(blocked_user.id),
+                "username": blocked_user.username,
+                "displayName": blocked_user.displayName,
+                "avatarUrl": blocked_user.avatarUrl
+            }
+            for blocked_user in blocked_users
+        ]

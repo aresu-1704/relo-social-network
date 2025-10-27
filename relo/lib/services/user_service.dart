@@ -110,7 +110,6 @@ class UserService {
   Future<User> getUserProfile(String userId) async {
     try {
       final response = await _dio.get('users/$userId');
-
       if (response.statusCode == 200) {
         return User.fromJson(response.data);
       } else {
@@ -134,6 +133,88 @@ class UserService {
       }
     } catch (e) {
       throw Exception('Failed to load pending friend requests: $e');
+    }
+  }
+
+  // Cập nhật thông tin profile người dùng
+  Future<void> updateProfile({
+    String? displayName,
+    String? bio,
+    String? avatarBase64,
+    String? backgroundBase64,
+  }) async {
+    try {
+      Map<String, dynamic> data = {};
+      if (displayName != null) data['displayName'] = displayName;
+      if (bio != null) data['bio'] = bio;
+      if (avatarBase64 != null) data['avatarBase64'] = avatarBase64;
+      if (backgroundBase64 != null) data['backgroundBase64'] = backgroundBase64;
+
+      await _dio.put('users/me', data: data);
+    } catch (e) {
+      throw Exception('Không thể cập nhật hồ sơ: $e');
+    }
+  }
+
+  // Cập nhật avatar và trả về user data mới
+  Future<User> updateAvatar(String base64Image) async {
+    try {
+      final response = await _dio.put(
+        'users/me',
+        data: {'avatarBase64': base64Image},
+      );
+      return User.fromJson(response.data);
+    } on DioException catch (e) {
+      print('Error updating avatar: ${e.response?.data}');
+      throw Exception('Không thể cập nhật ảnh đại diện: ${e.message}');
+    } catch (e) {
+      throw Exception('Không thể cập nhật ảnh đại diện: $e');
+    }
+  }
+
+  // Cập nhật ảnh bìa và trả về user data mới
+  Future<User> updateBackground(String base64Image) async {
+    try {
+      final response = await _dio.put(
+        'users/me',
+        data: {'backgroundBase64': base64Image},
+      );
+      return User.fromJson(response.data);
+    } on DioException catch (e) {
+      print('Error updating background: ${e.response?.data}');
+      throw Exception('Không thể cập nhật ảnh bìa: ${e.message}');
+    } catch (e) {
+      throw Exception('Không thể cập nhật ảnh bìa: $e');
+    }
+  }
+
+  // Xóa tài khoản (soft delete)
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('users/me');
+    } on DioException catch (e) {
+      print('Error deleting account: ${e.response?.data}');
+      throw Exception('Không thể xóa tài khoản: ${e.message}');
+    } catch (e) {
+      throw Exception('Không thể xóa tài khoản: $e');
+    }
+  }
+
+  // Lấy danh sách người dùng bị chặn
+  Future<List<User>> getBlockedUsers(String userId) async {
+    try {
+      final response = await _dio.get('users/blocked-lists/$userId');
+      print(response.data);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => User.fromJson(json)).toList();
+      } else if (response.statusCode == 404) {
+        return [];
+      } else {
+        throw Exception('Không thể tải danh sách người dùng bị chặn');
+      }
+    } catch (e) {
+      throw Exception('Failed to load blocked users: $e');
     }
   }
 }

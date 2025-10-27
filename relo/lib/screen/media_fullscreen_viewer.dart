@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:extended_image/extended_image.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:relo/utils/permission_util.dart';
 
 class MediaFullScreenViewer extends StatefulWidget {
   final List<String> mediaUrls;
@@ -50,10 +50,10 @@ class _MediaFullScreenViewerState extends State<MediaFullScreenViewer> {
     setState(() => _isDownloading = true);
 
     try {
-      if (Platform.isAndroid) {
-        final status = await Permission.storage.request();
-        if (!status.isGranted) throw Exception('Permission denied');
-      }
+      final isStorageAllowed = await PermissionUtils.ensureStoragePermission(
+        context,
+      );
+      if (!isStorageAllowed) return;
 
       final dir = Platform.isAndroid
           ? Directory('/storage/emulated/0/Download')

@@ -8,25 +8,30 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:relo/widgets/message_list.dart';
-import 'package:relo/widgets/message_composer.dart';
+import 'package:relo/widgets/messages/message_list.dart';
+import 'package:relo/widgets/messages/message_composer.dart';
 import 'package:relo/utils/message_utils.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:relo/widgets/action_button.dart';
+import 'package:relo/screen/profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
   final bool isGroup;
-  final String? friendName;
+  final String? chatName;
   final List<String>? memberIds;
+
+  final void Function(String conversationId)? onConversationSeen;
 
   const ChatScreen({
     super.key,
     required this.conversationId,
     required this.isGroup,
-    this.friendName,
+    this.chatName,
     this.memberIds,
+    this.onConversationSeen,
   });
 
   @override
@@ -73,11 +78,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _listenToWebSocket() {
-    _webSocketSubscription = webSocketService.stream.listen((message) {
+    _webSocketSubscription = webSocketService.stream.listen((message) async {
       final data = jsonDecode(message);
       if (data['type'] == 'new_message') {
         final msgData = data['payload']?['message'];
         if (msgData == null) return;
+        if (msgData['senderId'] != _currentUserId) {
+          await _messageService.markAsSeen(_conversationId!, _currentUserId!);
+          widget.onConversationSeen?.call(_conversationId!);
+        }
         if (msgData['senderId'] == _currentUserId) return;
         if (msgData['conversationId'] != _conversationId) return;
 
@@ -86,6 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
           conversationId: msgData['conversationId'],
           senderId: msgData['senderId'],
           content: msgData['content'] ?? '',
+          avatarUrl: msgData['avatarUrl'] ?? '',
           timestamp:
               DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
           status: 'sent',
@@ -274,7 +284,7 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               if (message.content['type'] == 'text')
                 // Nút sao chép
-                _ActionButton(
+                ActionButton(
                   icon: LucideIcons.copy,
                   label: 'Sao chép',
                   color: const Color(0xFF4CAF50),
@@ -291,7 +301,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
 
               // Nút chuyển tiếp
-              _ActionButton(
+              ActionButton(
                 icon: LucideIcons.share2, // icon mới gọn, đẹp hơn
                 label: 'Chuyển tiếp',
                 color: const Color(0xFF2979FF),
@@ -303,7 +313,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
               // Nút thu hồi (chỉ hiện với tin nhắn của mình)
               if (isMe)
-                _ActionButton(
+                ActionButton(
                   icon: LucideIcons.trash2,
                   label: 'Thu hồi',
                   color: const Color(0xFFFF5252),
@@ -312,6 +322,155 @@ class _ChatScreenState extends State<ChatScreen> {
                     _recallMessage(message);
                   },
                 ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showConversationSettings() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        // Danh sách nút hành động động
+        final actions = <ActionButton>[
+          if (!widget.isGroup)
+            ActionButton(
+              icon: LucideIcons.userCircle2,
+              label: 'Xem trang cá nhân',
+              color: const Color(0xFF2979FF),
+              onTap: () async {
+                Navigator.pop(context);
+                String friendId = widget.memberIds!.firstWhere(
+                  (id) => id != _currentUserId,
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) {
+                      return ProfileScreen(userId: friendId);
+                    },
+                  ),
+                );
+              },
+            ),
+          ActionButton(
+            icon: LucideIcons.bellOff,
+            label: 'Tắt thông báo',
+            color: const Color(0xFF2979FF),
+            onTap: () async {
+              final result = await ShowNotification.showConfirmDialog(
+                context,
+                title: 'Tắt thông báo cuộc trò chuyện ?',
+                confirmText: 'Đồng ý',
+                confirmColor: Colors.red,
+              );
+
+              if (!result!) return;
+              Navigator.pop(context);
+              // TODO: logic tắt thông báo
+            },
+          ),
+          if (widget.isGroup)
+            ActionButton(
+              icon: LucideIcons.edit3,
+              label: 'Đổi tên nhóm',
+              color: const Color(0xFF9C27B0),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: logic đổi tên nhóm
+              },
+            )
+          else
+            ActionButton(
+              icon: LucideIcons.users,
+              label: 'Tạo nhóm với ${widget.chatName}',
+              color: const Color(0xFF00BCD4),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: logic tạo nhóm
+              },
+            ),
+          if (widget.isGroup)
+            ActionButton(
+              icon: LucideIcons.logOut,
+              label: 'Rời nhóm',
+              color: const Color(0xFFFF5722),
+              onTap: () async {
+                final result = await ShowNotification.showConfirmDialog(
+                  context,
+                  title: 'Bạn muốn rời khỏi cuộc trò chuyện ?',
+                  confirmText: 'Đồng ý',
+                  confirmColor: Colors.red,
+                );
+
+                if (!result!) return;
+                // TODO: logic rời nhóm
+              },
+            )
+          else
+            ActionButton(
+              icon: LucideIcons.userX,
+              label: 'Chặn người dùng',
+              color: const Color(0xFFFF5252),
+              onTap: () async {
+                final result = await ShowNotification.showConfirmDialog(
+                  context,
+                  title: 'Bạn muốn chặn người dùng này ?',
+                  confirmText: 'Đồng ý',
+                  confirmColor: Colors.red,
+                );
+
+                if (!result!) return;
+                Navigator.pop(context);
+                // TODO: logic chặn
+              },
+            ),
+          ActionButton(
+            icon: LucideIcons.trash2,
+            label: 'Xóa cuộc trò chuyện',
+            color: const Color(0xFFE91E63),
+            onTap: () async {
+              final result = await ShowNotification.showConfirmDialog(
+                context,
+                title: 'Xóa tin nhắn ?',
+                confirmText: 'Xóa',
+                confirmColor: Colors.red,
+              );
+
+              if (!result!) return;
+              Navigator.pop(context);
+              // TODO: logic xóa
+              await _messageService.deleteConversation(_conversationId!);
+              Navigator.of(context).pop();
+            },
+          ),
+        ];
+
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, -3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                VerticalActionButton(button: actions[i]),
+                if (i != actions.length - 1) const SizedBox(height: 12),
+              ],
             ],
           ),
         );
@@ -336,7 +495,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.friendName ?? 'Chat',
+                    widget.chatName ?? 'Tài khoản không tồn tại',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -360,11 +519,10 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.white),
+            icon: const Icon(LucideIcons.settings2, color: Colors.white),
             onPressed: () {
-              //TODO:
+              _showConversationSettings();
             },
-            tooltip: 'Xem chi tiết',
           ),
         ],
       ),
@@ -427,74 +585,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// Widget nút với hiệu ứng scale khi nhấn
-class _ActionButton extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  State<_ActionButton> createState() => _ActionButtonState();
-}
-
-class _ActionButtonState extends State<_ActionButton>
-    with SingleTickerProviderStateMixin {
-  double _scale = 1.0;
-
-  void _onTapDown(TapDownDetails details) {
-    setState(() => _scale = 0.9);
-  }
-
-  void _onTapUp(TapUpDetails details) {
-    setState(() => _scale = 1.0);
-    widget.onTap();
-  }
-
-  void _onTapCancel() {
-    setState(() => _scale = 1.0);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _onTapDown,
-      onTapUp: _onTapUp,
-      onTapCancel: _onTapCancel,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedScale(
-            scale: _scale,
-            duration: const Duration(milliseconds: 100),
-            curve: Curves.easeOut,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: widget.color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(widget.icon, size: 28, color: widget.color),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.label,
-            style: TextStyle(color: widget.color, fontWeight: FontWeight.w500),
-          ),
-        ],
       ),
     );
   }

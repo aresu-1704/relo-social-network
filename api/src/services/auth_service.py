@@ -56,6 +56,10 @@ class AuthService:
         if not user:
             return None # Không tìm thấy người dùng
         
+        # Kiểm tra nếu tài khoản đã bị xóa (soft delete)
+        if user.status == 'deleted':
+            raise ValueError("Tài khoản đã bị xóa. Vui lòng liên hệ hỗ trợ nếu cần khôi phục.")
+        
         # Xác minh mật khẩu (hoạt động đồng bộ)
         if not AuthService.verify_password(password, user.hashedPassword):
             return None # Mật khẩu không hợp lệ

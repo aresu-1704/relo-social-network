@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from typing import List
 from ..services import UserService
 from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate, UserSearchResult
@@ -21,11 +21,12 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         displayName=current_user.displayName,
         avatarUrl=current_user.avatarUrl,
+        backgroundUrl=current_user.backgroundUrl,
         bio=current_user.bio
     )
 
 # Cập nhật hồ sơ của người dùng hiện tại
-@router.put("/me", response_model=UserPublic)
+@router.put("/me")
 async def update_user_me(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user)
@@ -38,7 +39,16 @@ async def update_user_me(
             user_id=str(current_user.id),
             user_update=user_update
         )
-        return {"message": "Cập nhật thành công."}
+        return {
+            "message": "Cập nhật thành công.",
+            "user": {
+                "id": str(updated_user.id),
+                "displayName": updated_user.displayName,
+                "bio": updated_user.bio,
+                "avatarUrl": updated_user.avatarUrl,
+                "backgroundUrl": updated_user.backgroundUrl,
+            }
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -93,43 +103,34 @@ async def get_pending_friend_requests(current_user: User = Depends(get_current_u
         raise HTTPException(status_code=404, detail=str(e))
 
 # Lấy danh sách bạn bè
-@router.get("/friends", response_model=List[UserPublic])
+@router.get("/friends")
 async def get_friends(current_user: User = Depends(get_current_user)):
     """
     Lấy danh sách bạn bè cho người dùng hiện được xác thực.
     """
     try:
         friends = await UserService.get_friends(user_id=str(current_user.id))
-        # Chuyển đổi đối tượng User model thành UserPublic schema
         return [
-            UserPublic(
-                id=str(friend.id),
-                username=friend.username,
-                email=friend.email,
-                displayName=friend.displayName,
-                avatarUrl=friend.avatarUrl,
-            ) for friend in friends
+            {
+                "id": str(friend.id),
+                "username": friend.username,
+                "email": friend.email,
+                "displayName": friend.displayName,
+                "avatarUrl": friend.avatarUrl,
+            } for friend in friends
         ]
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 # Lấy hồ sơ công khai của người dùng
-@router.get("/{user_id}", response_model=UserPublic)
+@router.get("/{user_id}")
 async def get_user_profile(user_id: str, current_user: User = Depends(get_current_user)):
     """
     Lấy hồ sơ công khai của bất kỳ người dùng nào.
     """
     try:
-        user = await UserService.get_user_profile(user_id, str(current_user.id))
-        return UserPublic(
-            id=str(user.id),
-            username=user.username,
-            email=user.email,
-            displayName=user.displayName,
-            avatarUrl=user.avatarUrl,
-            backgroundUrl=user.backgroundUrl,
-            bio=user.bio
-        )
+        return await UserService.get_user_profile(user_id, str(current_user.id))
+    
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -148,6 +149,21 @@ async def unblock_user(request: BlockUserRequest, current_user: User = Depends(g
     try:
         result = await UserService.unblock_user(str(current_user.id), request.user_id)
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+# Lấy danh sách người dùng bị chặn
+@router.get("/blocked-lists/{user_id}")
+async def get_blocked_users(user_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Lấy danh sách người dùng bị chặn của người dùng hiện tại.
+    """
+    if user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Không có quyền truy cập danh sách người dùng bị chặn của người khác.")
+    
+    try:
+        blocked_users = await UserService.get_blocked_users(user_id)
+        return blocked_users
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -169,3 +185,40 @@ async def search_users(query: str = Query(..., min_length=1), current_user: User
         ]
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+# Kiểm tra trạng thái kết bạn
+@router.get("/{user_id}/friend-status")
+async def check_friend_status(user_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Kiểm tra trạng thái kết bạn giữa người dùng hiện tại và người dùng khác.
+    """
+    try:
+        status = await UserService.check_friend_status(str(current_user.id), user_id)
+        return {"status": status}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Hủy kết bạn
+@router.post("/{user_id}/unfriend", status_code=200)
+async def unfriend_user(user_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Hủy kết bạn với một người dùng.
+    """
+    try:
+        result = await UserService.unfriend_user(str(current_user.id), user_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Xóa tài khoản (soft delete)
+@router.delete("/me", status_code=200)
+async def delete_account(current_user: User = Depends(get_current_user)):
+    """
+    Xóa tài khoản người dùng (soft delete).
+    Đổi status thành 'deleted' thay vì xóa khỏi database.
+    """
+    try:
+        result = await UserService.delete_account(str(current_user.id))
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

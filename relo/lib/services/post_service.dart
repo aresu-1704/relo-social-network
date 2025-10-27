@@ -38,8 +38,7 @@ class PostService {
       final formData = FormData();
       
       // Thêm content (luôn gửi, ngay cả khi rỗng)
-      formData.fields.add(MapEntry('content', content ?? ''));
-      
+      formData.fields.add(MapEntry('content', content));
       // Thêm files nếu có
       if (filePaths != null && filePaths.isNotEmpty) {
         for (final path in filePaths) {
@@ -51,8 +50,6 @@ class PostService {
           );
         }
       }
-      
-      print('📤 Sending post: content="${content ?? ''}", files count: ${filePaths?.length ?? 0}');
       
       final response = await _dio.post(
         'posts',

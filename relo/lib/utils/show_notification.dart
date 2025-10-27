@@ -12,7 +12,7 @@ class ShowNotification {
       context: context,
       builder: (_) => Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
+          constraints: const BoxConstraints(maxWidth: 340), // 👈 Giới hạn ngang
           child: AlertDialog(
             contentPadding: const EdgeInsets.fromLTRB(24, 20, 50, 0),
             content: Text(
@@ -41,7 +41,9 @@ class ShowNotification {
                     ),
                     const SizedBox(width: 3),
                     TextButton(
-                      onPressed: () => Navigator.pop(context, true),
+                      onPressed: () => {
+                        if (context.mounted) {Navigator.pop(context, true)},
+                      },
                       child: Text(
                         confirmText,
                         style: TextStyle(
@@ -114,7 +116,7 @@ class ShowNotification {
     final overlay = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        bottom: 100, // cách đáy màn hình
+        bottom: 120, // cách đáy màn hình
         left: 50,
         right: 50,
         child: Material(
@@ -141,5 +143,21 @@ class ShowNotification {
 
     overlay.insert(overlayEntry);
     Future.delayed(const Duration(seconds: 2), () => overlayEntry.remove());
+  }
+
+  static Future<void> showLoadingDialog(BuildContext context, String message) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: Color(0xFF7A2FC0)),
+            SizedBox(width: 20),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
   }
 }

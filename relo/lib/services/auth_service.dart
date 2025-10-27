@@ -3,6 +3,14 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/constants.dart';
 import 'package:relo/services/websocket_service.dart';
 
+/// Custom exception cho tài khoản đã bị xóa
+class AccountDeletedException implements Exception {
+  final String message;
+  AccountDeletedException(this.message);
+
+  @override
+  String toString() => message;
+}
 
 class AuthService {
   final Dio _dio = Dio(BaseOptions(baseUrl: baseUrl));
@@ -44,12 +52,20 @@ class AuthService {
         throw Exception('Login failed: Invalid response from server.');
       }
     } on DioException catch (e) {
-      // Handle Dio-specific errors, e.g., 401 Unauthorized
+      // Handle Dio-specific errors
       if (e.response?.statusCode == 401) {
         throw Exception('Tên đăng nhập hoặc mật khẩu không chính xác.');
+      } else if (e.response?.statusCode == 403) {
+        // Tài khoản đã bị xóa
+        final errorMessage =
+            e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
+        throw AccountDeletedException(errorMessage);
       }
       throw Exception('Đã xảy ra lỗi mạng.');
     } catch (e) {
+      if (e is AccountDeletedException) {
+        rethrow;
+      }
       throw Exception('Đã xảy ra lỗi không xác định.');
     }
   }
@@ -98,7 +114,9 @@ class AuthService {
     try {
       final refreshToken = await _storageService.getRefreshToken();
       if (refreshToken == null) {
-        throw Exception('No refresh token available.');
+        // This isn't a network error, but a state error. No token, so can't refresh.
+        await logout();
+        return null;
       }
 
       final response = await _dio.post(
@@ -110,15 +128,30 @@ class AuthService {
         final newAccessToken = response.data['access_token'];
         await _storageService.saveTokens(
           accessToken: newAccessToken,
-          refreshToken: refreshToken,
+          refreshToken:
+              refreshToken, // The refresh token might be rotated, but the example doesn't show it
         );
         return newAccessToken;
       } else {
-        throw Exception('Failed to refresh token.');
+        // A non-200 response that isn't a DioException (unlikely but possible)
+        // should be treated as a session failure.
+        await logout();
+        return null;
       }
-    } catch (e) {
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 403) {
+        await logout();
+        final errorMessage =
+            e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
+        throw AccountDeletedException(errorMessage);
+      }
       // If refresh fails, logout the user
       await logout();
+      return null;
+    } catch (e) {
+      if (e is AccountDeletedException) {
+        rethrow;
+      }
       return null;
     } finally {
       _isRefreshing = false;

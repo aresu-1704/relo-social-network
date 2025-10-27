@@ -123,10 +123,9 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _capturePhoto() async {
     if (_isCapturing || !_controller!.value.isInitialized) return;
 
-    setState(() => _isCapturing = true); // ✅ cập nhật UI ngay
+    setState(() => _isCapturing = true);
 
     try {
-      // 🔥 Tắt flash trước khi rời màn hình
       if (_flashOn) {
         await _controller!.setFlashMode(FlashMode.off);
         _flashOn = false;
