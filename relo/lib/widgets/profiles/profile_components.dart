@@ -60,7 +60,10 @@ class ProfileComponents {
   static Widget _buildStatItem(String label, String value) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
         SizedBox(height: 5),
         Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
       ],
@@ -78,7 +81,8 @@ class ProfileComponents {
   }) {
     if (isFriend) {
       return ElevatedButton.icon(
-        onPressed: () => _showFriendOptions(context, user, userService, refreshState),
+        onPressed: () =>
+            _showFriendOptions(context, user, userService, refreshState),
         icon: Icon(Icons.check, color: Color(0xFF7A2FC0)),
         label: Text('Bạn bè', style: TextStyle(color: Color(0xFF7A2FC0))),
         style: ElevatedButton.styleFrom(
@@ -98,7 +102,9 @@ class ProfileComponents {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.grey[200],
           padding: EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     } else {
@@ -148,7 +154,6 @@ class ProfileComponents {
               leading: Icon(Icons.block, color: Colors.red),
               title: Text('Chặn người dùng'),
               onTap: () async {
-                Navigator.pop(context);
                 bool? confirm = await ShowNotification.showConfirmDialog(
                   context,
                   title: 'Bạn có chắc muốn chặn ${user.displayName}?',
@@ -160,10 +165,16 @@ class ProfileComponents {
                 if (confirm == true) {
                   try {
                     await userService.blockUser(user.id);
-                    await ShowNotification.showToast(context, 'Đã chặn người dùng');
+                    await ShowNotification.showToast(
+                      context,
+                      'Đã chặn người dùng',
+                    );
                     Navigator.pop(context);
                   } catch (e) {
-                    await ShowNotification.showToast(context, 'Không thể chặn người dùng');
+                    await ShowNotification.showToast(
+                      context,
+                      'Không thể chặn người dùng',
+                    );
                   }
                 }
               },
@@ -173,7 +184,10 @@ class ProfileComponents {
               title: Text('Hủy kết bạn'),
               onTap: () async {
                 Navigator.pop(context);
-                await ShowNotification.showToast(context, 'Tính năng đang phát triển');
+                await ShowNotification.showToast(
+                  context,
+                  'Tính năng đang phát triển',
+                );
               },
             ),
             ListTile(
@@ -201,7 +215,10 @@ class ProfileComponents {
               children: [
                 Text(label, style: TextStyle(color: Colors.grey, fontSize: 13)),
                 SizedBox(height: 3),
-                Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                Text(
+                  value,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                ),
               ],
             ),
           ),

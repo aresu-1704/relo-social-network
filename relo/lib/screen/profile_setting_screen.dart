@@ -5,8 +5,7 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/models/user.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/auth_service.dart';
-
-import 'profile_screen.dart';
+import 'package:shimmer/shimmer.dart';
 import 'privacy_settings_screen.dart';
 
 class ProfileSettingScreen extends StatefulWidget {
@@ -72,17 +71,13 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
         iconTheme: IconThemeData(color: Colors.white),
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: Color(0xFF7A2FC0)))
+          ? _buildShimmerProfile()
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Add more widgets here
                 InkWell(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProfileScreen()),
-                    );
+                    Navigator.pop(context);
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -177,7 +172,8 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PrivacySettingsScreen(),
+                        builder: (context) =>
+                            PrivacySettingsScreen(userId: _currentUserId!),
                       ),
                     );
                   },
@@ -412,5 +408,82 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
         );
       }
     }
+  }
+
+  Widget _buildShimmerProfile() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Vòng tròn shimmer avatar
+              Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: CircleAvatar(radius: 25, backgroundColor: Colors.white),
+              ),
+              const SizedBox(width: 16),
+              // Shimmer tên & mô tả
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        width: 150,
+                        height: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        width: 100,
+                        height: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Shimmer cho item setting
+          ...List.generate(2, (index) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              child: Row(
+                children: [
+                  Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(height: 16, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
   }
 }

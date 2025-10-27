@@ -125,3 +125,22 @@ async def recall_message(
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+async def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Xóa một cuộc trò chuyện bằng cách cập nhật ParticipantInfo của người dùng hiện tại.
+    """
+    try:
+        result = await MessageService.delete_conversation(
+            conversation_id=conversation_id,
+            user_id=str(current_user.id)
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))

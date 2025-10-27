@@ -333,14 +333,12 @@ class UserService:
             raise ValueError("Không tìm thấy người dùng.")
 
         update_data = user_update.model_dump(exclude_unset=True)
-        print(f"DEBUG: Received update data keys: {list(update_data.keys())}")
 
         tmp_avatar_path = None
         tmp_background_path = None
 
         try:
             if "avatarBase64" in update_data and update_data["avatarBase64"]:
-                print("DEBUG: Processing avatar upload...")
                 avatar_data = update_data["avatarBase64"]
                 
                 # Giải mã base64
@@ -357,11 +355,8 @@ class UserService:
 
                 # Xóa ảnh cũ nếu có
                 if user.avatarPublicId:
-                    print(f"DEBUG: Deleting old avatar: {user.avatarPublicId}")
-                    try:
-                        destroy(user.avatarPublicId)
-                    except Exception as e:
-                        print(f"WARNING: Could not delete old avatar: {e}")
+                    destroy(user.avatarPublicId)
+
 
                 result = cloudinary_upload(tmp_avatar_path, folder="avatars")
                 user.avatarUrl = result["secure_url"]
@@ -373,7 +368,6 @@ class UserService:
 
             # 2️⃣ Upload Background lên Cloudinary
             if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
-                print("DEBUG: Processing background upload...")
                 background_data = update_data["backgroundBase64"]
                 
                 # Giải mã base64
@@ -383,22 +377,14 @@ class UserService:
                 else:
                     image_bytes = base64.b64decode(background_data)
 
-                print(f"DEBUG: Background decoded, size: {len(image_bytes)} bytes")
-
                 # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                     tmp.write(image_bytes)
                     tmp_background_path = tmp.name
 
-                print(f"DEBUG: Temp background file created at: {tmp_background_path}")
-
                 # Xóa ảnh cũ nếu có
                 if user.backgroundPublicId:
-                    print(f"DEBUG: Deleting old background: {user.backgroundPublicId}")
-                    try:
-                        destroy(user.backgroundPublicId)
-                    except Exception as e:
-                        print(f"WARNING: Could not delete old background: {e}")
+                    destroy(user.backgroundPublicId)
 
                 result = cloudinary_upload(tmp_background_path, folder="backgrounds")
                 user.backgroundUrl = result["secure_url"]
@@ -411,11 +397,9 @@ class UserService:
             # 3️⃣ Cập nhật các trường text
             if "displayName" in update_data and update_data["displayName"]:
                 user.displayName = update_data["displayName"]
-                print(f"DEBUG: Updated displayName to: {user.displayName}")
                 
             if "bio" in update_data:
                 user.bio = update_data["bio"] if update_data["bio"] else ""
-                print(f"DEBUG: Updated bio to: {user.bio}")
 
             # 4️⃣ Lưu vào database
             await user.save()
@@ -460,3 +444,24 @@ class UserService:
         await user.save()
         
         return {"message": "Tài khoản đã được xóa thành công."}
+
+    @staticmethod
+    async def get_blocked_users(user_id: str):
+        """
+        Lấy danh sách người dùng bị chặn bởi người dùng hiện tại.
+        """
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+
+        # Lấy danh sách người dùng bị chặn
+        blocked_users = await User.find({"_id": {"$in": [ObjectId(uid) for uid in user.blockedUserIds]}}).to_list()
+        return [
+            {
+                "id": str(blocked_user.id),
+                "username": blocked_user.username,
+                "displayName": blocked_user.displayName,
+                "avatarUrl": blocked_user.avatarUrl
+            }
+            for blocked_user in blocked_users
+        ]

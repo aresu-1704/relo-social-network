@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from typing import List, Optional
-from ..models import Conversation, LastMessage, Message, ParticipantInfo
+from ..models import Conversation, LastMessage, Message, ParticipantInfo, User
 from ..websocket import manager
 from ..schemas import SimpleMessagePublic, LastMessagePublic, ConversationWithParticipants
 from ..schemas.user_schema import UserPublic
@@ -96,8 +96,18 @@ class MessageService:
         conversation.seenIds = [sender_id]
         await conversation.save()
 
+        sender = await User.get(sender_id)
+
         # Phát broadcast tin nhắn mới
-        message_data = map_message_to_public_dict(message)
+        message_data = {
+            "id": str(message.id),
+            "senderId": str(sender.id),
+            "conversationId": message.conversationId,
+            "avatarUrl": sender.avatarUrl,
+            "content": message.content,
+            "createdAt": message.createdAt.isoformat()
+        }
+
         conversation_data = map_conversation_to_public_dict(conversation)
 
         tasks = [
@@ -247,18 +257,6 @@ class MessageService:
             conversation.seenIds.append(user_id)
             await conversation.save()
 
-        task = [
-            # Phát tính hiệu refresh
-            manager.broadcast_to_user(
-                user_id,
-                {
-                    "type": "conversation_seen",
-                    "payload": {"conversationId": conversation_id}
-                }
-            )
-        ]
-        await asyncio.gather(*task)
-
         return conversation
     
     @staticmethod
@@ -303,3 +301,36 @@ class MessageService:
         await asyncio.gather(*tasks)
 
         return message
+    
+    @staticmethod
+    async def delete_conversation(conversation_id: str, user_id: str):
+        """
+        Xóa một cuộc trò chuyện bằng cách cập nhật ParticipantInfo của người dùng.
+        """
+        conversation = await Conversation.get(conversation_id)
+        if not conversation:
+            raise ValueError("Không tìm thấy cuộc trò chuyện.")
+
+        # Kiểm tra xem người dùng có trong danh sách participants không
+        participant = next((p for p in conversation.participants if p.userId == user_id), None)
+        if not participant:
+            raise PermissionError("Bạn không có quyền xóa cuộc trò chuyện này.")
+
+        # Cập nhật thời gian xóa tin nhắn cuối cùng
+        participant.lastMessageDelete = datetime.utcnow() + timedelta(hours=7)
+        await conversation.save()
+
+        # Thông báo cho người dùng
+        task = [ 
+            manager.broadcast_to_user(
+                user_id,
+                {
+                    "type": "conversation_deleted",
+                    "payload": {"conversationId": conversation_id}
+                }
+            )
+        ]
+        await asyncio.gather(*task)
+
+
+        return {"message": "Cuộc trò chuyện đã được xóa thành công."}

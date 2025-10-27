@@ -41,7 +41,9 @@ class ShowNotification {
                     ),
                     const SizedBox(width: 3),
                     TextButton(
-                      onPressed: () => Navigator.pop(context, true),
+                      onPressed: () => {
+                        if (context.mounted) {Navigator.pop(context, true)},
+                      },
                       child: Text(
                         confirmText,
                         style: TextStyle(

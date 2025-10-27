@@ -7,16 +7,19 @@ class BuildTextFormField {
     required String hintText,
     required IconData icon,
     required String? Function(String?) validator,
+    Function(String)? onChanged,
     bool isPassword = false,
     bool obscureText = false,
     VoidCallback? toggleObscure,
   }) {
     const Color mainColor = Color(0xFF7A2FC0);
+
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       validator: validator,
       cursorColor: mainColor,
+      onChanged: onChanged, // ✅ Gọi trực tiếp callback, Flutter tự truyền value
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: mainColor),
         hintText: hintText,

@@ -199,4 +199,22 @@ class UserService {
       throw Exception('Không thể xóa tài khoản: $e');
     }
   }
+
+  // Lấy danh sách người dùng bị chặn
+  Future<List<User>> getBlockedUsers(String userId) async {
+    try {
+      final response = await _dio.get('users/blocked-lists/$userId');
+      print(response.data);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => User.fromJson(json)).toList();
+      } else if (response.statusCode == 404) {
+        return [];
+      } else {
+        throw Exception('Không thể tải danh sách người dùng bị chặn');
+      }
+    } catch (e) {
+      throw Exception('Failed to load blocked users: $e');
+    }
+  }
 }
