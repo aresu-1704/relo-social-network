@@ -22,6 +22,7 @@ class ChatScreen extends StatefulWidget {
   final bool isGroup;
   final String? chatName;
   final List<String>? memberIds;
+  final int? memberCount;
 
   final void Function(String conversationId)? onConversationSeen;
 
@@ -32,6 +33,7 @@ class ChatScreen extends StatefulWidget {
     this.chatName,
     this.memberIds,
     this.onConversationSeen,
+    this.memberCount,
   });
 
   @override
@@ -83,12 +85,16 @@ class _ChatScreenState extends State<ChatScreen> {
       if (data['type'] == 'new_message') {
         final msgData = data['payload']?['message'];
         if (msgData == null) return;
-        if (msgData['senderId'] != _currentUserId) {
-          await _messageService.markAsSeen(_conversationId!, _currentUserId!);
-          widget.onConversationSeen?.call(_conversationId!);
-        }
+
+        // Nếu message từ chính mình, không cần xử lý
         if (msgData['senderId'] == _currentUserId) return;
+
+        // Chỉ xử lý message từ conversation hiện tại
         if (msgData['conversationId'] != _conversationId) return;
+
+        // Mark as seen khi message đến từ conversation đang mở
+        await _messageService.markAsSeen(_conversationId!, _currentUserId!);
+        widget.onConversationSeen?.call(_conversationId!);
 
         final newMsg = Message(
           id: msgData['id'] ?? '',
@@ -504,8 +510,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (widget.isGroup)
-                    const Text(
-                      'Nhóm trò chuyện',
+                    Text(
+                      '${widget.memberCount!} thành viên',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 12,

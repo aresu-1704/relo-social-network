@@ -1,7 +1,7 @@
 import cloudinary.uploader
 from fastapi import UploadFile
 
-async def upload_to_cloudinary(file: UploadFile):
+async def upload_to_cloudinary(file: UploadFile, folder: str = "chat_media"):
     """
     Upload 1 file (image/video/audio) lên Cloudinary.
     Tự động xác định loại (resource_type="auto").
@@ -10,7 +10,7 @@ async def upload_to_cloudinary(file: UploadFile):
         result = cloudinary.uploader.upload(
             file.file,
             resource_type="auto",  # cho phép image, video, audio
-            folder="chat_media"    # tùy chọn: lưu vào thư mục Cloudinary
+            folder=folder          # tùy chọn: lưu vào thư mục Cloudinary
         )
         return {
             "url": result["secure_url"],

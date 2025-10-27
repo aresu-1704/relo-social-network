@@ -9,7 +9,6 @@ class Post {
   final List<String> mediaUrls;
   final List<Reaction> reactions;
   final Map<String, int> reactionCounts;
-  final int commentCount;
   final DateTime createdAt;
 
   Post({
@@ -20,13 +19,12 @@ class Post {
     required this.mediaUrls,
     required this.reactions,
     required this.reactionCounts,
-    required this.commentCount,
     required this.createdAt,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
-      id: json['_id'] ?? '',
+      id: json['id'] ?? json['_id'] ?? '',
       authorId: json['authorId'],
       authorInfo: AuthorInfo.fromJson(json['authorInfo']),
       content: json['content'] ?? '',
@@ -36,7 +34,6 @@ class Post {
               .toList() ??
           [],
       reactionCounts: Map<String, int>.from(json['reactionCounts'] ?? {}),
-      commentCount: json['commentCount'] ?? 0,
       createdAt: DateTime.parse(json['createdAt']),
     );
   }

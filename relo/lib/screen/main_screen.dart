@@ -5,8 +5,10 @@ import 'package:relo/screen/profile_setting_screen.dart';
 import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
+import 'newsfeed_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:convex_bottom_bar/convex_bottom_bar.dart';
 import 'dart:async';
 
 class MainScreen extends StatefulWidget {
@@ -53,11 +55,11 @@ class MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> currentScreens = [
-      const MessagesScreen(),
-      const Center(child: Text('TODO: Tường nhà')),
-      const FriendsScreen(),
-      Center(child: Text('TODO: Thông báo')),
-      const ProfileScreen(),
+      const NewsFeedScreen(), // Feed (0)
+      const FriendsScreen(), // Friends (1)
+      MessagesScreen(), // Messages (2) - ở giữa
+      Center(child: Text('TODO: Thông báo')), // Notifications (3)
+      const ProfileScreen(), // Profile (4)
     ];
 
     return Scaffold(
@@ -149,77 +151,71 @@ class MainScreenState extends State<MainScreen> {
         ],
       ),
 
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          border: Border(top: BorderSide(color: Colors.grey[300]!, width: 0.5)),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          selectedItemColor: const Color(0xFF7A2FC0),
-          unselectedItemColor: Colors.grey,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          showSelectedLabels: true,
-          showUnselectedLabels: false,
-          onTap: (int i) {
-            setState(() {
-              _selectedIndex = i;
-              if (i == 3) _notificationCount = 0;
-            });
-          },
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(LucideIcons.messageCircle),
-              label: 'Tin nhắn',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(LucideIcons.layoutGrid),
-              label: 'Tường nhà',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(LucideIcons.users),
-              label: 'Bạn bè',
-            ),
-            BottomNavigationBarItem(
-              icon: Stack(
-                children: [
-                  const Icon(LucideIcons.bell),
-                  if (_notificationCount > 0)
-                    Positioned(
-                      top: 0,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '$_notificationCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+      bottomNavigationBar: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ConvexAppBar(
+            items: [
+              TabItem(icon: LucideIcons.home, title: 'Tường nhà'),
+              TabItem(icon: LucideIcons.users, title: 'Bạn bè'),
+              TabItem(
+                icon: Icons.forum_outlined, // Icon chat như Zalo
+                title: 'Tin nhắn',
+              ), // Giữa
+              TabItem(icon: LucideIcons.bell, title: 'Thông báo'),
+              TabItem(icon: LucideIcons.user, title: 'Cá nhân'),
+            ],
+            initialActiveIndex: _selectedIndex,
+            onTap: (int i) {
+              setState(() {
+                _selectedIndex = i;
+                if (i == 3) _notificationCount = 0;
+              });
+            },
+            backgroundColor: Colors.grey[100],
+            activeColor: const Color(0xFF7A2FC0), // Màu tím khi active
+            color: Colors.grey[600], // Màu xám khi không active
+            style: TabStyle.flip,
+            height: 65,
+            curveSize: 100,
+            elevation: 10,
+          ),
+          // Badge cho thông báo (index 3, tính từ bên phải)
+          if (_notificationCount > 0)
+            Positioned(
+              top: 8,
+              right:
+                  MediaQuery.of(context).size.width *
+                  0.18, // Vị trí tab thứ 2 từ phải
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedIndex = 3;
+                    _notificationCount = 0;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Text(
+                    '$_notificationCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                     ),
-                ],
+                  ),
+                ),
               ),
-              label: 'Thông báo',
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(LucideIcons.user),
-              label: 'Cá nhân',
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

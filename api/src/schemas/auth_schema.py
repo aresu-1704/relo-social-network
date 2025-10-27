@@ -17,6 +17,8 @@ class UserPublic(BaseModel):
     username: str
     email: EmailStr
     displayName: str
+    avatarUrl: Optional[str] = None
+    bio: Optional[str] = None
 
     class Config:
         from_attributes = True

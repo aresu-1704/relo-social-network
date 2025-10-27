@@ -122,12 +122,11 @@ class TextMessageBubble extends StatelessWidget {
                   ],
                 ),
               ),
-              isMe && isLastFromMe && !isRecalled
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 1, right: 0),
-                      child: MessageStatusWidget(message: message),
-                    )
-                  : const SizedBox(height: 4),
+              if (isMe && isLastFromMe && !isRecalled)
+                Padding(
+                  padding: const EdgeInsets.only(top: 1, right: 0),
+                  child: MessageStatusWidget(message: message),
+                ),
             ],
           ),
         ),

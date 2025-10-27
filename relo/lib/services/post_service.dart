@@ -1,207 +1,140 @@
 import 'package:dio/dio.dart';
 import 'package:relo/models/post.dart';
-import 'package:relo/models/comment.dart';
-import 'dart:io';
 
 class PostService {
   final Dio _dio;
 
   PostService(this._dio);
 
-  /// Tạo bài viết mới
-  Future<Post?> createPost({
-    required String content,
-    List<File>? mediaFiles,
-  }) async {
-    try {
-      FormData formData = FormData();
-      
-      // Add text content
-      formData.fields.add(MapEntry('content', content));
-      
-      // Add media files if any
-      if (mediaFiles != null && mediaFiles.isNotEmpty) {
-        for (int i = 0; i < mediaFiles.length; i++) {
-          File file = mediaFiles[i];
-          String fileName = file.path.split('/').last;
-          formData.files.add(
-            MapEntry(
-              'files',
-              await MultipartFile.fromFile(file.path, filename: fileName),
-            ),
-          );
-        }
-        formData.fields.add(MapEntry('type', 'media'));
-      } else {
-        formData.fields.add(MapEntry('type', 'text'));
-      }
-      
-      final response = await _dio.post(
-        'posts',
-        data: formData,
-        options: Options(
-          headers: {'Content-Type': 'multipart/form-data'},
-        ),
-      );
-      
-      if (response.data != null) {
-        return Post.fromJson(response.data);
-      }
-      return null;
-    } on DioException catch (e) {
-      print('Error creating post: ${e.message}');
-      throw Exception('Failed to create post: ${e.response?.data ?? e.message}');
-    }
-  }
-
-  /// Upload ảnh Base64 cho profile/background (tương tự message_service.py)
-  Future<String?> uploadImageBase64(String base64Image) async {
-    try {
-      final response = await _dio.post(
-        'upload/image',
-        data: {'image': base64Image},
-        options: Options(
-          headers: {'Content-Type': 'application/json'},
-        ),
-      );
-      
-      if (response.data != null && response.data['url'] != null) {
-        return response.data['url'];
-      }
-      return null;
-    } catch (e) {
-      print('Error uploading image: $e');
-      return null;
-    }
-  }
-
-  /// Lấy danh sách bài viết
-  Future<List<Post>> getPosts({
-    String? userId,
-    int limit = 20,
-    int offset = 0,
-  }) async {
+  /// Lấy danh sách bài đăng (newsfeed)
+  Future<List<Post>> getFeed({int skip = 0, int limit = 20}) async {
     try {
       final response = await _dio.get(
-        'posts',
-        queryParameters: {
-          if (userId != null) 'userId': userId,
-          'limit': limit,
-          'offset': offset,
-        },
+        'posts/feed',
+        queryParameters: {'skip': skip, 'limit': limit},
       );
-      
+
       if (response.data is List) {
         return (response.data as List)
             .map((json) => Post.fromJson(json))
             .toList();
       }
+
       return [];
+    } on DioException catch (e) {
+      throw Exception('Failed to fetch feed: $e');
     } catch (e) {
-      print('Error getting posts: $e');
-      return [];
+      throw Exception('An unknown error occurred: $e');
     }
   }
 
-  /// Thêm reaction cho bài viết
-  Future<bool> addReaction(String postId, String reactionType) async {
-    try {
-      await _dio.post('posts/$postId/reactions', data: {
-        'type': reactionType,
-      });
-      return true;
-    } catch (e) {
-      print('Error adding reaction: $e');
-      return false;
-    }
-  }
-
-  /// Xóa reaction
-  Future<bool> removeReaction(String postId) async {
-    try {
-      await _dio.delete('posts/$postId/reactions');
-      return true;
-    } catch (e) {
-      print('Error removing reaction: $e');
-      return false;
-    }
-  }
-
-  /// Thêm comment (với real-time placeholder)
-  Future<Comment?> addComment({
-    required String postId,
+  /// Tạo bài đăng mới
+  Future<Post> createPost({
     required String content,
-    List<File>? mediaFiles,
+    List<String>? filePaths,
   }) async {
     try {
-      FormData formData = FormData();
-      formData.fields.add(MapEntry('content', content));
+      // Tạo FormData
+      final formData = FormData();
       
-      if (mediaFiles != null && mediaFiles.isNotEmpty) {
-        for (var file in mediaFiles) {
+      // Thêm content (luôn gửi, ngay cả khi rỗng)
+      formData.fields.add(MapEntry('content', content));
+      // Thêm files nếu có
+      if (filePaths != null && filePaths.isNotEmpty) {
+        for (final path in filePaths) {
           formData.files.add(
             MapEntry(
               'files',
-              await MultipartFile.fromFile(file.path),
+              await MultipartFile.fromFile(path),
             ),
           );
         }
       }
       
       final response = await _dio.post(
-        'posts/$postId/comments',
+        'posts',
         data: formData,
       );
-      
-      if (response.data != null) {
-        // TODO: Real time add vào ở đây
-        // Khi có comment mới, broadcast qua WebSocket:
-        // WebSocketService.instance.broadcast({
-        //   'type': 'new_comment',
-        //   'postId': postId,
-        //   'comment': response.data
-        // });
-        
-        return Comment.fromJson(response.data);
-      }
-      return null;
+
+      return Post.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception('Failed to create post: ${e.response?.data ?? e.message}');
     } catch (e) {
-      print('Error adding comment: $e');
-      return null;
+      throw Exception('An unknown error occurred: $e');
     }
   }
 
-  /// Lấy comments của bài viết
-  Future<List<Comment>> getComments(String postId, {int limit = 20, int offset = 0}) async {
+  /// Thả reaction vào bài đăng
+  Future<Post> reactToPost({
+    required String postId,
+    required String reactionType,
+  }) async {
     try {
-      final response = await _dio.get(
-        'posts/$postId/comments',
-        queryParameters: {
-          'limit': limit,
-          'offset': offset,
-        },
+      final response = await _dio.post(
+        'posts/$postId/react',
+        data: {'reaction_type': reactionType},
       );
-      
-      if (response.data is List) {
-        return (response.data as List)
-            .map((json) => Comment.fromJson(json))
-            .toList();
-      }
-      return [];
+
+      return Post.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception('Failed to react: ${e.response?.data ?? e.message}');
     } catch (e) {
-      print('Error getting comments: $e');
-      return [];
+      throw Exception('An unknown error occurred: $e');
     }
   }
 
-  /// Xóa bài viết
-  Future<bool> deletePost(String postId) async {
+  /// Cập nhật bài đăng
+  Future<Post> updatePost({
+    required String postId,
+    required String content,
+    List<String>? existingImageUrls,
+    List<String>? newFilePaths,
+  }) async {
+    try {
+      final formData = FormData();
+      
+      // Add content
+      formData.fields.add(MapEntry('content', content));
+      
+      // Add existing image URLs to keep
+      if (existingImageUrls != null) {
+        for (var url in existingImageUrls) {
+          formData.fields.add(MapEntry('existing_image_urls', url));
+        }
+      }
+      
+      // Add new files to upload
+      if (newFilePaths != null) {
+        for (var filePath in newFilePaths) {
+          final file = await MultipartFile.fromFile(
+            filePath,
+            filename: filePath.split('/').last,
+          );
+          formData.files.add(MapEntry('files', file));
+        }
+      }
+
+      final response = await _dio.put(
+        'posts/$postId',
+        data: formData,
+      );
+
+      return Post.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception('Failed to update post: ${e.response?.data ?? e.message}');
+    } catch (e) {
+      throw Exception('An unknown error occurred: $e');
+    }
+  }
+
+  /// Xóa bài đăng
+  Future<void> deletePost(String postId) async {
     try {
       await _dio.delete('posts/$postId');
-      return true;
+    } on DioException catch (e) {
+      throw Exception('Failed to delete post: ${e.response?.data ?? e.message}');
     } catch (e) {
-      print('Error deleting post: $e');
-      return false;
+      throw Exception('An unknown error occurred: $e');
     }
   }
 }

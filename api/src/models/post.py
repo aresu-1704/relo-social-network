@@ -1,7 +1,7 @@
 from beanie import Document
-from pydantic import Field, BaseModel
-from typing import Optional, List, Dict
-from datetime import datetime
+from pydantic import Field, BaseModel, computed_field
+from typing import Optional, List, Dict, Literal
+from datetime import datetime, timedelta
 
 class AuthorInfo(BaseModel):
     """Thông tin tác giả được phi chuẩn hóa để hiển thị nhanh."""
@@ -13,11 +13,11 @@ class Reaction(BaseModel):
     userId: str
     type: str
 
-class Comment(BaseModel):
-    """Đại diện cho một bình luận trên bài đăng."""
-    userId: str
-    content: str
-    createdAt: datetime = Field(default_factory=datetime.utcnow)
+class MediaItem(BaseModel):
+    """Media item với URL và publicId để quản lý trên Cloudinary."""
+    url: str
+    publicId: str
+    type: Literal["image", "video", "audio", "file"] = "image"
 
 class Post(Document):
     """
@@ -26,12 +26,15 @@ class Post(Document):
     authorId: str = Field(..., description="ID của tác giả bài đăng.")
     authorInfo: AuthorInfo = Field(..., description="Thông tin phi chuẩn hóa của tác giả.")
     content: str = Field(..., description="Nội dung văn bản của bài đăng.")
-    mediaUrls: List[str] = Field(default_factory=list, description="Danh sách các URL media (hình ảnh/video).")
+    media: List[MediaItem] = Field(default_factory=list, description="Danh sách media items.")
     reactions: List[Reaction] = Field(default_factory=list, description="Danh sách các phản ứng.")
     reactionCounts: Dict[str, int] = Field(default_factory=dict, description="Số lượng của mỗi loại phản ứng.")
-    commentCount: int = Field(default=0, description="Tổng số bình luận.")
-    comments: List[Comment] = Field(default_factory=dict, description="Danh sách các bình luận.")
-    createdAt: datetime = Field(default_factory=datetime.utcnow, description="Thời điểm bài đăng được tạo.")
+    createdAt: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(hours=7), description="Thời điểm bài đăng được tạo.")
+
+    @property
+    def mediaUrls(self) -> List[str]:
+        """Trả về danh sách URLs từ media items."""
+        return [item.url for item in self.media]
 
     class Settings:
         name = "posts"
@@ -39,3 +42,4 @@ class Post(Document):
             "authorId",
             "createdAt",
         ]
+        

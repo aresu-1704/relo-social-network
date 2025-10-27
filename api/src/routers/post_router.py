@@ -1,24 +1,40 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile, Body
+from typing import List, Optional
 from ..services import PostService
-from ..schemas import PostCreate, PostPublic, ReactionCreate
+from ..schemas import PostPublic, ReactionCreate
 from ..models import User
 from ..security import get_current_user
 
 router = APIRouter(tags=["Post"])
 
-@router.post("/posts", response_model=PostPublic, status_code=201)
+@router.post("", response_model=PostPublic, status_code=201)
 async def create_post(
-    post_data: PostCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    content: str = Form(""),
+    files: List[UploadFile] = File(default=[])
 ):
     """Tạo một bài đăng mới. Yêu cầu xác thực người dùng."""
     try:
+        # Debug logging
+        print(f"📝 Content received: '{content}', length: {len(content) if content else 0}")
+        print(f"📎 Files received: {files}")
+        if files:
+            print(f"   Files count: {len(files)}")
+            for i, f in enumerate(files):
+                print(f"   File {i+1}: {f.filename}, size: {f.size}")
+        
+        # Validate: cần ít nhất content hoặc files
+        has_content = content and content.strip()
+        has_files = len(files) > 0
+        
+        if not has_content and not has_files:
+            raise ValueError('Vui lòng nhập nội dung hoặc chọn ảnh')
+        
         # Gọi service để tạo bài đăng một cách bất đồng bộ
         new_post = await PostService.create_post(
-            author_id=str(current_user.id), # Sử dụng str(current_user.id) thay vì _id
-            content=post_data.content,
-            media_base_64=post_data.mediaBase64
+            author_id=str(current_user.id),
+            content=content,
+            files=files
         )
         # Ánh xạ kết quả trả về sang schema PostPublic
         return PostPublic(
@@ -27,14 +43,20 @@ async def create_post(
             authorInfo=new_post.authorInfo,
             content=new_post.content,
             mediaUrls=new_post.mediaUrls,
+            reactions=new_post.reactions,
             reactionCounts=new_post.reactionCounts,
-            commentCount=new_post.commentCount,
             createdAt=new_post.createdAt.isoformat()
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"❌ Validation error: {e}")
+        raise HTTPException(status_code=400, detail=f"Lỗi validation: {str(e)}")
+    except Exception as e:
+        print(f"❌ Server error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
 
-@router.get("/posts/feed", response_model=List[PostPublic])
+@router.get("/feed", response_model=List[PostPublic])
 async def get_post_feed(skip: int = 0, limit: int = 20):
     """Lấy một nguồn cấp dữ liệu (feed) các bài đăng, không yêu cầu xác thực."""
     # Lấy danh sách bài đăng một cách bất đồng bộ
@@ -42,7 +64,7 @@ async def get_post_feed(skip: int = 0, limit: int = 20):
     # Ánh xạ danh sách kết quả sang schema PostPublic
     return posts
 
-@router.post("/posts/{post_id}/react", response_model=PostPublic)
+@router.post("/{post_id}/react", response_model=PostPublic)
 async def react_to_post(
     post_id: str,
     reaction_data: ReactionCreate,
@@ -63,14 +85,49 @@ async def react_to_post(
             authorInfo=updated_post.authorInfo,
             content=updated_post.content,
             mediaUrls=updated_post.mediaUrls,
+            reactions=updated_post.reactions,
             reactionCounts=updated_post.reactionCounts,
-            commentCount=updated_post.commentCount,
             createdAt=updated_post.createdAt.isoformat()
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-@router.delete("/posts/{post_id}", status_code=200)
+@router.put("/{post_id}", response_model=PostPublic)
+async def update_post(
+    post_id: str,
+    content: str = Form(...),
+    existing_image_urls: Optional[List[str]] = Form(None),
+    files: Optional[List[UploadFile]] = File(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Cập nhật bài đăng. Chỉ tác giả mới có quyền chỉnh sửa."""
+    try:
+        # Gọi service để cập nhật bài đăng
+        updated_post = await PostService.update_post(
+            post_id=post_id,
+            user_id=str(current_user.id),
+            content=content,
+            existing_image_urls=existing_image_urls or [],
+            files=files or []
+        )
+        
+        # Ánh xạ kết quả trả về sang schema PostPublic
+        return PostPublic(
+            id=str(updated_post.id),
+            authorId=str(updated_post.authorId),
+            authorInfo=updated_post.authorInfo,
+            content=updated_post.content,
+            mediaUrls=updated_post.mediaUrls,
+            reactions=updated_post.reactions,
+            reactionCounts=updated_post.reactionCounts,
+            createdAt=updated_post.createdAt.isoformat()
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@router.delete("/{post_id}", status_code=200)
 async def delete_post(
     post_id: str,
     current_user: User = Depends(get_current_user)
