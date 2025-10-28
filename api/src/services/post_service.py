@@ -2,6 +2,7 @@ import asyncio
 from typing import List
 from cloudinary.uploader import destroy as cloudinary_destroy
 from fastapi import UploadFile
+from bson import ObjectId
 from ..models import Post, AuthorInfo, Reaction, MediaItem, User
 from ..websocket import manager
 from ..schemas import PostPublic
@@ -80,12 +81,43 @@ class PostService:
             raise ValueError(f"Lỗi khi tạo bài đăng: {e}")
 
     @staticmethod
-    async def get_post_feed(limit: int = 20, skip: int = 0):
+    async def get_post_feed(user_id: str, limit: int = 20, skip: int = 0):
         """
-        Lấy một nguồn cấp dữ liệu chung về các bài đăng gần đây.
+        Lấy một nguồn cấp dữ liệu về các bài đăng từ bạn bè.
+        Chỉ lấy posts từ những users chưa bị xóa (status != 'deleted') và là bạn bè.
         """
-        # Truy vấn các bài đăng gần đây nhất, được sắp xếp theo ngày tạo
-        posts = await Post.find_all(sort="-createdAt", skip=skip, limit=limit).to_list()
+        # Lấy thông tin current user để lấy danh sách bạn bè
+        current_user = await User.get(user_id)
+        if not current_user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Danh sách ID của bạn bè + chính mình
+        friend_ids = [user_id] + current_user.friendIds
+        
+        # Truy vấn các bài đăng từ bạn bè
+        posts = await Post.find(
+            {
+                "authorId": {"$in": friend_ids}
+            },
+            sort="-createdAt", 
+            skip=skip, 
+            limit=limit
+        ).to_list()
+
+        # Lấy danh sách author IDs
+        author_ids = list(set(str(post.authorId) for post in posts))
+        
+        # Lấy thông tin các tác giả
+        authors = await User.find({"_id": {"$in": [ObjectId(uid) for uid in author_ids]}}).to_list()
+        
+        # Tạo map để kiểm tra status
+        author_status_map = {str(author.id): author.status for author in authors}
+        
+        # Lọc ra chỉ những posts từ users không bị xóa
+        valid_posts = [
+            post for post in posts 
+            if author_status_map.get(str(post.authorId)) != 'deleted'
+        ]
 
         return [ 
             PostPublic(
@@ -97,7 +129,7 @@ class PostService:
                 reactions=post.reactions,
                 reactionCounts=post.reactionCounts,
                 createdAt=post.createdAt.isoformat()
-            ) for post in posts 
+            ) for post in valid_posts 
         ]
 
     @staticmethod

@@ -204,7 +204,6 @@ class UserService {
   Future<List<User>> getBlockedUsers(String userId) async {
     try {
       final response = await _dio.get('users/blocked-lists/$userId');
-      print(response.data);
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
         return data.map((json) => User.fromJson(json)).toList();
@@ -215,6 +214,16 @@ class UserService {
       }
     } catch (e) {
       throw Exception('Failed to load blocked users: $e');
+    }
+  }
+
+  // Kiểm tra trạng thái block giữa 2 người dùng
+  Future<Map<String, dynamic>> checkBlockStatus(String otherUserId) async {
+    try {
+      final response = await _dio.get('users/block-status/$otherUserId');
+      return response.data;
+    } catch (e) {
+      throw Exception('Failed to check block status: $e');
     }
   }
 }

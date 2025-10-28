@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/screen/register_screen.dart';
+import 'package:relo/screen/forgot_password_screen.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/notification_service.dart';
 import 'package:relo/screen/main_screen.dart';
@@ -67,7 +68,11 @@ class _LoginScreenState extends State<LoginScreen> {
             builder: (context) => AlertDialog(
               title: Row(
                 children: const [
-                  Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.red,
+                    size: 28,
+                  ),
                   SizedBox(width: 10),
                   Text('Tài khoản đã bị xóa'),
                 ],
@@ -76,10 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    e.message,
-                    style: const TextStyle(fontSize: 16),
-                  ),
+                  Text(e.message, style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 12),
                   const Text(
                     'Tài khoản của bạn đã bị xóa và không thể đăng nhập.\n\n'
@@ -197,7 +199,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _isLoading
                         ? null
                         : () {
-                            // TODO: Implement forgot password functionality
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen(),
+                              ),
+                            );
                           },
                     child: Text(
                       'Quên mật khẩu ?',

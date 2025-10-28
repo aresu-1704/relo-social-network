@@ -5,6 +5,7 @@ import 'package:relo/models/message.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
+import 'package:relo/services/user_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -16,6 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:relo/widgets/action_button.dart';
 import 'package:relo/screen/profile_screen.dart';
+import 'package:relo/widgets/messages/block_composer.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -42,6 +44,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final MessageService _messageService = ServiceLocator.messageService;
+  final UserService _userService = ServiceLocator.userService;
   final SecureStorageService _secureStorageService = SecureStorageService();
   final Uuid _uuid = const Uuid();
 
@@ -61,6 +64,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   String? _currentlyPlayingUrl;
+
+  // Block status
+  bool _isBlocked = false;
+  bool _isBlockedByMe = false;
+  String? _blockedUserId;
 
   @override
   void initState() {
@@ -143,6 +151,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (_conversationId != null) {
         await _loadMessages(isInitial: true);
+        // Check block status asynchronously after loading messages
+        _checkBlockStatus();
       } else {
         throw Exception("Could not establish a conversation.");
       }
@@ -154,6 +164,83 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _checkBlockStatus() async {
+    if (_currentUserId == null) return;
+
+    try {
+      if (!widget.isGroup && widget.memberIds != null) {
+        // Chat 1-1: Check block status với user còn lại
+        try {
+          String otherUserId = widget.memberIds!.firstWhere(
+            (id) => id != _currentUserId,
+            orElse: () => '',
+          );
+
+          if (otherUserId.isEmpty) {
+            return;
+          }
+
+          final blockStatus = await _userService.checkBlockStatus(otherUserId);
+
+          if (mounted) {
+            setState(() {
+              _isBlocked = blockStatus['isBlocked'] ?? false;
+              _isBlockedByMe = blockStatus['isBlockedByMe'] ?? false;
+              _blockedUserId = otherUserId;
+            });
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      } else if (widget.isGroup && widget.memberIds != null) {
+        // Chat nhóm: Check xem có ai trong group bị mình block không
+        List<String> blockedInGroup = [];
+
+        for (String memberId in widget.memberIds!) {
+          if (memberId != _currentUserId) {
+            try {
+              final blockStatus = await _userService.checkBlockStatus(memberId);
+              if (blockStatus['isBlockedByMe'] ?? false) {
+                blockedInGroup.add(memberId);
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        }
+
+        if (blockedInGroup.isNotEmpty && mounted) {
+          // Show confirm dialog
+          await _showGroupBlockDialog();
+        }
+      }
+    } catch (e) {
+      print('Error checking block status: $e');
+    }
+  }
+
+  Future<void> _showGroupBlockDialog() async {
+    if (!mounted) return;
+
+    final result = await ShowNotification.showConfirmDialog(
+      context,
+      title:
+          'Có thành viên trong danh sách chặn trong nhóm. Bạn có muốn rời nhóm?',
+      confirmText: 'Rời nhóm',
+      cancelText: 'Ở lại',
+      confirmColor: Colors.red,
+    );
+
+    if (result == true && mounted) {
+      // TODO: Logic rời nhóm
+      await ShowNotification.showToast(
+        context,
+        'Chức năng rời nhóm đang được phát triển',
+      );
+      Navigator.pop(context);
     }
   }
 
@@ -267,6 +354,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showMessageActions(Message message) {
     final isMe = message.senderId == _currentUserId;
+    final isDeletedAccount = message.senderId == 'deleted';
+
+    // Không hiển thị actions cho tin nhắn từ tài khoản đã bị xóa
+    if (isDeletedAccount) {
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -336,13 +429,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showConversationSettings() {
+    // Kiểm tra nếu đang chat với tài khoản đã bị xóa
+    final isDeletedAccount =
+        widget.chatName == 'Tài khoản không tồn tại' ||
+        (widget.memberIds != null && widget.memberIds!.contains('deleted'));
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) {
         // Danh sách nút hành động động
         final actions = <ActionButton>[
-          if (!widget.isGroup)
+          if (!widget.isGroup && !isDeletedAccount && !_isBlocked)
             ActionButton(
               icon: LucideIcons.userCircle2,
               label: 'Xem trang cá nhân',
@@ -362,23 +460,24 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
               },
             ),
-          ActionButton(
-            icon: LucideIcons.bellOff,
-            label: 'Tắt thông báo',
-            color: const Color(0xFF2979FF),
-            onTap: () async {
-              final result = await ShowNotification.showConfirmDialog(
-                context,
-                title: 'Tắt thông báo cuộc trò chuyện ?',
-                confirmText: 'Đồng ý',
-                confirmColor: Colors.red,
-              );
+          if (!_isBlocked)
+            ActionButton(
+              icon: LucideIcons.bellOff,
+              label: 'Tắt thông báo',
+              color: const Color(0xFF2979FF),
+              onTap: () async {
+                final result = await ShowNotification.showConfirmDialog(
+                  context,
+                  title: 'Tắt thông báo cuộc trò chuyện ?',
+                  confirmText: 'Đồng ý',
+                  confirmColor: Colors.red,
+                );
 
-              if (!result!) return;
-              Navigator.pop(context);
-              // TODO: logic tắt thông báo
-            },
-          ),
+                if (!result!) return;
+                Navigator.pop(context);
+                // TODO: logic tắt thông báo
+              },
+            ),
           if (widget.isGroup)
             ActionButton(
               icon: LucideIcons.edit3,
@@ -389,7 +488,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 // TODO: logic đổi tên nhóm
               },
             )
-          else
+          else if (!isDeletedAccount && !_isBlocked)
             ActionButton(
               icon: LucideIcons.users,
               label: 'Tạo nhóm với ${widget.chatName}',
@@ -416,7 +515,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 // TODO: logic rời nhóm
               },
             )
-          else
+          else if (!isDeletedAccount && !_isBlocked)
             ActionButton(
               icon: LucideIcons.userX,
               label: 'Chặn người dùng',
@@ -431,7 +530,42 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 if (!result!) return;
                 Navigator.pop(context);
-                // TODO: logic chặn
+
+                // Logic chặn người dùng
+                try {
+                  String friendId = widget.memberIds!.firstWhere(
+                    (id) => id != _currentUserId,
+                    orElse: () => '',
+                  );
+
+                  if (friendId.isEmpty) {
+                    if (mounted) {
+                      await ShowNotification.showToast(
+                        context,
+                        'Không tìm thấy người dùng',
+                      );
+                    }
+                    return;
+                  }
+
+                  await _userService.blockUser(friendId);
+
+                  if (mounted) {
+                    await ShowNotification.showToast(
+                      context,
+                      'Đã chặn người dùng',
+                    );
+                    // Quay về màn hình messages
+                    Navigator.pop(context);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    await ShowNotification.showToast(
+                      context,
+                      'Không thể chặn người dùng',
+                    );
+                  }
+                }
               },
             ),
           ActionButton(
@@ -448,9 +582,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
               if (!result!) return;
               Navigator.pop(context);
-              // TODO: logic xóa
-              await _messageService.deleteConversation(_conversationId!);
-              Navigator.of(context).pop();
+
+              try {
+                await _messageService.deleteConversation(_conversationId!);
+                if (mounted) {
+                  await ShowNotification.showToast(
+                    context,
+                    'Đã xóa cuộc trò chuyện',
+                  );
+                  Navigator.of(context).pop();
+                }
+              } catch (e) {
+                if (mounted) {
+                  await ShowNotification.showToast(
+                    context,
+                    'Không thể xóa cuộc trò chuyện',
+                  );
+                }
+              }
             },
           ),
         ];
@@ -571,22 +720,34 @@ class _ChatScreenState extends State<ChatScreen> {
                           onMessageLongPress: _showMessageActions,
                         ),
                 ),
-                MessageComposer(
-                  onSend: (content) => MessageUtils.performSend(
-                    context,
-                    _messageService,
-                    _uuid,
-                    _messages,
-                    _conversationId!,
-                    _currentUserId!,
-                    content,
-                    (updatedMessages) => setState(() {
-                      _messages
-                        ..clear()
-                        ..addAll(updatedMessages);
-                    }),
-                  ),
-                ),
+                _isBlocked && !widget.isGroup
+                    ? BlockComposer(
+                        blockedUserId: _blockedUserId!,
+                        chatName: widget.chatName ?? 'Người này',
+                        isBlockedByMe: _isBlockedByMe,
+                        onUnblockSuccess: () {
+                          setState(() {
+                            _isBlocked = false;
+                            _isBlockedByMe = false;
+                          });
+                        },
+                      )
+                    : MessageComposer(
+                        onSend: (content) => MessageUtils.performSend(
+                          context,
+                          _messageService,
+                          _uuid,
+                          _messages,
+                          _conversationId!,
+                          _currentUserId!,
+                          content,
+                          (updatedMessages) => setState(() {
+                            _messages
+                              ..clear()
+                              ..addAll(updatedMessages);
+                          }),
+                        ),
+                      ),
               ],
             ),
           ],

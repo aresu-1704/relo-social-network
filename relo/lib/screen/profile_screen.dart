@@ -3,6 +3,7 @@ import 'package:relo/models/user.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/message_service.dart';
+import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -655,6 +656,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       );
 
                                   // Navigate to chat screen
+                                  final participants =
+                                      (newConversation['participants'] ?? [])
+                                          as List;
+                                  final secureStorage =
+                                      const SecureStorageService();
+                                  final currentUserId = await secureStorage
+                                      .getUserId();
+
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -664,6 +673,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                                             newConversation['id'],
                                         isGroup: false,
                                         chatName: _user!.displayName,
+                                        memberIds: participants.isNotEmpty
+                                            ? participants
+                                                  .map(
+                                                    (p) =>
+                                                        p['id']?.toString() ??
+                                                        '',
+                                                  )
+                                                  .where((id) => id.isNotEmpty)
+                                                  .toList()
+                                            : [_user!.id, currentUserId!],
                                       ),
                                     ),
                                   );

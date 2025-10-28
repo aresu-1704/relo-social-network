@@ -1,4 +1,19 @@
-from .auth_schema import UserCreate, UserLogin, UserPublic, RefreshTokenRequest
+from .auth_schema import (
+    UserCreate,
+    UserLogin,
+    UserPublic,
+    RefreshTokenRequest,
+    SendOTPRequest,
+    SendOTPResponse,
+    VerifyOTPRequest,
+    VerifyOTPResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    ChangeEmailVerifyPasswordRequest,
+    ChangeEmailVerifyPasswordResponse,
+    UpdateEmailRequest,
+    UpdateEmailResponse
+)
 from .message_schema import (
     ConversationCreate,
     MessageCreate,

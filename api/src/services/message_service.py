@@ -98,12 +98,15 @@ class MessageService:
 
         sender = await User.get(sender_id)
 
+        # Kiểm tra nếu sender đã bị xóa
+        is_sender_deleted = not sender or sender.status == 'deleted'
+
         # Phát broadcast tin nhắn mới
         message_data = {
             "id": str(message.id),
-            "senderId": str(sender.id),
+            "senderId": "deleted" if is_sender_deleted else str(sender.id),
             "conversationId": message.conversationId,
-            "avatarUrl": sender.avatarUrl,
+            "avatarUrl": None if is_sender_deleted else sender.avatarUrl,
             "content": message.content,
             "createdAt": message.createdAt.isoformat()
         }
@@ -168,12 +171,24 @@ class MessageService:
         simple_messages = []
         for msg in messages:
             sender = senders_map.get(msg.senderId)
-            if sender:
+            # Kiểm tra nếu sender không tồn tại hoặc đã bị xóa
+            if sender and sender.status != 'deleted':
                 simple_messages.append(
                     SimpleMessagePublic(
                         id=str(msg.id),
                         senderId=msg.senderId,
                         avatarUrl=sender.avatarUrl,
+                        content=msg.content,
+                        createdAt=msg.createdAt
+                    )
+                )
+            else:
+                # Gửi thông tin "deleted" cho tài khoản đã bị xóa
+                simple_messages.append(
+                    SimpleMessagePublic(
+                        id=str(msg.id),
+                        senderId="deleted",
+                        avatarUrl=None,
                         content=msg.content,
                         createdAt=msg.createdAt
                     )
@@ -203,19 +218,37 @@ class MessageService:
 
             # Lấy thông tin chi tiết của người tham gia
             participants = await UserService.get_users_by_ids([p.userId for p in convo.participants])
+            participants_map = {str(p.id): p for p in participants}
 
-            participant_publics = [
-                UserPublic(
-                    id=str(p.id),
-                    username=p.username,
-                    email=p.email,
-                    displayName=p.displayName,
-                    avatarUrl=p.avatarUrl,
-                    backgroundUrl=p.backgroundUrl,
-                    bio=p.bio
-                )
-                for p in participants
-            ]
+            participant_publics = []
+            for participant_info in convo.participants:
+                participant_user = participants_map.get(participant_info.userId)
+                # Kiểm tra nếu participant đã bị xóa
+                if participant_user and participant_user.status != 'deleted':
+                    participant_publics.append(
+                        UserPublic(
+                            id=str(participant_user.id),
+                            username=participant_user.username,
+                            email=participant_user.email,
+                            displayName=participant_user.displayName,
+                            avatarUrl=participant_user.avatarUrl,
+                            backgroundUrl=participant_user.backgroundUrl,
+                            bio=participant_user.bio
+                        )
+                    )
+                else:
+                    # Tạo user public cho tài khoản đã bị xóa
+                    participant_publics.append(
+                        UserPublic(
+                            id=participant_info.userId,
+                            username="deleted",
+                            email="",
+                            displayName="Tài khoản không tồn tại",
+                            avatarUrl=None,
+                            backgroundUrl=None,
+                            bio=None
+                        )
+                    )
 
             last_message_preview = None
 

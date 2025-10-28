@@ -21,6 +21,64 @@ class AuthService {
 
   Future<String?> get accessToken => _storageService.getAccessToken();
 
+  /// Gửi mã OTP qua email
+  Future<String> sendOTP(String identifier) async {
+    try {
+      final response = await _dio.post(
+        'auth/send-otp',
+        data: {'identifier': identifier},
+      );
+
+      if (response.statusCode == 200) {
+        return response.data['email'];
+      }
+      throw Exception('Không thể gửi OTP');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception('Không tìm thấy tài khoản');
+      }
+      throw Exception('Đã xảy ra lỗi mạng.');
+    } catch (e) {
+      throw Exception('Đã xảy ra lỗi không xác định.');
+    }
+  }
+
+  /// Xác minh mã OTP
+  Future<void> verifyOTP(String email, String otpCode) async {
+    try {
+      await _dio.post(
+        'auth/verify-otp',
+        data: {'email': email, 'otp_code': otpCode},
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception(e.response?.data['detail'] ?? 'Mã OTP không hợp lệ.');
+      }
+      throw Exception('Đã xảy ra lỗi mạng.');
+    } catch (e) {
+      throw Exception('Đã xảy ra lỗi không xác định.');
+    }
+  }
+
+  /// Đặt lại mật khẩu mới
+  Future<void> resetPassword(String email, String newPassword) async {
+    try {
+      await _dio.post(
+        'auth/reset-password',
+        data: {'email': email, 'new_password': newPassword},
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception(
+          e.response?.data['detail'] ?? 'Không thể đặt lại mật khẩu.',
+        );
+      }
+      throw Exception('Đã xảy ra lỗi mạng.');
+    } catch (e) {
+      throw Exception('Đã xảy ra lỗi không xác định.');
+    }
+  }
+
   /// Đăng nhập người dùng và lưu tokens nếu thành công.
   Future<void> login(
     String username,
@@ -155,6 +213,42 @@ class AuthService {
       return null;
     } finally {
       _isRefreshing = false;
+    }
+  }
+
+  Future<Map<String, dynamic>> changeEmailVerifyPassword(
+    String userId,
+    String newEmail,
+    String password,
+  ) async {
+    try {
+      final response = await _dio.post(
+        '/auth/change-email/verify-password',
+        data: {'user_id': userId, 'new_email': newEmail, 'password': password},
+      );
+
+      return response.data;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception(e.response?.data['detail'] ?? 'Thất bại');
+      }
+      throw Exception('Lỗi kết nối. Vui lòng thử lại.');
+    }
+  }
+
+  Future<String> updateEmail(String userId, String newEmail) async {
+    try {
+      final response = await _dio.post(
+        '/auth/change-email/update',
+        data: {'user_id': userId, 'new_email': newEmail},
+      );
+
+      return response.data['message'];
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception(e.response?.data['detail'] ?? 'Thất bại');
+      }
+      throw Exception('Lỗi kết nối. Vui lòng thử lại.');
     }
   }
 }

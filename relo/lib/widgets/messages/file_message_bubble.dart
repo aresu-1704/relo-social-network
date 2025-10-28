@@ -36,6 +36,8 @@ class FileMessageBubble extends StatelessWidget {
     final fileName = message.content['fileName'] ?? 'File';
     final fileSize = message.content['fileSize'] ?? 0;
 
+    final isDeletedAccount = message.senderId == 'deleted';
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -45,12 +47,17 @@ class FileMessageBubble extends StatelessWidget {
             padding: const EdgeInsets.only(right: 6),
             child: CircleAvatar(
               radius: 16,
-              backgroundImage:
-                  (message.avatarUrl != null && message.avatarUrl!.isNotEmpty)
+              backgroundColor: isDeletedAccount ? Colors.grey[300] : null,
+              backgroundImage: isDeletedAccount
+                  ? null
+                  : (message.avatarUrl != null && message.avatarUrl!.isNotEmpty)
                   ? NetworkImage(message.avatarUrl!)
                   : const NetworkImage(
                       'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
                     ),
+              child: isDeletedAccount
+                  ? const Icon(Icons.person_off, size: 20, color: Colors.grey)
+                  : null,
             ),
           ),
         Flexible(
@@ -59,6 +66,18 @@ class FileMessageBubble extends StatelessWidget {
                 ? CrossAxisAlignment.end
                 : CrossAxisAlignment.start,
             children: [
+              if (isDeletedAccount && !isMe)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 2),
+                  child: Text(
+                    'Tài khoản không tồn tại',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
               Container(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.7,

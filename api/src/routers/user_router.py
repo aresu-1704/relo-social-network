@@ -167,6 +167,24 @@ async def get_blocked_users(user_id: str, current_user: User = Depends(get_curre
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# Kiểm tra trạng thái block giữa 2 người dùng
+@router.get("/block-status/{other_user_id}")
+async def check_block_status(
+    other_user_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Kiểm tra trạng thái block giữa current_user và other_user_id.
+    """
+    try:
+        result = await UserService.check_block_status(
+            str(current_user.id),
+            other_user_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 # Tìm kiếm người dùng
 @router.get("/search", response_model=List[UserPublic])
 async def search_users(query: str = Query(..., min_length=1), current_user: User = Depends(get_current_user)):
