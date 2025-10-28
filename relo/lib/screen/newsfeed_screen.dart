@@ -113,32 +113,32 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _posts.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      LucideIcons.layoutGrid,
-                      size: 80,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Chưa có bài viết nào',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _navigateToCreatePost,
-                      icon: const Icon(LucideIcons.plus),
-                      label: const Text('Tạo bài viết đầu tiên'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7A2FC0),
-                        foregroundColor: Colors.white,
+            ? Column(
+                children: [
+                  PostComposerWidget(onTap: _navigateToCreatePost),
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            LucideIcons.layoutGrid,
+                            size: 80,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Chưa có bài viết nào',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               )
             : ListView.builder(
                 controller: _scrollController,

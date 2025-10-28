@@ -166,6 +166,25 @@ class UserService:
             raise ValueError("Phản hồi không hợp lệ. Phải là 'accept' hoặc 'reject'.")
         
         return friend_request
+    
+    @staticmethod
+    async def respond_to_friend_request_by_from_user(from_user_id: str, current_user_id: str, response: str):
+        """
+        Phản hồi một yêu cầu kết bạn dựa vào from_user_id ('accept' hoặc 'reject').
+        """
+        # Tìm friend request từ from_user_id tới current_user_id
+        friend_request = await FriendRequest.find_one({
+            "fromUserId": from_user_id,
+            "toUserId": current_user_id,
+            "status": "pending"
+        })
+        
+        if not friend_request:
+            raise ValueError("Không tìm thấy yêu cầu kết bạn.")
+        
+        # Sử dụng lại logic từ respond_to_friend_request
+        request_id = str(friend_request.id)
+        return await UserService.respond_to_friend_request(request_id, current_user_id, response)
 
     @staticmethod
     async def get_friend_requests(user_id: str):

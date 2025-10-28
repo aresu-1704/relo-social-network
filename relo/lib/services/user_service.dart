@@ -88,12 +88,38 @@ class UserService {
     }
   }
 
+  // Phản hồi yêu cầu kết bạn theo userId (cho profile screen)
+  Future<void> respondToFriendRequestByUser(
+    String userId,
+    String response,
+  ) async {
+    try {
+      final response_api = await _dio.post(
+        'users/friend-request/by-user/$userId',
+        data: {'response': response}, // 'accept' or 'reject'
+      );
+      print('Respond to friend request by user: ${response_api.statusCode}');
+    } catch (e) {
+      print('Respond to friend request error: $e');
+      throw Exception('Failed to respond to friend request: $e');
+    }
+  }
+
   // Hủy lời mời kết bạn
   Future<void> cancelFriendRequest(String userId) async {
     try {
-      await _dio.delete('users/friend-request/$userId');
+      final response = await _dio.delete('users/friend-request/$userId');
+      print(
+        'Cancel friend request response: ${response.statusCode} - ${response.data}',
+      );
+    } on DioException catch (e) {
+      print(
+        'Cancel friend request error: ${e.response?.statusCode} - ${e.response?.data}',
+      );
+      throw Exception('Không thể hủy lời mời kết bạn');
     } catch (e) {
-      throw Exception('Failed to cancel friend request: $e');
+      print('Cancel friend request exception: $e');
+      throw Exception('Không thể hủy lời mời kết bạn: $e');
     }
   }
 
@@ -118,9 +144,11 @@ class UserService {
   // Hủy kết bạn
   Future<void> unfriendUser(String userId) async {
     try {
-      await _dio.post('users/$userId/unfriend');
+      final response = await _dio.post('users/$userId/unfriend');
+      print('Unfriend response: ${response.statusCode} - ${response.data}');
     } catch (e) {
-      throw Exception('Failed to unfriend user: $e');
+      print('Unfriend error: $e');
+      rethrow;
     }
   }
 

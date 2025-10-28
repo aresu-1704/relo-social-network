@@ -59,23 +59,14 @@ async def send_friend_request(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        print(f"DEBUG: Received friend request data: {request_data}")
-        print(f"DEBUG: Current user: {current_user.id}")
-        
         to_user_id = request_data.to_user_id
-        print(f"DEBUG: To user ID: {to_user_id}")
         
         result = await UserService.send_friend_request(from_user_id=str(current_user.id), to_user_id=to_user_id)
-        print(f"DEBUG: Friend request created successfully: {result}")
         
         return {"message": "Gửi yêu cầu kết bạn thành công."}
     except ValueError as e:
-        print(f"ERROR: ValueError in send_friend_request: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"ERROR: Unexpected error in send_friend_request: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
 
 # Hủy lời mời kết bạn
@@ -101,6 +92,23 @@ async def respond_to_friend_request(
         await UserService.respond_to_friend_request(
             request_id=request_id,
             user_id=str(current_user.id),
+            response=response_data.response
+        )
+        return {"message": f"Yêu cầu kết bạn đã được {response_data.response}."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Phản hồi yêu cầu kết bạn theo from_user_id
+@router.post("/friend-request/by-user/{from_user_id}", status_code=200)
+async def respond_to_friend_request_by_user(
+    from_user_id: str,
+    response_data: FriendRequestResponse,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        await UserService.respond_to_friend_request_by_from_user(
+            from_user_id=from_user_id,
+            current_user_id=str(current_user.id),
             response=response_data.response
         )
         return {"message": f"Yêu cầu kết bạn đã được {response_data.response}."}

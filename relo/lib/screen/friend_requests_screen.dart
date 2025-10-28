@@ -3,6 +3,7 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:relo/screen/profile_screen.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -121,45 +122,57 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                 ),
                 child: Column(
                   children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundImage:
-                              avatarUrl != null && avatarUrl.isNotEmpty
-                              ? NetworkImage(avatarUrl)
-                              : NetworkImage(fallbackAvatarUrl)
-                                    as ImageProvider,
-                          onBackgroundImageError: (_, __) {},
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                fromUser['displayName'] ?? 'Người dùng',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '@${fromUser['username'] ?? ''}',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ],
+                    InkWell(
+                      onTap: () {
+                        // Navigate to profile screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ProfileScreen(userId: fromUser['id']),
                           ),
-                        ),
-                      ],
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundImage:
+                                avatarUrl != null && avatarUrl.isNotEmpty
+                                ? NetworkImage(avatarUrl)
+                                : NetworkImage(fallbackAvatarUrl)
+                                      as ImageProvider,
+                            onBackgroundImageError: (_, __) {},
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  fromUser['displayName'] ?? 'Người dùng',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '@${fromUser['username'] ?? ''}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(

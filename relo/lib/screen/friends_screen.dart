@@ -160,6 +160,23 @@ class _FriendsScreenState extends State<FriendsScreen>
             return _buildShimmerList();
           }
 
+          if (friends.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, size: 80, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Bạn chưa kết bạn với bất kỳ người dùng nào',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
           final groupedFriends = _groupFriends(friends);
           final sortedKeys = groupedFriends.keys.toList()..sort();
 
@@ -422,6 +439,7 @@ class _FriendsScreenState extends State<FriendsScreen>
                   isGroup: false,
                   chatName: friend.displayName,
                   memberIds: memberIds,
+                  avatarUrl: friend.avatarUrl,
                   onUserBlocked: (blockedUserId) {
                     // Xóa user khỏi danh sách bạn bè và refresh
                     setState(() {
@@ -534,6 +552,7 @@ class _FriendsScreenState extends State<FriendsScreen>
                   isGroup: true,
                   chatName: groupName,
                   memberIds: memberIds,
+                  avatarUrl: group['avatarUrl'],
                   onLeftGroup: () {
                     // Reload groups when back
                     if (mounted) {

@@ -15,6 +15,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:relo/utils/permission_util.dart';
 import 'package:relo/screen/media_fullscreen_viewer.dart';
 import 'package:relo/screen/edit_profile_screen.dart';
@@ -23,11 +24,13 @@ import 'package:relo/widgets/profiles/profile_header.dart';
 import 'package:relo/widgets/profiles/profile_components.dart';
 import 'package:relo/widgets/posts/enhanced_post_card.dart';
 import 'package:intl/intl.dart';
+import 'package:relo/services/websocket_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
+  final bool hideMessageButton;
 
-  const ProfileScreen({super.key, this.userId});
+  const ProfileScreen({super.key, this.userId, this.hideMessageButton = false});
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -53,9 +56,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   // Statistics
   int _friendCount = 0;
   int _postCount = 0;
-  bool _isFriend = false;
-  bool _hasPendingRequest = false;
+  String _friendStatus =
+      'none'; // 'none', 'pending_sent', 'pending_received', 'friends'
   List<Post> _posts = [];
+
+  // WebSocket listener
+  StreamSubscription? _webSocketSubscription;
 
   // Temporary image storage for preview
   String? _tempAvatarPath;
@@ -69,6 +75,56 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
     );
     _initProfile();
+    _listenToWebSocket();
+  }
+
+  void _listenToWebSocket() {
+    if (widget.userId == null) return; // Only for other users' profiles
+
+    _webSocketSubscription = webSocketService.stream.listen((message) async {
+      try {
+        final data = jsonDecode(message);
+        final type = data['type'] as String?;
+        final payload = data['payload'];
+
+        // Listen to friend-related events (matching backend broadcast types)
+        final isFriendEvent =
+            type == 'friend_request_received' ||
+            type == 'friend_request_accepted' ||
+            type == 'friend_added' ||
+            type == 'friend_request_declined';
+
+        if (widget.userId != null && payload != null && isFriendEvent) {
+          // Extract user IDs from payload based on event type
+          String? relevantUserId;
+
+          if (type == 'friend_request_received') {
+            // payload: {request_id, from_user_id, displayName, avatar}
+            relevantUserId = payload['from_user_id'] as String?;
+          } else if (type == 'friend_request_accepted') {
+            // payload: {user_id, displayName, avatarUrl}
+            relevantUserId = payload['user_id'] as String?;
+          } else if (type == 'friend_added') {
+            // payload: {user_id, displayName, avatarUrl}
+            relevantUserId = payload['user_id'] as String?;
+          } else if (type == 'friend_request_declined') {
+            // payload: {user_id}
+            relevantUserId = payload['user_id'] as String?;
+          }
+
+          // Check if this event affects the current profile user
+          if (relevantUserId == widget.userId && mounted) {
+            // Reload friend status
+            final currentUser = await _userService.getMe();
+            if (currentUser != null && _user != null && mounted) {
+              await _checkFriendStatus(currentUser, _user!);
+            }
+          }
+        }
+      } catch (e) {
+        print('Error in WebSocket listener: $e');
+      }
+    });
   }
 
   Future<void> _initProfile() async {
@@ -84,6 +140,10 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     setState(() {
       _currentUserId = currentUser.id;
+      // Set _isOwnProfile early if userId is provided
+      if (widget.userId != null) {
+        _isOwnProfile = currentUser.id == widget.userId;
+      }
     });
   }
 
@@ -92,13 +152,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       User? user;
       if (widget.userId == null) {
         user = await _userService.getUserProfile(_currentUserId);
-        _isOwnProfile = true;
+        setState(() {
+          _isOwnProfile = true;
+        });
       } else {
         // Load other user profile
         user = await _userService.getUserProfile(widget.userId!);
         // Check if it's own profile by comparing with current user
         User? currentUser = await _userService.getMe();
-        _isOwnProfile = currentUser?.id == widget.userId;
+        setState(() {
+          _isOwnProfile = currentUser?.id == widget.userId;
+        });
 
         // Check friend status if not own profile
         if (!_isOwnProfile && currentUser != null) {
@@ -155,6 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _animationController.dispose();
     _refreshController.dispose();
+    _webSocketSubscription?.cancel();
     super.dispose();
   }
 
@@ -172,13 +237,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       // Check friend status using API
       final status = await _userService.checkFriendStatus(profileUser.id);
+      print('Friend status updated to: $status');
 
-      setState(() {
-        _isFriend = status == 'friends';
-        // hasPendingRequest = true if there's a pending request (sent or received)
-        _hasPendingRequest =
-            status == 'pending_sent' || status == 'pending_received';
-      });
+      if (mounted) {
+        setState(() {
+          _friendStatus = status;
+        });
+      }
     } catch (e) {
       print('Error checking friend status: $e');
     }
@@ -501,7 +566,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      floatingActionButton: !_isOwnProfile
+      floatingActionButton: !_isOwnProfile && !widget.hideMessageButton
           ? FloatingActionButton.extended(
               onPressed: () async {
                 try {
@@ -529,6 +594,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   .where((id) => id.isNotEmpty)
                                   .toList()
                             : [_user!.id, currentUserId!],
+                        avatarUrl: _user!.avatarUrl,
                       ),
                     ),
                   );
@@ -699,8 +765,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       padding: EdgeInsets.symmetric(horizontal: 15),
                       child: ProfileComponents.buildFriendButton(
                         context: context,
-                        isFriend: _isFriend,
-                        hasPendingRequest: _hasPendingRequest,
+                        friendStatus: _friendStatus,
                         user: _user!,
                         userService: _userService,
                         refreshState: setState,

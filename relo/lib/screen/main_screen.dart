@@ -6,9 +6,10 @@ import 'package:relo/screen/search_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 import 'newsfeed_screen.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'notifications_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:convex_bottom_bar/convex_bottom_bar.dart';
+import 'package:provider/provider.dart';
+import 'package:relo/providers/notification_provider.dart';
 import 'dart:async';
 
 class MainScreen extends StatefulWidget {
@@ -20,7 +21,6 @@ class MainScreen extends StatefulWidget {
 
 class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  int _notificationCount = 3;
   bool _isOffline = false;
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
@@ -58,7 +58,7 @@ class MainScreenState extends State<MainScreen> {
       const NewsFeedScreen(), // Feed (0)
       const FriendsScreen(), // Friends (1)
       MessagesScreen(), // Messages (2) - ở giữa
-      Center(child: Text('TODO: Thông báo')), // Notifications (3)
+      const NotificationsScreen(), // Notifications (3)
       const ProfileScreen(), // Profile (4)
     ];
 
@@ -151,71 +151,110 @@ class MainScreenState extends State<MainScreen> {
         ],
       ),
 
-      bottomNavigationBar: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          ConvexAppBar(
-            items: [
-              TabItem(icon: LucideIcons.home, title: 'Tường nhà'),
-              TabItem(icon: LucideIcons.users, title: 'Bạn bè'),
-              TabItem(
-                icon: Icons.forum_outlined, // Icon chat như Zalo
-                title: 'Tin nhắn',
-              ), // Giữa
-              TabItem(icon: LucideIcons.bell, title: 'Thông báo'),
-              TabItem(icon: LucideIcons.user, title: 'Cá nhân'),
-            ],
-            initialActiveIndex: _selectedIndex,
-            onTap: (int i) {
-              setState(() {
-                _selectedIndex = i;
-                if (i == 3) _notificationCount = 0;
-              });
-            },
-            backgroundColor: Colors.grey[100],
-            activeColor: const Color(0xFF7A2FC0), // Màu tím khi active
-            color: Colors.grey[600], // Màu xám khi không active
-            style: TabStyle.flip,
-            height: 65,
-            curveSize: 100,
-            elevation: 10,
-          ),
-          // Badge cho thông báo (index 3, tính từ bên phải)
-          if (_notificationCount > 0)
-            Positioned(
-              top: 8,
-              right:
-                  MediaQuery.of(context).size.width *
-                  0.18, // Vị trí tab thứ 2 từ phải
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedIndex = 3;
-                    _notificationCount = 0;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+      bottomNavigationBar: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              currentIndex: _selectedIndex,
+              onTap: (int i) {
+                setState(() {
+                  _selectedIndex = i;
+                  if (i == 3) {
+                    // Mark all notifications as read when opening notifications tab
+                    final notificationProvider =
+                        Provider.of<NotificationProvider>(
+                          context,
+                          listen: false,
+                        );
+                    if (notificationProvider.hasUnread) {
+                      notificationProvider.markAllAsRead();
+                    }
+                  }
+                });
+              },
+              selectedItemColor: const Color(0xFF7A2FC0),
+              unselectedItemColor: Colors.grey[600],
+              backgroundColor: Colors.white,
+              elevation: 8,
+              showSelectedLabels: true,
+              showUnselectedLabels: false,
+              items: [
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 0 ? Icons.home : Icons.home_outlined,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
-                  child: Text(
-                    '$_notificationCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  label: 'Tường nhà',
                 ),
-              ),
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 1 ? Icons.people : Icons.people_outline,
+                  ),
+                  label: 'Bạn bè',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 2
+                        ? Icons.chat_bubble
+                        : Icons.chat_bubble_outline,
+                  ),
+                  label: 'Tin nhắn',
+                ),
+                BottomNavigationBarItem(
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        _selectedIndex == 3
+                            ? Icons.notifications
+                            : Icons.notifications_outlined,
+                      ),
+                      Consumer<NotificationProvider>(
+                        builder: (context, notificationProvider, child) {
+                          final unreadCount = notificationProvider.unreadCount;
+                          if (unreadCount > 0) {
+                            return Positioned(
+                              right: -8,
+                              top: -8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
+                  ),
+                  label: 'Thông báo',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 4 ? Icons.person : Icons.person_outline,
+                  ),
+                  label: 'Cá nhân',
+                ),
+              ],
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

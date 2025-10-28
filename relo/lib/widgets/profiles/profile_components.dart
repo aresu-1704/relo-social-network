@@ -73,13 +73,16 @@ class ProfileComponents {
   // ==== Nút kết bạn ====
   static Widget buildFriendButton({
     required BuildContext context,
-    required bool isFriend,
-    required bool hasPendingRequest,
+    required String
+    friendStatus, // 'none', 'pending_sent', 'pending_received', 'friends'
     required dynamic user,
     required UserService userService,
     required Function refreshState,
     Function? onFriendRequestSent,
   }) {
+    final isFriend = friendStatus == 'friends';
+    final hasPendingRequestSent = friendStatus == 'pending_sent';
+    final hasPendingRequestReceived = friendStatus == 'pending_received';
     // Nút chặn luôn hiển thị ở dưới
     final blockButton = ElevatedButton.icon(
       onPressed: () async {
@@ -126,8 +129,13 @@ class ProfileComponents {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ElevatedButton.icon(
-            onPressed: () =>
-                _showFriendOptions(context, user, userService, refreshState),
+            onPressed: () => _showFriendOptions(
+              context,
+              user,
+              userService,
+              refreshState,
+              onFriendRequestSent: onFriendRequestSent,
+            ),
             icon: Icon(Icons.check, color: Color(0xFF7A2FC0)),
             label: Text('Bạn bè', style: TextStyle(color: Color(0xFF7A2FC0))),
             style: ElevatedButton.styleFrom(
@@ -143,7 +151,8 @@ class ProfileComponents {
           blockButton,
         ],
       );
-    } else if (hasPendingRequest) {
+    } else if (hasPendingRequestSent) {
+      // Tôi đã gửi lời mời → Hiển thị nút "Hủy lời mời"
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -193,7 +202,93 @@ class ProfileComponents {
           blockButton,
         ],
       );
+    } else if (hasPendingRequestReceived) {
+      // Người khác đã gửi lời mời → Hiển thị 2 nút "Chấp nhận" và "Từ chối" trên cùng 1 hàng
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await userService.respondToFriendRequestByUser(
+                        user.id,
+                        'accept',
+                      );
+                      if (onFriendRequestSent != null) {
+                        await onFriendRequestSent();
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        await ShowNotification.showToast(
+                          context,
+                          'Không thể chấp nhận lời mời',
+                        );
+                      }
+                    }
+                  },
+                  icon: Icon(Icons.check, size: 18, color: Colors.white),
+                  label: Text(
+                    'Chấp nhận',
+                    style: TextStyle(fontSize: 14, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF7A2FC0),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await userService.respondToFriendRequestByUser(
+                        user.id,
+                        'reject',
+                      );
+                      if (onFriendRequestSent != null) {
+                        await onFriendRequestSent();
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        await ShowNotification.showToast(
+                          context,
+                          'Không thể từ chối lời mời',
+                        );
+                      }
+                    }
+                  },
+                  icon: Icon(Icons.close, size: 18, color: Color(0xFF7A2FC0)),
+                  label: Text(
+                    'Từ chối',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF7A2FC0)),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Color(0xFF7A2FC0),
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(color: Color(0xFF7A2FC0)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          blockButton,
+        ],
+      );
     } else {
+      // Chưa có lời mời nào → Hiển thị nút "Kết bạn"
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -238,8 +333,9 @@ class ProfileComponents {
     BuildContext context,
     dynamic user,
     UserService userService,
-    Function refreshState,
-  ) {
+    Function refreshState, {
+    Function? onFriendRequestSent,
+  }) {
     showModalBottomSheet(
       context: context,
       shape: RoundedRectangleBorder(
@@ -268,7 +364,13 @@ class ProfileComponents {
                     await userService.unfriendUser(user.id);
                     if (context.mounted) {
                       Navigator.pop(context); // Close bottom sheet
-                      refreshState(); // Refresh profile screen
+
+                      // Call callback to refresh friend status
+                      if (onFriendRequestSent != null) {
+                        await onFriendRequestSent();
+                      } else {
+                        refreshState(); // Fallback to just setState
+                      }
                     }
                   } catch (e) {
                     if (context.mounted) {
