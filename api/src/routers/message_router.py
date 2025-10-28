@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile, Body
 from typing import List, Optional
+from pydantic import BaseModel
 from ..services import MessageService
 from ..schemas import (
     ConversationCreate,
@@ -142,5 +143,85 @@ async def delete_conversation(
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+class UpdateGroupNameRequest(BaseModel):
+    new_name: str
+
+@router.put("/conversations/{conversation_id}/name")
+async def update_group_name(
+    conversation_id: str,
+    request: UpdateGroupNameRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Cập nhật tên nhóm."""
+    try:
+        result = await MessageService.update_group_name(
+            conversation_id=conversation_id,
+            user_id=str(current_user.id),
+            new_name=request.new_name
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+class UpdateGroupAvatarRequest(BaseModel):
+    avatar_url: str
+
+@router.put("/conversations/{conversation_id}/avatar")
+async def update_group_avatar(
+    conversation_id: str,
+    request: UpdateGroupAvatarRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Cập nhật ảnh đại diện nhóm."""
+    try:
+        result = await MessageService.update_group_avatar(
+            conversation_id=conversation_id,
+            user_id=str(current_user.id),
+            avatar_url=request.avatar_url
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@router.post("/conversations/{conversation_id}/leave")
+async def leave_group(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Rời khỏi nhóm."""
+    try:
+        result = await MessageService.leave_group(
+            conversation_id=conversation_id,
+            user_id=str(current_user.id)
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+@router.post("/conversations/{conversation_id}/members")
+async def add_member_to_group(
+    conversation_id: str,
+    member_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Thêm thành viên vào nhóm."""
+    try:
+        result = await MessageService.add_member_to_group(
+            conversation_id=conversation_id,
+            added_by=str(current_user.id),
+            member_id=member_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))

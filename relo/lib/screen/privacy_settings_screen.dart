@@ -291,11 +291,11 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         radius: 25,
         backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
             ? CachedNetworkImageProvider(user.avatarUrl!)
-            : null,
+            : NetworkImage(
+                    'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
+                  )
+                  as ImageProvider,
         backgroundColor: Colors.grey[400],
-        child: user.avatarUrl == null || user.avatarUrl!.isEmpty
-            ? Icon(Icons.person, color: Colors.white)
-            : null,
       ),
       title: Text(user.displayName),
       subtitle: Text('@${user.username}'),

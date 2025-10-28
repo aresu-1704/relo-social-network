@@ -324,7 +324,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       ),
                     )
                   : null,
-              onTap: () {
+              onTap: () async {
                 setState(() {
                   final index = conversations.indexWhere(
                     (c) => c['id'] == conversation['id'],
@@ -339,12 +339,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     }
                   }
                 });
-                Navigator.push(
+                final conversationId = conversation['id'];
+                final isGroup = conversation['isGroup'];
+
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => ChatScreen(
-                      conversationId: conversation['id'],
-                      isGroup: conversation['isGroup'],
+                      conversationId: conversationId,
+                      isGroup: isGroup,
                       chatName: title,
                       memberIds: participants
                           .map((p) => p['id']?.toString() ?? '')
@@ -352,6 +355,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
                           .toList(),
                       memberCount: conversation['participants'].length,
                       onConversationSeen: _updateSeenStatus,
+                      onLeftGroup: () {
+                        // Xóa conversation khỏi danh sách khi rời nhóm
+                        setState(() {
+                          conversations.removeWhere(
+                            (c) => c['id'] == conversationId,
+                          );
+                        });
+                      },
                     ),
                   ),
                 );

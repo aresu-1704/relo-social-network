@@ -4,6 +4,7 @@ import 'package:relo/widgets/messages/audio_message_bubble.dart';
 import 'package:relo/widgets/messages/media_message_bubble.dart';
 import 'package:relo/widgets/messages/text_message_bubble.dart';
 import 'package:relo/widgets/messages/file_message_bubble.dart';
+import 'package:relo/widgets/messages/notification_message_bubble.dart';
 
 class MessageList extends StatelessWidget {
   final List<Message> messages;
@@ -89,7 +90,16 @@ class MessageList extends StatelessWidget {
         }
 
         final messageType = message.content['type'];
-        if (messageType == 'audio') {
+
+        // Handle notification messages
+        if (messageType == 'notification') {
+          widgets.add(
+            NotificationMessageBubble(
+              content: message.content,
+              timestamp: message.timestamp,
+            ),
+          );
+        } else if (messageType == 'audio') {
           final url = message.content['url'];
           final isPlaying = currentlyPlayingUrl == url;
 

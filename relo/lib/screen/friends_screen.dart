@@ -248,7 +248,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             memberIds = [friend.id];
           }
 
-          Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ChatScreen(
@@ -256,6 +256,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 isGroup: false,
                 chatName: friend.displayName,
                 memberIds: memberIds,
+                onUserBlocked: (blockedUserId) {
+                  // Xóa user khỏi danh sách bạn bè và refresh
+                  setState(() {
+                    _friendsFuture = _userService.getFriends();
+                  });
+                },
               ),
             ),
           );
