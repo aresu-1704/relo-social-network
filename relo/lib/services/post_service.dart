@@ -28,6 +28,32 @@ class PostService {
     }
   }
 
+  /// Lấy danh sách bài đăng của một user cụ thể
+  Future<List<Post>> getUserPosts(
+    String userId, {
+    int skip = 0,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        'posts/user/$userId',
+        queryParameters: {'skip': skip, 'limit': limit},
+      );
+
+      if (response.data is List) {
+        return (response.data as List)
+            .map((json) => Post.fromJson(json))
+            .toList();
+      }
+
+      return [];
+    } on DioException catch (e) {
+      throw Exception('Failed to fetch user posts: $e');
+    } catch (e) {
+      throw Exception('An unknown error occurred: $e');
+    }
+  }
+
   /// Tạo bài đăng mới
   Future<Post> createPost({
     required String content,
@@ -36,29 +62,25 @@ class PostService {
     try {
       // Tạo FormData
       final formData = FormData();
-      
+
       // Thêm content (luôn gửi, ngay cả khi rỗng)
       formData.fields.add(MapEntry('content', content));
       // Thêm files nếu có
       if (filePaths != null && filePaths.isNotEmpty) {
         for (final path in filePaths) {
           formData.files.add(
-            MapEntry(
-              'files',
-              await MultipartFile.fromFile(path),
-            ),
+            MapEntry('files', await MultipartFile.fromFile(path)),
           );
         }
       }
-      
-      final response = await _dio.post(
-        'posts',
-        data: formData,
-      );
+
+      final response = await _dio.post('posts', data: formData);
 
       return Post.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to create post: ${e.response?.data ?? e.message}');
+      throw Exception(
+        'Failed to create post: ${e.response?.data ?? e.message}',
+      );
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
     }
@@ -92,17 +114,17 @@ class PostService {
   }) async {
     try {
       final formData = FormData();
-      
+
       // Add content
       formData.fields.add(MapEntry('content', content));
-      
+
       // Add existing image URLs to keep
       if (existingImageUrls != null) {
         for (var url in existingImageUrls) {
           formData.fields.add(MapEntry('existing_image_urls', url));
         }
       }
-      
+
       // Add new files to upload
       if (newFilePaths != null) {
         for (var filePath in newFilePaths) {
@@ -114,14 +136,13 @@ class PostService {
         }
       }
 
-      final response = await _dio.put(
-        'posts/$postId',
-        data: formData,
-      );
+      final response = await _dio.put('posts/$postId', data: formData);
 
       return Post.fromJson(response.data);
     } on DioException catch (e) {
-      throw Exception('Failed to update post: ${e.response?.data ?? e.message}');
+      throw Exception(
+        'Failed to update post: ${e.response?.data ?? e.message}',
+      );
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
     }
@@ -132,7 +153,9 @@ class PostService {
     try {
       await _dio.delete('posts/$postId');
     } on DioException catch (e) {
-      throw Exception('Failed to delete post: ${e.response?.data ?? e.message}');
+      throw Exception(
+        'Failed to delete post: ${e.response?.data ?? e.message}',
+      );
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
     }

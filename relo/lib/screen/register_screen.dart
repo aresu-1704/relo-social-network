@@ -197,9 +197,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _displayNameController,
                     hintText: 'Tên hiển thị',
                     icon: Icons.badge,
+                    maxLength: 50,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Vui lòng nhập tên hiển thị';
+                      }
+                      if (value.length > 50) {
+                        return 'Tên hiển thị không được quá 50 ký tự';
                       }
                       return null;
                     },

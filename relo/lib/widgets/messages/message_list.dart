@@ -100,15 +100,15 @@ class MessageList extends StatelessWidget {
             ),
           );
         } else if (messageType == 'audio') {
-          final url = message.content['url'];
-          final isPlaying = currentlyPlayingUrl == url;
+          final url = message.content['url'] as String?;
+          final isPlaying = currentlyPlayingUrl == url && url != null;
 
           widgets.add(
             AudioMessageBubble(
               message: message,
               isMe: isMe,
               isPlaying: isPlaying,
-              onPlay: () => onPlayAudio(url),
+              onPlay: url != null ? () => onPlayAudio(url) : () {},
               isLastFromMe: _isLastFromUser(messages, index, currentUserId),
             ),
           );

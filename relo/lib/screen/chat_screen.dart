@@ -93,51 +93,80 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _listenToWebSocket() {
     _webSocketSubscription = webSocketService.stream.listen((message) async {
-      final data = jsonDecode(message);
-      if (data['type'] == 'new_message') {
-        final msgData = data['payload']?['message'];
-        if (msgData == null) return;
+      try {
+        final data = jsonDecode(message);
 
-        // Nếu message từ chính mình, không cần xử lý
-        if (msgData['senderId'] == _currentUserId) return;
+        // Ignore friend_request_received events (not relevant to chat screen)
+        if (data['type'] == 'friend_request_received') return;
+        if (data['type'] == 'friend_request_accepted') return;
+        if (data['type'] == 'friend_added') return;
 
-        // Chỉ xử lý message từ conversation hiện tại
-        if (msgData['conversationId'] != _conversationId) return;
+        if (data['type'] == 'new_message') {
+          final msgData = data['payload']?['message'];
+          if (msgData == null) return;
 
-        // Mark as seen khi message đến từ conversation đang mở
-        await _messageService.markAsSeen(_conversationId!, _currentUserId!);
-        widget.onConversationSeen?.call(_conversationId!);
+          // Nếu message từ chính mình, không cần xử lý
+          if (msgData['senderId'] == _currentUserId) return;
 
-        final newMsg = Message(
-          id: msgData['id'] ?? '',
-          conversationId: msgData['conversationId'],
-          senderId: msgData['senderId'],
-          content: msgData['content'] ?? '',
-          avatarUrl: msgData['avatarUrl'] ?? '',
-          timestamp:
-              DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
-          status: 'sent',
-        );
+          // Chỉ xử lý message từ conversation hiện tại
+          if (msgData['conversationId'] != _conversationId) return;
 
-        if (mounted) {
-          setState(() {
-            _messages.insert(0, newMsg);
-          });
+          // Mark as seen khi message đến từ conversation đang mở
+          await _messageService.markAsSeen(_conversationId!, _currentUserId!);
+          widget.onConversationSeen?.call(_conversationId!);
+
+          final newMsg = Message(
+            id: msgData['id'] ?? '',
+            conversationId: msgData['conversationId'],
+            senderId: msgData['senderId'],
+            content: msgData['content'] ?? '',
+            avatarUrl: msgData['avatarUrl'] ?? '',
+            timestamp:
+                DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
+            status: 'sent',
+          );
+
+          if (mounted) {
+            setState(() {
+              _messages.insert(0, newMsg);
+            });
+          }
+        } else if (data['type'] == 'recalled_message') {
+          final msgData = data['payload']?['message'];
+          if (msgData == null) return;
+
+          final messageId = msgData['id'];
+          final index = _messages.indexWhere((m) => m.id == messageId);
+
+          if (index != -1) {
+            setState(() {
+              _messages[index] = _messages[index].copyWith(
+                content: {'type': 'delete'},
+              );
+            });
+          }
+        } else if (data['type'] == 'user_blocked' ||
+            data['type'] == 'you_were_blocked' ||
+            data['type'] == 'user_unblocked') {
+          // Handle block/unblock events
+          final payload = data['payload'];
+          if (payload == null) return;
+
+          final blockedUserId = payload['user_id'];
+
+          // Only update if it's relevant to this conversation
+          final isRelevant =
+              widget.memberIds != null &&
+              widget.memberIds!.contains(blockedUserId);
+
+          if (isRelevant) {
+            // Re-check block status (silently, no toast)
+            await _checkBlockStatus();
+          }
         }
-      } else if (data['type'] == 'recalled_message') {
-        final msgData = data['payload']?['message'];
-        if (msgData == null) return;
-
-        final messageId = msgData['id'];
-        final index = _messages.indexWhere((m) => m.id == messageId);
-
-        if (index != -1) {
-          setState(() {
-            _messages[index] = _messages[index].copyWith(
-              content: {'type': 'delete'},
-            );
-          });
-        }
+      } catch (e) {
+        // Silently ignore unhandled websocket messages to prevent crashes
+        print('ChatScreen: Unhandled WebSocket message type: ${e.toString()}');
       }
     }, onError: (error) => print("WebSocket Error: $error"));
   }
@@ -376,25 +405,33 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _playAudio(String url) async {
-    if (_currentlyPlayingUrl == url) {
-      await _audioPlayer.stop();
-      setState(() => _currentlyPlayingUrl = null);
-      return;
-    }
-
-    if (_currentlyPlayingUrl != null) {
-      await _audioPlayer.stop();
-    }
-
-    setState(() => _currentlyPlayingUrl = url);
-
-    await _audioPlayer.play(UrlSource(url));
-
-    _audioPlayer.onPlayerComplete.listen((_) {
-      if (mounted) {
+    try {
+      if (_currentlyPlayingUrl == url) {
+        await _audioPlayer.stop();
         setState(() => _currentlyPlayingUrl = null);
+        return;
       }
-    });
+
+      if (_currentlyPlayingUrl != null) {
+        await _audioPlayer.stop();
+      }
+
+      setState(() => _currentlyPlayingUrl = url);
+
+      await _audioPlayer.play(UrlSource(url));
+
+      _audioPlayer.onPlayerComplete.listen((_) {
+        if (mounted && _currentlyPlayingUrl == url) {
+          setState(() => _currentlyPlayingUrl = null);
+        }
+      });
+    } catch (e) {
+      print('Error playing audio: $e');
+      setState(() => _currentlyPlayingUrl = null);
+      if (mounted) {
+        await ShowNotification.showToast(context, 'Không thể phát audio');
+      }
+    }
   }
 
   Future<void> _recallMessage(Message message) async {

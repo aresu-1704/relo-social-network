@@ -88,6 +88,15 @@ class UserService {
     }
   }
 
+  // Hủy lời mời kết bạn
+  Future<void> cancelFriendRequest(String userId) async {
+    try {
+      await _dio.delete('users/friend-request/$userId');
+    } catch (e) {
+      throw Exception('Failed to cancel friend request: $e');
+    }
+  }
+
   // Chặn người dùng
   Future<void> blockUser(String userId) async {
     try {
@@ -103,6 +112,15 @@ class UserService {
       await _dio.post('users/unblock', data: {'user_id': userId});
     } catch (e) {
       throw Exception('Failed to unblock user: $e');
+    }
+  }
+
+  // Hủy kết bạn
+  Future<void> unfriendUser(String userId) async {
+    try {
+      await _dio.post('users/$userId/unfriend');
+    } catch (e) {
+      throw Exception('Failed to unfriend user: $e');
     }
   }
 
@@ -224,6 +242,16 @@ class UserService {
       return response.data;
     } catch (e) {
       throw Exception('Failed to check block status: $e');
+    }
+  }
+
+  // Kiểm tra trạng thái kết bạn giữa 2 người dùng
+  Future<String> checkFriendStatus(String userId) async {
+    try {
+      final response = await _dio.get('users/$userId/friend-status');
+      return response.data['status'] ?? 'none';
+    } catch (e) {
+      return 'none';
     }
   }
 }

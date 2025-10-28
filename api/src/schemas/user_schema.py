@@ -15,6 +15,7 @@ class UserPublic(BaseModel):
     avatarUrl: str | None = ""
     backgroundUrl: str | None = ""
     bio: str | None = ""
+    createdAt: str | None = None
 
 class FriendRequestPublic(BaseModel):
     id: str

@@ -7,6 +7,9 @@ class User {
   final String? backgroundUrl;
   final String? bio;
   final String? status;
+  final String? createdAt;
+  final String?
+  friendStatus; // For search results: 'friends', 'pending_sent', 'pending_received', 'none'
 
   User({
     required this.id,
@@ -17,6 +20,8 @@ class User {
     this.backgroundUrl,
     this.bio,
     this.status,
+    this.createdAt,
+    this.friendStatus,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -29,6 +34,8 @@ class User {
       backgroundUrl: json['backgroundUrl'] ?? '',
       bio: json['bio'] ?? '',
       status: json['status'] ?? 'available',
+      createdAt: json['createdAt'],
+      friendStatus: json['friendStatus'],
     );
   }
 }
