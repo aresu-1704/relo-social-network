@@ -184,4 +184,40 @@ class MessageService {
       throw Exception('An unknown error occurred: $e');
     }
   }
+
+  // Cập nhật tên nhóm
+  Future<void> updateGroupName(String conversationId, String newName) async {
+    try {
+      await _dio.put(
+        'messages/conversations/$conversationId/name',
+        data: {'new_name': newName},
+      );
+    } catch (e) {
+      throw Exception('Failed to update group name: $e');
+    }
+  }
+
+  // Cập nhật ảnh đại diện nhóm
+  Future<void> updateGroupAvatar(
+    String conversationId,
+    String avatarUrl,
+  ) async {
+    try {
+      await _dio.put(
+        'messages/conversations/$conversationId/avatar',
+        data: {'avatar_url': avatarUrl},
+      );
+    } catch (e) {
+      throw Exception('Failed to update group avatar: $e');
+    }
+  }
+
+  // Rời khỏi nhóm
+  Future<void> leaveGroup(String conversationId) async {
+    try {
+      await _dio.post('messages/conversations/$conversationId/leave');
+    } catch (e) {
+      throw Exception('Failed to leave group: $e');
+    }
+  }
 }

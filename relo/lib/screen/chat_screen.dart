@@ -27,6 +27,8 @@ class ChatScreen extends StatefulWidget {
   final int? memberCount;
 
   final void Function(String conversationId)? onConversationSeen;
+  final void Function()? onLeftGroup;
+  final void Function(String userId)? onUserBlocked;
 
   const ChatScreen({
     super.key,
@@ -36,6 +38,8 @@ class ChatScreen extends StatefulWidget {
     this.memberIds,
     this.onConversationSeen,
     this.memberCount,
+    this.onLeftGroup,
+    this.onUserBlocked,
   });
 
   @override
@@ -235,13 +239,86 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     if (result == true && mounted) {
-      // TODO: Logic rời nhóm
-      await ShowNotification.showToast(
-        context,
-        'Chức năng rời nhóm đang được phát triển',
-      );
-      Navigator.pop(context);
+      _handleLeaveGroup();
     }
+  }
+
+  Future<void> _handleLeaveGroup() async {
+    try {
+      await _messageService.leaveGroup(_conversationId!);
+      if (mounted) {
+        await ShowNotification.showToast(context, 'Đã rời khỏi nhóm');
+
+        // Gọi callback để xóa conversation khỏi message screen
+        if (widget.onLeftGroup != null) {
+          widget.onLeftGroup!();
+        }
+
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        await ShowNotification.showToast(context, 'Không thể rời nhóm');
+      }
+    }
+  }
+
+  Future<void> _showChangeGroupNameDialog() async {
+    if (!mounted) return;
+
+    final dialogContext = context; // Save context before showing dialog
+    final TextEditingController nameController = TextEditingController(
+      text: widget.chatName ?? '',
+    );
+
+    await showDialog(
+      context: context,
+      builder: (dialogBuildContext) => AlertDialog(
+        title: const Text('Đổi tên nhóm'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(hintText: 'Nhập tên nhóm mới'),
+          maxLength: 50,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogBuildContext),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isEmpty) {
+                Navigator.pop(dialogBuildContext);
+                return;
+              }
+
+              Navigator.pop(dialogBuildContext);
+              try {
+                await _messageService.updateGroupName(
+                  _conversationId!,
+                  newName,
+                );
+                if (mounted) {
+                  await ShowNotification.showToast(
+                    dialogContext,
+                    'Đã đổi tên nhóm',
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  await ShowNotification.showToast(
+                    dialogContext,
+                    'Không thể đổi tên nhóm',
+                  );
+                }
+              }
+            },
+            child: const Text('Đổi tên'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadMessages({bool isInitial = false}) async {
@@ -478,17 +555,43 @@ class _ChatScreenState extends State<ChatScreen> {
                 // TODO: logic tắt thông báo
               },
             ),
-          if (widget.isGroup)
+          if (widget.isGroup) ...[
             ActionButton(
               icon: LucideIcons.edit3,
               label: 'Đổi tên nhóm',
               color: const Color(0xFF9C27B0),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: logic đổi tên nhóm
+                _showChangeGroupNameDialog();
               },
-            )
-          else if (!isDeletedAccount && !_isBlocked)
+            ),
+            ActionButton(
+              icon: LucideIcons.imagePlus,
+              label: 'Đổi ảnh nhóm',
+              color: const Color(0xFF4CAF50),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement change group avatar
+                ShowNotification.showToast(
+                  context,
+                  'Chức năng đang phát triển',
+                );
+              },
+            ),
+            ActionButton(
+              icon: LucideIcons.userPlus,
+              label: 'Thêm thành viên',
+              color: const Color(0xFF2196F3),
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Implement add members to group
+                ShowNotification.showToast(
+                  context,
+                  'Chức năng đang phát triển',
+                );
+              },
+            ),
+          ] else if (!isDeletedAccount && !_isBlocked)
             ActionButton(
               icon: LucideIcons.users,
               label: 'Tạo nhóm với ${widget.chatName}',
@@ -512,7 +615,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
 
                 if (!result!) return;
-                // TODO: logic rời nhóm
+                Navigator.pop(context);
+                _handleLeaveGroup();
               },
             )
           else if (!isDeletedAccount && !_isBlocked)
@@ -555,6 +659,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       context,
                       'Đã chặn người dùng',
                     );
+
+                    // Gọi callback để xóa user khỏi danh sách bạn bè
+                    if (widget.onUserBlocked != null) {
+                      widget.onUserBlocked!(friendId);
+                    }
+
                     // Quay về màn hình messages
                     Navigator.pop(context);
                   }

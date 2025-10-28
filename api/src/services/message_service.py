@@ -12,6 +12,63 @@ from ..utils import map_message_to_public_dict, map_conversation_to_public_dict
 
 class MessageService:
 
+    @staticmethod
+    async def create_notification_message(
+        conversation_id: str,
+        notification_type: str,
+        text: str,
+        metadata: Optional[dict] = None
+    ):
+        """
+        Tạo một notification message trong conversation.
+        notification_type: 'name_changed', 'avatar_changed', 'member_left', 'member_added'
+        """
+        notification_content = {
+            "type": "notification",
+            "notification_type": notification_type,
+            "text": text,
+            "metadata": metadata or {}
+        }
+        
+        # Tạo message với sender_id là system
+        message = Message(
+            conversationId=conversation_id,
+            senderId="system",
+            content=notification_content,
+            createdAt=datetime.utcnow() + timedelta(hours=7)
+        )
+        await message.save()
+        
+        # Cập nhật lastMessage
+        conversation = await Conversation.get(conversation_id)
+        if conversation:
+            conversation.lastMessage = LastMessage(
+                content=message.content,
+                senderId=message.senderId,
+                createdAt=message.createdAt
+            )
+            conversation.updatedAt = datetime.utcnow() + timedelta(hours=7)
+            conversation.seenIds = []
+            await conversation.save()
+            
+            # Broadcast notification message
+            message_data = map_message_to_public_dict(message)
+            conversation_data = map_conversation_to_public_dict(conversation)
+            
+            tasks = [
+                manager.broadcast_to_user(
+                    uid,
+                    {
+                        "type": "new_message",
+                        "payload": {"message": message_data, "conversation": conversation_data}
+                    }
+                )
+                for uid in [p.userId for p in conversation.participants]
+            ]
+            await asyncio.gather(*tasks)
+        
+        return message
+
     async def get_or_create_conversation(
         participant_ids: List[str],
         is_group: bool = False,
@@ -96,7 +153,13 @@ class MessageService:
         conversation.seenIds = [sender_id]
         await conversation.save()
 
-        sender = await User.get(sender_id)
+        # Chỉ lấy sender nếu sender_id hợp lệ (không phải system hoặc deleted)
+        sender = None
+        if sender_id not in ['system', 'deleted']:
+            try:
+                sender = await User.get(sender_id)
+            except:
+                sender = None
 
         # Kiểm tra nếu sender đã bị xóa
         is_sender_deleted = not sender or sender.status == 'deleted'
@@ -104,9 +167,9 @@ class MessageService:
         # Phát broadcast tin nhắn mới
         message_data = {
             "id": str(message.id),
-            "senderId": "deleted" if is_sender_deleted else str(sender.id),
+            "senderId": sender_id if sender_id in ['system', 'deleted'] else ("deleted" if is_sender_deleted else str(sender.id)),
             "conversationId": message.conversationId,
-            "avatarUrl": None if is_sender_deleted else sender.avatarUrl,
+            "avatarUrl": None if (sender_id in ['system', 'deleted'] or is_sender_deleted) else sender.avatarUrl,
             "content": message.content,
             "createdAt": message.createdAt.isoformat()
         }
@@ -165,14 +228,27 @@ class MessageService:
 
         # Lấy người gửi để gắn thêm thông tin hiển thị
         sender_ids = list(set(msg.senderId for msg in messages))
-        senders = await UserService.get_users_by_ids(sender_ids)
+        # Lọc bỏ các senderId không phải ObjectId (system, deleted)
+        valid_sender_ids = [sid for sid in sender_ids if sid not in ['system', 'deleted']]
+        senders = await UserService.get_users_by_ids(valid_sender_ids) if valid_sender_ids else []
         senders_map = {str(s.id): s for s in senders}
 
         simple_messages = []
         for msg in messages:
             sender = senders_map.get(msg.senderId)
+            # Xử lý tin nhắn notification (từ system)
+            if msg.senderId == "system":
+                simple_messages.append(
+                    SimpleMessagePublic(
+                        id=str(msg.id),
+                        senderId="system",
+                        avatarUrl=None,
+                        content=msg.content,
+                        createdAt=msg.createdAt
+                    )
+                )
             # Kiểm tra nếu sender không tồn tại hoặc đã bị xóa
-            if sender and sender.status != 'deleted':
+            elif sender and sender.status != 'deleted':
                 simple_messages.append(
                     SimpleMessagePublic(
                         id=str(msg.id),
@@ -367,3 +443,131 @@ class MessageService:
 
 
         return {"message": "Cuộc trò chuyện đã được xóa thành công."}
+    
+    @staticmethod
+    async def update_group_name(conversation_id: str, user_id: str, new_name: str):
+        """
+        Cập nhật tên nhóm và tạo notification message.
+        """
+        conversation = await Conversation.get(conversation_id)
+        if not conversation:
+            raise ValueError("Không tìm thấy cuộc trò chuyện.")
+        
+        if not conversation.isGroup:
+            raise ValueError("Đây không phải là nhóm chat.")
+        
+        # Lấy thông tin người thay đổi
+        user = await User.get(user_id)
+        old_name = conversation.name
+        
+        # Cập nhật tên
+        conversation.name = new_name
+        await conversation.save()
+        
+        # Tạo notification message
+        await MessageService.create_notification_message(
+            conversation_id=conversation_id,
+            notification_type="name_changed",
+            text=f"Tên nhóm đã được đặt thành {new_name}",
+            metadata={"old_name": old_name, "new_name": new_name, "changed_by": user.displayName if user else ""}
+        )
+        
+        return {"message": "Tên nhóm đã được cập nhật thành công."}
+    
+    @staticmethod
+    async def update_group_avatar(conversation_id: str, user_id: str, avatar_url: str):
+        """
+        Cập nhật ảnh đại diện nhóm và tạo notification message.
+        """
+        conversation = await Conversation.get(conversation_id)
+        if not conversation:
+            raise ValueError("Không tìm thấy cuộc trò chuyện.")
+        
+        if not conversation.isGroup:
+            raise ValueError("Đây không phải là nhóm chat.")
+        
+        old_avatar = conversation.avatarUrl
+        
+        # Cập nhật avatar
+        conversation.avatarUrl = avatar_url
+        await conversation.save()
+        
+        # Tạo notification message
+        await MessageService.create_notification_message(
+            conversation_id=conversation_id,
+            notification_type="avatar_changed",
+            text="Ảnh nhóm đã được thay đổi",
+            metadata={"changed_by": user_id}
+        )
+        
+        return {"message": "Ảnh nhóm đã được cập nhật thành công."}
+    
+    @staticmethod
+    async def leave_group(conversation_id: str, user_id: str):
+        """
+        Rời khỏi nhóm và tạo notification message.
+        """
+        conversation = await Conversation.get(conversation_id)
+        if not conversation:
+            raise ValueError("Không tìm thấy cuộc trò chuyện.")
+        
+        if not conversation.isGroup:
+            raise ValueError("Đây không phải là nhóm chat.")
+        
+        # Kiểm tra người dùng có trong nhóm không
+        participant = next((p for p in conversation.participants if p.userId == user_id), None)
+        if not participant:
+            raise PermissionError("Bạn không có trong nhóm này.")
+        
+        # Lấy thông tin người rời
+        user = await User.get(user_id)
+        
+        # Xóa người dùng khỏi nhóm
+        conversation.participants = [p for p in conversation.participants if p.userId != user_id]
+        await conversation.save()
+        
+        # Tạo notification message
+        await MessageService.create_notification_message(
+            conversation_id=conversation_id,
+            notification_type="member_left",
+            text=f"{user.displayName if user else 'Người dùng'} vừa rời khỏi nhóm",
+            metadata={"user_id": user_id, "display_name": user.displayName if user else ""}
+        )
+        
+        return {"message": "Bạn đã rời khỏi nhóm thành công."}
+    
+    @staticmethod
+    async def add_member_to_group(conversation_id: str, added_by: str, member_id: str):
+        """
+        Thêm thành viên vào nhóm và tạo notification message.
+        """
+        conversation = await Conversation.get(conversation_id)
+        if not conversation:
+            raise ValueError("Không tìm thấy cuộc trò chuyện.")
+        
+        if not conversation.isGroup:
+            raise ValueError("Đây không phải là nhóm chat.")
+        
+        # Kiểm tra thành viên đã có trong nhóm chưa
+        existing = next((p for p in conversation.participants if p.userId == member_id), None)
+        if existing:
+            raise ValueError("Thành viên này đã có trong nhóm.")
+        
+        # Lấy thông tin người được thêm
+        member = await User.get(member_id)
+        if not member:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Thêm thành viên mới
+        conversation.participants.append(ParticipantInfo(userId=member_id))
+        await conversation.save()
+        
+        # Tạo notification message
+        await MessageService.create_notification_message(
+            conversation_id=conversation_id,
+            notification_type="member_added",
+            text=f"{member.displayName} vừa được thêm vào nhóm",
+            metadata={"member_id": member_id, "member_name": member.displayName, "added_by": added_by}
+        )
+        
+        return {"message": "Thành viên đã được thêm vào nhóm thành công."}
