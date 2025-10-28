@@ -181,7 +181,7 @@ class UserService:
     @staticmethod
     async def block_user(user_id: str, block_user_id: str):
         """
-        Chặn một người dùng.
+        Chặn một người dùng và tự động hủy kết bạn.
         """
         if user_id == block_user_id:
             raise ValueError("Không thể tự chặn chính mình.")
@@ -190,9 +190,24 @@ class UserService:
         if not user:
             raise ValueError("Không tìm thấy người dùng.")
 
+        blocked_user = await User.get(block_user_id)
+        if not blocked_user:
+            raise ValueError("Không tìm thấy người dùng bị chặn.")
+
+        # Chặn người dùng
         if block_user_id not in user.blockedUserIds:
             user.blockedUserIds.append(block_user_id)
-            await user.save()
+        
+        # Hủy kết bạn từ phía user (người chặn)
+        if block_user_id in user.friendIds:
+            user.friendIds.remove(block_user_id)
+        
+        await user.save()
+
+        # Hủy kết bạn từ phía blocked_user (người bị chặn)
+        if user_id in blocked_user.friendIds:
+            blocked_user.friendIds.remove(user_id)
+            await blocked_user.save()
 
         return {"message": "Người dùng đã bị chặn thành công."}
 
@@ -466,3 +481,24 @@ class UserService:
             }
             for blocked_user in blocked_users
         ]
+
+    @staticmethod
+    async def check_block_status(user_id: str, other_user_id: str):
+        """
+        Kiểm tra trạng thái block giữa hai người dùng.
+        Returns: {"isBlockedByMe": bool, "isBlockedByOther": bool}
+        """
+        user = await User.get(user_id)
+        other_user = await User.get(other_user_id)
+        
+        if not user or not other_user:
+            raise ValueError("Không tìm thấy người dùng.")
+
+        is_blocked_by_me = other_user_id in user.blockedUserIds
+        is_blocked_by_other = user_id in other_user.blockedUserIds
+
+        return {
+            "isBlockedByMe": is_blocked_by_me,
+            "isBlockedByOther": is_blocked_by_other,
+            "isBlocked": is_blocked_by_me or is_blocked_by_other
+        }

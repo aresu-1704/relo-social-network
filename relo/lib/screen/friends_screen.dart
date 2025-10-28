@@ -5,6 +5,7 @@ import 'package:relo/services/user_service.dart';
 import 'package:relo/models/user.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/services/message_service.dart';
+import 'package:relo/services/secure_storage_service.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -207,8 +208,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
     return InkWell(
       onTap: () async {
         try {
+          // Get current user ID
+          final SecureStorageService secureStorage =
+              const SecureStorageService();
+          final currentUserId = await secureStorage.getUserId();
+
           final conversation = await _messageService.getOrCreateConversation(
-            [friend.id],
+            [currentUserId!, friend.id],
             false,
             null,
           );
@@ -222,6 +228,26 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
           final participants = (conversation['participants'] ?? []) as List;
 
+          // Extract member IDs from participants
+          List<String> memberIds = [];
+          if (participants.isNotEmpty) {
+            for (var p in participants) {
+              if (p is Map) {
+                String? id = p['id']?.toString() ?? p['userId']?.toString();
+                if (id != null && id.isNotEmpty) {
+                  memberIds.add(id);
+                }
+              } else if (p is String) {
+                memberIds.add(p);
+              }
+            }
+          }
+
+          // Fallback to friend.id if no participants found
+          if (memberIds.isEmpty) {
+            memberIds = [friend.id];
+          }
+
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -229,12 +255,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 conversationId: conversation['id'],
                 isGroup: false,
                 chatName: friend.displayName,
-                memberIds: participants.isNotEmpty
-                    ? participants
-                          .map((p) => p['id']?.toString() ?? '')
-                          .where((id) => id.isNotEmpty)
-                          .toList()
-                    : [friend.id],
+                memberIds: memberIds,
               ),
             ),
           );

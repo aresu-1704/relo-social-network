@@ -81,13 +81,28 @@ class PostService:
             raise ValueError(f"Lỗi khi tạo bài đăng: {e}")
 
     @staticmethod
-    async def get_post_feed(limit: int = 20, skip: int = 0):
+    async def get_post_feed(user_id: str, limit: int = 20, skip: int = 0):
         """
-        Lấy một nguồn cấp dữ liệu chung về các bài đăng gần đây.
-        Chỉ lấy posts từ những users chưa bị xóa (status != 'deleted').
+        Lấy một nguồn cấp dữ liệu về các bài đăng từ bạn bè.
+        Chỉ lấy posts từ những users chưa bị xóa (status != 'deleted') và là bạn bè.
         """
-        # Truy vấn các bài đăng gần đây nhất, được sắp xếp theo ngày tạo
-        posts = await Post.find_all(sort="-createdAt", skip=skip, limit=limit).to_list()
+        # Lấy thông tin current user để lấy danh sách bạn bè
+        current_user = await User.get(user_id)
+        if not current_user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Danh sách ID của bạn bè + chính mình
+        friend_ids = [user_id] + current_user.friendIds
+        
+        # Truy vấn các bài đăng từ bạn bè
+        posts = await Post.find(
+            {
+                "authorId": {"$in": friend_ids}
+            },
+            sort="-createdAt", 
+            skip=skip, 
+            limit=limit
+        ).to_list()
 
         # Lấy danh sách author IDs
         author_ids = list(set(str(post.authorId) for post in posts))

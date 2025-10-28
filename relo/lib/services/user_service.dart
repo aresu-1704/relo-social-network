@@ -216,4 +216,14 @@ class UserService {
       throw Exception('Failed to load blocked users: $e');
     }
   }
+
+  // Kiểm tra trạng thái block giữa 2 người dùng
+  Future<Map<String, dynamic>> checkBlockStatus(String otherUserId) async {
+    try {
+      final response = await _dio.get('users/block-status/$otherUserId');
+      return response.data;
+    } catch (e) {
+      throw Exception('Failed to check block status: $e');
+    }
+  }
 }

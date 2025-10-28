@@ -6,6 +6,7 @@ import 'package:relo/utils/show_notification.dart';
 import 'package:relo/screen/verify_otp_screen.dart';
 import 'package:relo/screen/change_email_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
   final String userId;
@@ -31,13 +32,10 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
 
   Future<void> _getCurrentUserInfo() async {
     final user = await _userService.getUserById(widget.userId);
-
-    if (user != null) {
-      setState(() {
-        _currentUsername = user.username;
-        _currentEmail = user.email;
-      });
-    }
+    setState(() {
+      _currentUsername = user.username;
+      _currentEmail = user.email;
+    });
   }
 
   Future<void> _loadBlockedUsers() async {
@@ -132,7 +130,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                           style: TextStyle(color: Colors.grey, fontSize: 14),
                         ),
                         SizedBox(height: 20),
-                        if (_blockedUsers.isEmpty)
+                        if (_isLoading)
+                          ...List.generate(3, (index) => _buildShimmerItem())
+                        else if (_blockedUsers.isEmpty)
                           Center(
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 20),
@@ -302,6 +302,30 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
       trailing: TextButton(
         onPressed: () => _unblockUser(user.id, user.displayName),
         child: Text('Bỏ chặn', style: TextStyle(color: Color(0xFF7A2FC0))),
+      ),
+    );
+  }
+
+  Widget _buildShimmerItem() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: ListTile(
+        leading: CircleAvatar(radius: 25, backgroundColor: Colors.white),
+        title: Container(
+          height: 16,
+          color: Colors.white,
+          margin: EdgeInsets.only(bottom: 8),
+        ),
+        subtitle: Container(height: 14, width: 100, color: Colors.white),
+        trailing: Container(
+          width: 70,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
     );
   }

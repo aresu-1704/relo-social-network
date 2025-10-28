@@ -167,12 +167,19 @@ class _UserSearchResultItem extends StatelessWidget {
       final conversationId = conversation['id'];
 
       if (context.mounted) {
+        final participants = (conversation['participants'] ?? []) as List;
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => ChatScreen(
               conversationId: conversationId,
               chatName: user.displayName,
               isGroup: false,
+              memberIds: participants.isNotEmpty
+                  ? participants
+                        .map((p) => p['id']?.toString() ?? '')
+                        .where((id) => id.isNotEmpty)
+                        .toList()
+                  : [currentUserId, user.id],
             ),
           ),
         );
