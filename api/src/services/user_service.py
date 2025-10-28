@@ -53,7 +53,7 @@ class UserService:
                 "request_id": str(new_request.id),
                 "from_user_id": str(from_user.id),
                 "displayName": from_user.displayName,
-                "avatar": from_user.avatar
+                "avatar": from_user.avatarUrl
             }
         }
         asyncio.create_task(
@@ -61,6 +61,26 @@ class UserService:
         )
 
         return new_request
+
+    @staticmethod
+    async def cancel_friend_request(from_user_id: str, to_user_id: str):
+        """
+        Hủy một lời mời kết bạn đã gửi.
+        """
+        # Tìm friend request pending từ from_user_id tới to_user_id
+        request = await FriendRequest.find_one({
+            "fromUserId": from_user_id,
+            "toUserId": to_user_id,
+            "status": "pending"
+        })
+        
+        if not request:
+            raise ValueError("Không tìm thấy lời mời kết bạn để hủy.")
+        
+        # Xóa friend request
+        await request.delete()
+        
+        return {"message": "Đã hủy lời mời kết bạn thành công."}
 
     @staticmethod
     async def respond_to_friend_request(request_id: str, user_id: str, response: str):
@@ -76,9 +96,6 @@ class UserService:
             raise ValueError("Yêu cầu kết bạn này đã được phản hồi.")
 
         if response == 'accept':
-            # Chấp nhận yêu cầu
-            friend_request.status = 'accepted'
-            
             # Lấy cả hai người dùng để cập nhật danh sách bạn bè của họ
             from_user = await User.get(friend_request.fromUserId)
             to_user = await User.get(friend_request.toUserId)
@@ -86,40 +103,94 @@ class UserService:
             if not from_user or not to_user:
                 raise ValueError("Không tìm thấy một trong hai người dùng.")
 
-            # Thêm ID bạn bè vào danh sách của nhau
-            from_user.friendIds.append(to_user.id)
-            to_user.friendIds.append(from_user.id)
+            # Thêm ID bạn bè vào danh sách của nhau (dùng string ID)
+            to_user_id_str = str(to_user.id)
+            from_user_id_str = str(from_user.id)
+            
+            if to_user_id_str not in from_user.friendIds:
+                from_user.friendIds.append(to_user_id_str)
+            if from_user_id_str not in to_user.friendIds:
+                to_user.friendIds.append(from_user_id_str)
 
             # Lưu các thay đổi vào cơ sở dữ liệu
-            await friend_request.save()
             await from_user.save()
             await to_user.save()
             
-            # Gửi thông báo real-time đến người gửi yêu cầu
-            notification_payload = {
+            # Xóa friend request khỏi database sau khi đã chấp nhận
+            await friend_request.delete()
+            
+            # Gửi thông báo real-time đến cả hai người
+            # Gửi cho người gửi yêu cầu
+            notification_payload_from = {
                 "type": "friend_request_accepted",
                 "payload": {
                     "user_id": str(to_user.id),
-                    "displayName": to_user.displayName
+                    "displayName": to_user.displayName,
+                    "avatarUrl": to_user.avatarUrl
                 }
             }
             asyncio.create_task(
-                manager.broadcast_to_user(friend_request.fromUserId, notification_payload)
+                manager.broadcast_to_user(friend_request.fromUserId, notification_payload_from)
+            )
+            
+            # Gửi cho người chấp nhận
+            notification_payload_to = {
+                "type": "friend_added",
+                "payload": {
+                    "user_id": str(from_user.id),
+                    "displayName": from_user.displayName,
+                    "avatarUrl": from_user.avatarUrl
+                }
+            }
+            asyncio.create_task(
+                manager.broadcast_to_user(str(to_user.id), notification_payload_to)
             )
 
         elif response == 'reject':
-            # Từ chối yêu cầu
-            friend_request.status = 'rejected'
-            await friend_request.save()
+            # Từ chối yêu cầu - xóa khỏi database
+            await friend_request.delete()
+            
+            # Broadcast notification đến người gửi yêu cầu
+            from_user = await User.get(friend_request.fromUserId)
+            if from_user:
+                notification_payload = {
+                    "type": "friend_request_declined",
+                    "payload": {
+                        "user_id": str(friend_request.toUserId)
+                    }
+                }
+                asyncio.create_task(
+                    manager.broadcast_to_user(friend_request.fromUserId, notification_payload)
+                )
         else:
             raise ValueError("Phản hồi không hợp lệ. Phải là 'accept' hoặc 'reject'.")
         
         return friend_request
+    
+    @staticmethod
+    async def respond_to_friend_request_by_from_user(from_user_id: str, current_user_id: str, response: str):
+        """
+        Phản hồi một yêu cầu kết bạn dựa vào from_user_id ('accept' hoặc 'reject').
+        """
+        # Tìm friend request từ from_user_id tới current_user_id
+        friend_request = await FriendRequest.find_one({
+            "fromUserId": from_user_id,
+            "toUserId": current_user_id,
+            "status": "pending"
+        })
+        
+        if not friend_request:
+            raise ValueError("Không tìm thấy yêu cầu kết bạn.")
+        
+        # Sử dụng lại logic từ respond_to_friend_request
+        request_id = str(friend_request.id)
+        return await UserService.respond_to_friend_request(request_id, current_user_id, response)
 
     @staticmethod
     async def get_friend_requests(user_id: str):
         """
         Lấy danh sách các lời mời kết bạn đang chờ xử lý cho một người dùng.
+        Trả về danh sách kèm thông tin người gửi.
         """
         # Tìm tất cả các yêu cầu kết bạn đang chờ xử lý gửi đến người dùng
         pending_requests = await FriendRequest.find(
@@ -129,7 +200,30 @@ class UserService:
             }
         ).to_list()
         
-        return pending_requests
+        # Lấy thông tin người gửi
+        result = []
+        for req in pending_requests:
+            try:
+                from_user = await User.get(req.fromUserId)
+                if from_user:
+                    result.append({
+                        "id": str(req.id),
+                        "fromUserId": req.fromUserId,
+                        "toUserId": req.toUserId,
+                        "status": req.status,
+                        "createdAt": req.createdAt,
+                        "fromUser": {
+                            "id": str(from_user.id),
+                            "username": from_user.username,
+                            "displayName": from_user.displayName,
+                            "avatarUrl": from_user.avatarUrl if from_user.avatarUrl else None,
+                        }
+                    })
+            except:
+                # Skip if user not found
+                continue
+        
+        return result
 
     @staticmethod
     async def get_friends(user_id: str):
@@ -175,7 +269,8 @@ class UserService:
             "displayName": user.displayName,
             "avatarUrl": user.avatarUrl if user.avatarUrl not in ["", None] else None,
             "backgroundUrl": user.backgroundUrl if user.backgroundUrl not in ["", None] else None,
-            "bio": user.bio if user.bio not in ["", None] else None
+            "bio": user.bio if user.bio not in ["", None] else None,
+            "createdAt": user.createdAt.isoformat() if user.createdAt else None
         }
 
     @staticmethod
@@ -209,6 +304,31 @@ class UserService:
             blocked_user.friendIds.remove(user_id)
             await blocked_user.save()
 
+        # Broadcast notification đến cả hai user
+        # Gửi cho người chặn
+        notification_payload_blocker = {
+            "type": "user_blocked",
+            "payload": {
+                "user_id": str(blocked_user.id),
+                "displayName": blocked_user.displayName
+            }
+        }
+        asyncio.create_task(
+            manager.broadcast_to_user(user_id, notification_payload_blocker)
+        )
+        
+        # Gửi cho người bị chặn
+        notification_payload_blocked = {
+            "type": "you_were_blocked",
+            "payload": {
+                "user_id": str(user.id),
+                "displayName": user.displayName
+            }
+        }
+        asyncio.create_task(
+            manager.broadcast_to_user(block_user_id, notification_payload_blocked)
+        )
+
         return {"message": "Người dùng đã bị chặn thành công."}
 
     @staticmethod
@@ -223,6 +343,20 @@ class UserService:
         if block_user_id in user.blockedUserIds:
             user.blockedUserIds.remove(block_user_id)
             await user.save()
+            
+            # Broadcast notification đến người bỏ chặn
+            blocked_user = await User.get(block_user_id)
+            if blocked_user:
+                notification_payload = {
+                    "type": "user_unblocked",
+                    "payload": {
+                        "user_id": str(blocked_user.id),
+                        "displayName": blocked_user.displayName
+                    }
+                }
+                asyncio.create_task(
+                    manager.broadcast_to_user(user_id, notification_payload)
+                )
 
         return {"message": "Người dùng đã được bỏ chặn thành công."}
 
@@ -239,21 +373,61 @@ class UserService:
         users_blocking_me = await User.find({"blockedUserIds": current_user_id}).to_list()
         ids_blocking_me = [str(u.id) for u in users_blocking_me]
 
-        # Tổng hợp danh sách ID bị chặn
-        excluded_ids = current_user.blockedUserIds + ids_blocking_me
+        # Tổng hợp danh sách ID bị chặn (bao gồm cả current_user và deleted users)
+        excluded_ids = current_user.blockedUserIds + ids_blocking_me + [current_user_id]
 
-        # Tìm kiếm người dùng
+        # Tìm kiếm người dùng (loại trừ deleted và blocked)
         users = await User.find(
             {
                 "$or": [
                     {"username": {"$regex": query, "$options": "i"}},
                     {"displayName": {"$regex": query, "$options": "i"}}
                 ],
-                "_id": {"$nin": [ObjectId(uid) for uid in excluded_ids]}
+                "_id": {"$nin": [ObjectId(uid) for uid in excluded_ids if uid and uid != '']},
+                "status": {"$ne": "deleted"}
             }
         ).to_list()
 
-        return users
+        # Add friend status info for each user
+        results = []
+        current_user_id_str = str(current_user.id)
+        
+        for user in users:
+            user_id_str = str(user.id)
+            
+            # Check if friend
+            is_friend = user_id_str in current_user.friendIds
+            
+            if is_friend:
+                friend_status = 'friends'
+            else:
+                # Check pending requests
+                sent_request = await FriendRequest.find_one({
+                    "fromUserId": current_user_id_str,
+                    "toUserId": user_id_str,
+                    "status": "pending"
+                })
+                if sent_request:
+                    friend_status = 'pending_sent'
+                else:
+                    received_request = await FriendRequest.find_one({
+                        "fromUserId": user_id_str,
+                        "toUserId": current_user_id_str,
+                        "status": "pending"
+                    })
+                    if received_request:
+                        friend_status = 'pending_received'
+                    else:
+                        friend_status = 'none'
+            
+            # Store with status
+            user_data = {
+                'user': user,
+                'friendStatus': friend_status
+            }
+            results.append(user_data)
+
+        return results
 
     @staticmethod
     async def get_users_by_ids(user_ids: list[str]):

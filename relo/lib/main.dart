@@ -7,6 +7,8 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:relo/screen/login_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:relo/providers/notification_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -115,15 +117,20 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ThemeData(primarySwatch: Colors.purple);
 
-    return MaterialApp(
-      navigatorKey:
-          ServiceLocator.navigatorKey, // Assign the global navigator key
-      debugShowCheckedModeBanner: false,
-      title: "Relo",
-      theme: theme.copyWith(
-        textTheme: GoogleFonts.poppinsTextTheme(theme.textTheme),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+      ],
+      child: MaterialApp(
+        navigatorKey:
+            ServiceLocator.navigatorKey, // Assign the global navigator key
+        debugShowCheckedModeBanner: false,
+        title: "Relo",
+        theme: theme.copyWith(
+          textTheme: GoogleFonts.poppinsTextTheme(theme.textTheme),
+        ),
+        home: isLoggedIn ? const MainScreen() : const LoginScreen(),
       ),
-      home: isLoggedIn ? const MainScreen() : const LoginScreen(),
     );
   }
 }

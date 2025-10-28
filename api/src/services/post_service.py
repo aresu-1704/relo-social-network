@@ -133,6 +133,43 @@ class PostService:
         ]
 
     @staticmethod
+    async def get_user_posts(user_id: str, limit: int = 20, skip: int = 0):
+        """
+        Lấy danh sách các bài đăng của một người dùng cụ thể.
+        """
+        # Lấy thông tin user
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Chỉ lấy posts nếu user chưa bị xóa
+        if user.status == 'deleted':
+            raise ValueError("Tài khoản đã bị xóa.")
+        
+        # Truy vấn các bài đăng của user
+        posts = await Post.find(
+            {
+                "authorId": user_id
+            },
+            sort="-createdAt", 
+            skip=skip, 
+            limit=limit
+        ).to_list()
+
+        return [ 
+            PostPublic(
+                id=str(post.id),
+                authorId=str(post.authorId),
+                authorInfo=post.authorInfo,
+                content=post.content,
+                mediaUrls=post.mediaUrls,
+                reactions=post.reactions,
+                reactionCounts=post.reactionCounts,
+                createdAt=post.createdAt.isoformat()
+            ) for post in posts 
+        ]
+
+    @staticmethod
     async def react_to_post(user_id: str, post_id: str, reaction_type: str):
         """
         Thêm hoặc thay đổi phản ứng của người dùng đối với một bài đăng.

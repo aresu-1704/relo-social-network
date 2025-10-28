@@ -11,6 +11,7 @@ class BuildTextFormField {
     bool isPassword = false,
     bool obscureText = false,
     VoidCallback? toggleObscure,
+    int? maxLength,
   }) {
     const Color mainColor = Color(0xFF7A2FC0);
 
@@ -20,6 +21,7 @@ class BuildTextFormField {
       validator: validator,
       cursorColor: mainColor,
       onChanged: onChanged, // ✅ Gọi trực tiếp callback, Flutter tự truyền value
+      maxLength: maxLength,
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: mainColor),
         hintText: hintText,

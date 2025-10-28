@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:relo/screen/chat_screen.dart';
-import 'package:relo/screen/main_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
@@ -186,26 +185,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
             'Bạn chưa có cuộc trò chuyện nào',
             style: TextStyle(fontSize: 18, color: Colors.grey[600]),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.person_add_alt_1, size: 18),
-            label: const Text(
-              'Tìm bạn để trò chuyện',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-            onPressed: () {
-              context.findAncestorStateOfType<MainScreenState>()?.changeTab(2);
-            },
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: const Color(0xFF7A2FC0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              minimumSize: const Size(0, 36),
-            ),
-          ),
         ],
       ),
     );
@@ -225,15 +204,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         String title;
         ImageProvider avatar;
+        String? avatarUrl; // Store avatar URL
 
         if (conversation['isGroup']) {
           title =
               conversation['name'] ??
               otherParticipants.map((p) => p['displayName']).join(", ");
-          avatar = NetworkImage(
-            conversation['avatarUrl'] ??
-                'https://img.freepik.com/premium-vector/group-chat-icon-3d-vector-illustration-design_48866-1609.jpg',
-          );
+          avatarUrl =
+              conversation['avatarUrl'] ??
+              'https://img.freepik.com/premium-vector/group-chat-icon-3d-vector-illustration-design_48866-1609.jpg';
+          avatar = NetworkImage(avatarUrl!);
         } else {
           final friend = otherParticipants.first;
           final isDeletedAccount =
@@ -241,15 +221,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
           if (isDeletedAccount) {
             title = 'Tài khoản không tồn tại';
+            avatarUrl = null;
             avatar = const AssetImage(
               'assets/icons/icon.png',
             ); // hoặc icon mặc định
           } else {
             title = friend['displayName'];
-            final avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
+            avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
                 ? friend['avatarUrl']
                 : 'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
-            avatar = NetworkImage(avatarUrl);
+            avatar = NetworkImage(avatarUrl!);
           }
         }
 
@@ -313,15 +294,30 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 ),
               ),
               trailing: updatedAt != null
-                  ? Text(
-                      Format.formatZaloTime(updatedAt),
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 10,
-                        fontWeight: (isMine || seen)
-                            ? FontWeight.normal
-                            : FontWeight.bold,
-                      ),
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          Format.formatZaloTime(updatedAt),
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                            fontWeight: (isMine || seen)
+                                ? FontWeight.normal
+                                : FontWeight.bold,
+                          ),
+                        ),
+                        if (!isMine && !seen)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
                     )
                   : null,
               onTap: () async {
@@ -349,6 +345,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       conversationId: conversationId,
                       isGroup: isGroup,
                       chatName: title,
+                      avatarUrl: avatarUrl,
                       memberIds: participants
                           .map((p) => p['id']?.toString() ?? '')
                           .where((id) => id.isNotEmpty)

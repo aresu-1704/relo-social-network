@@ -5,7 +5,10 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/secure_storage_service.dart';
-import 'chat_screen.dart';
+import 'package:relo/screen/profile_screen.dart';
+import 'package:relo/utils/show_notification.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shimmer/shimmer.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -80,20 +83,34 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF7A2FC0),
-        title: TextField(
-          controller: _searchController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          cursorColor: Colors.white,
-          decoration: const InputDecoration(
-            hintText: 'Tìm kiếm người dùng...',
-            hintStyle: TextStyle(color: Colors.white70),
-            border: InputBorder.none,
-          ),
-        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
+        ),
+        leadingWidth: 40,
+        titleSpacing: 0,
+        title: Container(
+          margin: EdgeInsets.only(right: 10),
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: Center(
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
+              cursorColor: Color(0xFF7A2FC0),
+              decoration: const InputDecoration(
+                hintText: 'Tìm kiếm người dùng...',
+                hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 20),
+                isDense: true,
+              ),
+            ),
+          ),
         ),
       ),
       body: _buildBody(),
@@ -102,7 +119,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return _buildShimmerList();
     }
 
     if (!_hasSearched) {
@@ -125,9 +142,51 @@ class _SearchScreenState extends State<SearchScreen> {
       },
     );
   }
+
+  Widget _buildShimmerList() {
+    return ListView.builder(
+      itemCount: 8,
+      itemBuilder: (_, __) => Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Row(
+            children: [
+              CircleAvatar(radius: 28, backgroundColor: Colors.white),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 16,
+                      width: 150,
+                      color: Colors.white,
+                      margin: const EdgeInsets.only(bottom: 8),
+                    ),
+                    Container(height: 14, width: 100, color: Colors.white),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 80,
+                height: 35,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _UserSearchResultItem extends StatelessWidget {
+class _UserSearchResultItem extends StatefulWidget {
   final User user;
   final MessageService messageService;
   final SecureStorageService secureStorageService;
@@ -138,57 +197,35 @@ class _UserSearchResultItem extends StatelessWidget {
     required this.secureStorageService,
   });
 
+  @override
+  State<_UserSearchResultItem> createState() => _UserSearchResultItemState();
+}
+
+class _UserSearchResultItemState extends State<_UserSearchResultItem> {
   final String _fallbackAvatarUrl =
       'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
+  final UserService _userService = ServiceLocator.userService;
 
-  void _navigateToChat(BuildContext context) async {
+  late String _friendStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    // Use friendStatus directly from API response
+    _friendStatus = widget.user.friendStatus ?? 'none';
+  }
+
+  Future<void> _sendFriendRequest() async {
     try {
-      final currentUserId = await secureStorageService.getUserId();
-      if (currentUserId == null) {
-        // Handle not being logged in
-        return;
-      }
-
-      // Don't allow messaging yourself
-      if (user.id == currentUserId) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Bạn không thể nhắn tin cho chính mình.'),
-          ),
-        );
-        return;
-      }
-
-      final conversation = await messageService.getOrCreateConversation(
-        [currentUserId, user.id],
-        false,
-        null,
-      );
-      final conversationId = conversation['id'];
-
-      if (context.mounted) {
-        final participants = (conversation['participants'] ?? []) as List;
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              conversationId: conversationId,
-              chatName: user.displayName,
-              isGroup: false,
-              memberIds: participants.isNotEmpty
-                  ? participants
-                        .map((p) => p['id']?.toString() ?? '')
-                        .where((id) => id.isNotEmpty)
-                        .toList()
-                  : [currentUserId, user.id],
-            ),
-          ),
-        );
+      await _userService.sendFriendRequest(widget.user.id);
+      if (mounted) {
+        setState(() => _friendStatus = 'pending_sent');
       }
     } catch (e) {
-      print('Error navigating to chat: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể mở cuộc trò chuyện: $e')),
+      if (mounted) {
+        await ShowNotification.showToast(
+          context,
+          'Không thể gửi lời mời kết bạn',
         );
       }
     }
@@ -198,8 +235,11 @@ class _UserSearchResultItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        // TODO: Điều hướng đến trang cá nhân của người dùng
-        print('Navigate to profile of ${user.displayName}');
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ProfileScreen(userId: widget.user.id),
+          ),
+        );
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -208,11 +248,12 @@ class _UserSearchResultItem extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundImage: NetworkImage(
-                user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                    ? user.avatarUrl!
+                widget.user.avatarUrl != null &&
+                        widget.user.avatarUrl!.isNotEmpty
+                    ? widget.user.avatarUrl!
                     : _fallbackAvatarUrl,
               ),
-              onBackgroundImageError: (_, __) {}, // Handle image load error
+              onBackgroundImageError: (_, __) {},
               backgroundColor: Colors.grey[200],
             ),
             const SizedBox(width: 16),
@@ -221,28 +262,60 @@ class _UserSearchResultItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user.displayName,
+                    widget.user.displayName,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '@${user.username}',
+                    '@${widget.user.username}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 16),
-            IconButton(
-              icon: const Icon(
-                Icons.message_outlined,
-                color: Color(0xFF7C3AED),
+            // Nút kết bạn - chỉ hiển thị khi không phải bạn bè
+            if (_friendStatus != 'friends') const SizedBox(width: 8),
+            if (_friendStatus != 'friends')
+              TextButton.icon(
+                onPressed: _sendFriendRequest,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  backgroundColor: Color(0xFF7A2FC0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                icon:
+                    _friendStatus == 'pending_sent' ||
+                        _friendStatus == 'pending_received'
+                    ? const Icon(
+                        LucideIcons.userCheck,
+                        color: Colors.white,
+                        size: 18,
+                      )
+                    : const Icon(
+                        LucideIcons.userPlus,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                label: Text(
+                  _friendStatus == 'pending_sent' ||
+                          _friendStatus == 'pending_received'
+                      ? 'Đã gửi'
+                      : 'Kết bạn',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
               ),
-              onPressed: () => _navigateToChat(context),
-            ),
           ],
         ),
       ),

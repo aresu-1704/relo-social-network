@@ -18,6 +18,8 @@ import 'package:relo/utils/show_notification.dart';
 import 'package:relo/widgets/action_button.dart';
 import 'package:relo/screen/profile_screen.dart';
 import 'package:relo/widgets/messages/block_composer.dart';
+import 'package:relo/screen/conversation_settings_screen.dart';
+import 'package:relo/screen/forward_message_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -25,6 +27,7 @@ class ChatScreen extends StatefulWidget {
   final String? chatName;
   final List<String>? memberIds;
   final int? memberCount;
+  final String? avatarUrl;
 
   final void Function(String conversationId)? onConversationSeen;
   final void Function()? onLeftGroup;
@@ -40,6 +43,7 @@ class ChatScreen extends StatefulWidget {
     this.memberCount,
     this.onLeftGroup,
     this.onUserBlocked,
+    this.avatarUrl,
   });
 
   @override
@@ -93,51 +97,80 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _listenToWebSocket() {
     _webSocketSubscription = webSocketService.stream.listen((message) async {
-      final data = jsonDecode(message);
-      if (data['type'] == 'new_message') {
-        final msgData = data['payload']?['message'];
-        if (msgData == null) return;
+      try {
+        final data = jsonDecode(message);
 
-        // Nếu message từ chính mình, không cần xử lý
-        if (msgData['senderId'] == _currentUserId) return;
+        // Ignore friend_request_received events (not relevant to chat screen)
+        if (data['type'] == 'friend_request_received') return;
+        if (data['type'] == 'friend_request_accepted') return;
+        if (data['type'] == 'friend_added') return;
 
-        // Chỉ xử lý message từ conversation hiện tại
-        if (msgData['conversationId'] != _conversationId) return;
+        if (data['type'] == 'new_message') {
+          final msgData = data['payload']?['message'];
+          if (msgData == null) return;
 
-        // Mark as seen khi message đến từ conversation đang mở
-        await _messageService.markAsSeen(_conversationId!, _currentUserId!);
-        widget.onConversationSeen?.call(_conversationId!);
+          // Nếu message từ chính mình, không cần xử lý
+          if (msgData['senderId'] == _currentUserId) return;
 
-        final newMsg = Message(
-          id: msgData['id'] ?? '',
-          conversationId: msgData['conversationId'],
-          senderId: msgData['senderId'],
-          content: msgData['content'] ?? '',
-          avatarUrl: msgData['avatarUrl'] ?? '',
-          timestamp:
-              DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
-          status: 'sent',
-        );
+          // Chỉ xử lý message từ conversation hiện tại
+          if (msgData['conversationId'] != _conversationId) return;
 
-        if (mounted) {
-          setState(() {
-            _messages.insert(0, newMsg);
-          });
+          // Mark as seen khi message đến từ conversation đang mở
+          await _messageService.markAsSeen(_conversationId!, _currentUserId!);
+          widget.onConversationSeen?.call(_conversationId!);
+
+          final newMsg = Message(
+            id: msgData['id'] ?? '',
+            conversationId: msgData['conversationId'],
+            senderId: msgData['senderId'],
+            content: msgData['content'] ?? '',
+            avatarUrl: msgData['avatarUrl'] ?? '',
+            timestamp:
+                DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
+            status: 'sent',
+          );
+
+          if (mounted) {
+            setState(() {
+              _messages.insert(0, newMsg);
+            });
+          }
+        } else if (data['type'] == 'recalled_message') {
+          final msgData = data['payload']?['message'];
+          if (msgData == null) return;
+
+          final messageId = msgData['id'];
+          final index = _messages.indexWhere((m) => m.id == messageId);
+
+          if (index != -1) {
+            setState(() {
+              _messages[index] = _messages[index].copyWith(
+                content: {'type': 'delete'},
+              );
+            });
+          }
+        } else if (data['type'] == 'user_blocked' ||
+            data['type'] == 'you_were_blocked' ||
+            data['type'] == 'user_unblocked') {
+          // Handle block/unblock events
+          final payload = data['payload'];
+          if (payload == null) return;
+
+          final blockedUserId = payload['user_id'];
+
+          // Only update if it's relevant to this conversation
+          final isRelevant =
+              widget.memberIds != null &&
+              widget.memberIds!.contains(blockedUserId);
+
+          if (isRelevant) {
+            // Re-check block status (silently, no toast)
+            await _checkBlockStatus();
+          }
         }
-      } else if (data['type'] == 'recalled_message') {
-        final msgData = data['payload']?['message'];
-        if (msgData == null) return;
-
-        final messageId = msgData['id'];
-        final index = _messages.indexWhere((m) => m.id == messageId);
-
-        if (index != -1) {
-          setState(() {
-            _messages[index] = _messages[index].copyWith(
-              content: {'type': 'delete'},
-            );
-          });
-        }
+      } catch (e) {
+        // Silently ignore unhandled websocket messages to prevent crashes
+        print('ChatScreen: Unhandled WebSocket message type: ${e.toString()}');
       }
     }, onError: (error) => print("WebSocket Error: $error"));
   }
@@ -376,25 +409,33 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _playAudio(String url) async {
-    if (_currentlyPlayingUrl == url) {
-      await _audioPlayer.stop();
-      setState(() => _currentlyPlayingUrl = null);
-      return;
-    }
-
-    if (_currentlyPlayingUrl != null) {
-      await _audioPlayer.stop();
-    }
-
-    setState(() => _currentlyPlayingUrl = url);
-
-    await _audioPlayer.play(UrlSource(url));
-
-    _audioPlayer.onPlayerComplete.listen((_) {
-      if (mounted) {
+    try {
+      if (_currentlyPlayingUrl == url) {
+        await _audioPlayer.stop();
         setState(() => _currentlyPlayingUrl = null);
+        return;
       }
-    });
+
+      if (_currentlyPlayingUrl != null) {
+        await _audioPlayer.stop();
+      }
+
+      setState(() => _currentlyPlayingUrl = url);
+
+      await _audioPlayer.play(UrlSource(url));
+
+      _audioPlayer.onPlayerComplete.listen((_) {
+        if (mounted && _currentlyPlayingUrl == url) {
+          setState(() => _currentlyPlayingUrl = null);
+        }
+      });
+    } catch (e) {
+      print('Error playing audio: $e');
+      setState(() => _currentlyPlayingUrl = null);
+      if (mounted) {
+        await ShowNotification.showToast(context, 'Không thể phát audio');
+      }
+    }
   }
 
   Future<void> _recallMessage(Message message) async {
@@ -426,6 +467,52 @@ class _ChatScreenState extends State<ChatScreen> {
         context,
         'Thu hồi tin nhắn thất bại: ${e.toString()}',
       );
+    }
+  }
+
+  Future<void> _forwardMessage(
+    Message message,
+    Set<String> conversationIds,
+  ) async {
+    try {
+      // Create forward content
+      Map<String, dynamic> forwardContent;
+
+      if (message.content['type'] == 'text') {
+        forwardContent = {
+          'type': 'text',
+          'text': '[Chuyển tiếp] ${message.content['text']}',
+        };
+      } else {
+        // For other message types, forward as text with a note
+        forwardContent = {
+          'type': 'text',
+          'text': '[Chuyển tiếp] [${message.content['type']}]',
+        };
+      }
+
+      // Send the forwarded message to each selected conversation
+      for (final targetConversationId in conversationIds) {
+        await _messageService.sendMessage(
+          targetConversationId,
+          forwardContent,
+          _currentUserId!,
+        );
+      }
+
+      if (mounted) {
+        await ShowNotification.showToast(
+          context,
+          'Đã chuyển tiếp đến ${conversationIds.length} cuộc trò chuyện',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        await ShowNotification.showToast(
+          context,
+          'Không thể chuyển tiếp tin nhắn: ${e.toString()}',
+        );
+      }
     }
   }
 
@@ -481,9 +568,23 @@ class _ChatScreenState extends State<ChatScreen> {
                 icon: LucideIcons.share2, // icon mới gọn, đẹp hơn
                 label: 'Chuyển tiếp',
                 color: const Color(0xFF2979FF),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(context);
-                  // TODO: logic chuyển tiếp
+                  final selectedConversations =
+                      await Navigator.push<Set<String>>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ForwardMessageScreen(
+                            message: message,
+                            conversationId: _conversationId!,
+                          ),
+                        ),
+                      );
+
+                  if (selectedConversations != null &&
+                      selectedConversations.isNotEmpty) {
+                    await _forwardMessage(message, selectedConversations);
+                  }
                 },
               ),
 
@@ -511,235 +612,73 @@ class _ChatScreenState extends State<ChatScreen> {
         widget.chatName == 'Tài khoản không tồn tại' ||
         (widget.memberIds != null && widget.memberIds!.contains('deleted'));
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        // Danh sách nút hành động động
-        final actions = <ActionButton>[
-          if (!widget.isGroup && !isDeletedAccount && !_isBlocked)
-            ActionButton(
-              icon: LucideIcons.userCircle2,
-              label: 'Xem trang cá nhân',
-              color: const Color(0xFF2979FF),
-              onTap: () async {
-                Navigator.pop(context);
-                String friendId = widget.memberIds!.firstWhere(
-                  (id) => id != _currentUserId,
-                );
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) {
-                      return ProfileScreen(userId: friendId);
-                    },
-                  ),
-                );
-              },
-            ),
-          if (!_isBlocked)
-            ActionButton(
-              icon: LucideIcons.bellOff,
-              label: 'Tắt thông báo',
-              color: const Color(0xFF2979FF),
-              onTap: () async {
-                final result = await ShowNotification.showConfirmDialog(
-                  context,
-                  title: 'Tắt thông báo cuộc trò chuyện ?',
-                  confirmText: 'Đồng ý',
-                  confirmColor: Colors.red,
-                );
-
-                if (!result!) return;
-                Navigator.pop(context);
-                // TODO: logic tắt thông báo
-              },
-            ),
-          if (widget.isGroup) ...[
-            ActionButton(
-              icon: LucideIcons.edit3,
-              label: 'Đổi tên nhóm',
-              color: const Color(0xFF9C27B0),
-              onTap: () {
-                Navigator.pop(context);
-                _showChangeGroupNameDialog();
-              },
-            ),
-            ActionButton(
-              icon: LucideIcons.imagePlus,
-              label: 'Đổi ảnh nhóm',
-              color: const Color(0xFF4CAF50),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Implement change group avatar
-                ShowNotification.showToast(
-                  context,
-                  'Chức năng đang phát triển',
-                );
-              },
-            ),
-            ActionButton(
-              icon: LucideIcons.userPlus,
-              label: 'Thêm thành viên',
-              color: const Color(0xFF2196F3),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Implement add members to group
-                ShowNotification.showToast(
-                  context,
-                  'Chức năng đang phát triển',
-                );
-              },
-            ),
-          ] else if (!isDeletedAccount && !_isBlocked)
-            ActionButton(
-              icon: LucideIcons.users,
-              label: 'Tạo nhóm với ${widget.chatName}',
-              color: const Color(0xFF00BCD4),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: logic tạo nhóm
-              },
-            ),
-          if (widget.isGroup)
-            ActionButton(
-              icon: LucideIcons.logOut,
-              label: 'Rời nhóm',
-              color: const Color(0xFFFF5722),
-              onTap: () async {
-                final result = await ShowNotification.showConfirmDialog(
-                  context,
-                  title: 'Bạn muốn rời khỏi cuộc trò chuyện ?',
-                  confirmText: 'Đồng ý',
-                  confirmColor: Colors.red,
-                );
-
-                if (!result!) return;
-                Navigator.pop(context);
-                _handleLeaveGroup();
-              },
-            )
-          else if (!isDeletedAccount && !_isBlocked)
-            ActionButton(
-              icon: LucideIcons.userX,
-              label: 'Chặn người dùng',
-              color: const Color(0xFFFF5252),
-              onTap: () async {
-                final result = await ShowNotification.showConfirmDialog(
-                  context,
-                  title: 'Bạn muốn chặn người dùng này ?',
-                  confirmText: 'Đồng ý',
-                  confirmColor: Colors.red,
-                );
-
-                if (!result!) return;
-                Navigator.pop(context);
-
-                // Logic chặn người dùng
-                try {
-                  String friendId = widget.memberIds!.firstWhere(
-                    (id) => id != _currentUserId,
-                    orElse: () => '',
-                  );
-
-                  if (friendId.isEmpty) {
-                    if (mounted) {
-                      await ShowNotification.showToast(
-                        context,
-                        'Không tìm thấy người dùng',
-                      );
-                    }
-                    return;
-                  }
-
-                  await _userService.blockUser(friendId);
-
-                  if (mounted) {
-                    await ShowNotification.showToast(
-                      context,
-                      'Đã chặn người dùng',
-                    );
-
-                    // Gọi callback để xóa user khỏi danh sách bạn bè
-                    if (widget.onUserBlocked != null) {
-                      widget.onUserBlocked!(friendId);
-                    }
-
-                    // Quay về màn hình messages
-                    Navigator.pop(context);
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    await ShowNotification.showToast(
-                      context,
-                      'Không thể chặn người dùng',
-                    );
-                  }
-                }
-              },
-            ),
-          ActionButton(
-            icon: LucideIcons.trash2,
-            label: 'Xóa cuộc trò chuyện',
-            color: const Color(0xFFE91E63),
-            onTap: () async {
-              final result = await ShowNotification.showConfirmDialog(
-                context,
-                title: 'Xóa tin nhắn ?',
-                confirmText: 'Xóa',
-                confirmColor: Colors.red,
-              );
-
-              if (!result!) return;
-              Navigator.pop(context);
-
-              try {
-                await _messageService.deleteConversation(_conversationId!);
-                if (mounted) {
-                  await ShowNotification.showToast(
-                    context,
-                    'Đã xóa cuộc trò chuyện',
-                  );
-                  Navigator.of(context).pop();
-                }
-              } catch (e) {
-                if (mounted) {
-                  await ShowNotification.showToast(
-                    context,
-                    'Không thể xóa cuộc trò chuyện',
-                  );
-                }
-              }
-            },
-          ),
-        ];
-
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.95),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 10,
-                offset: Offset(0, -3),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ConversationSettingsScreen(
+          isGroup: widget.isGroup,
+          chatName: widget.chatName,
+          avatarUrl: widget.avatarUrl,
+          currentUserId: _currentUserId,
+          memberIds: widget.memberIds,
+          isDeletedAccount: isDeletedAccount,
+          isBlocked: _isBlocked,
+          conversationId: _conversationId!,
+          onViewProfile: (friendId) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    ProfileScreen(userId: friendId, hideMessageButton: true),
               ),
-            ],
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < actions.length; i++) ...[
-                VerticalActionButton(button: actions[i]),
-                if (i != actions.length - 1) const SizedBox(height: 12),
-              ],
-            ],
-          ),
-        );
-      },
+            );
+          },
+          onLeaveGroup: () {
+            _handleLeaveGroup();
+          },
+          onChangeGroupName: () {
+            _showChangeGroupNameDialog();
+          },
+          onBlockUser: (friendId) async {
+            try {
+              await _userService.blockUser(friendId);
+              if (mounted) {
+                await ShowNotification.showToast(context, 'Đã chặn người dùng');
+                if (widget.onUserBlocked != null) {
+                  widget.onUserBlocked!(friendId);
+                }
+                Navigator.pop(context);
+              }
+            } catch (e) {
+              if (mounted) {
+                await ShowNotification.showToast(
+                  context,
+                  'Không thể chặn người dùng',
+                );
+              }
+            }
+          },
+          onDeleteConversation: () async {
+            try {
+              await _messageService.deleteConversation(_conversationId!);
+              if (mounted) {
+                await ShowNotification.showToast(
+                  context,
+                  'Đã xóa cuộc trò chuyện',
+                );
+                Navigator.of(context).pop(); // Back to messages screen
+              }
+            } catch (e) {
+              if (mounted) {
+                await ShowNotification.showToast(
+                  context,
+                  'Không thể xóa cuộc trò chuyện',
+                );
+              }
+            }
+          },
+        ),
+      ),
     );
   }
 
@@ -784,7 +723,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.settings2, color: Colors.white),
+            icon: const Icon(LucideIcons.info, color: Colors.white),
             onPressed: () {
               _showConversationSettings();
             },

@@ -4,6 +4,8 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/secure_storage_service.dart';
+import 'package:relo/services/post_service.dart';
+import 'package:relo/models/post.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -13,17 +15,22 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:relo/utils/permission_util.dart';
 import 'package:relo/screen/media_fullscreen_viewer.dart';
 import 'package:relo/screen/edit_profile_screen.dart';
 import 'package:relo/utils/image_picker_settings.dart';
 import 'package:relo/widgets/profiles/profile_header.dart';
 import 'package:relo/widgets/profiles/profile_components.dart';
+import 'package:relo/widgets/posts/enhanced_post_card.dart';
+import 'package:intl/intl.dart';
+import 'package:relo/services/websocket_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
+  final bool hideMessageButton;
 
-  const ProfileScreen({super.key, this.userId});
+  const ProfileScreen({super.key, this.userId, this.hideMessageButton = false});
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -33,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     with TickerProviderStateMixin {
   final UserService _userService = ServiceLocator.userService;
   final MessageService _messageService = ServiceLocator.messageService;
+  final PostService _postService = ServiceLocator.postService;
   User? _user;
   bool _isLoading = true;
   bool _isOwnProfile = false;
@@ -48,8 +56,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   // Statistics
   int _friendCount = 0;
   int _postCount = 0;
-  bool _isFriend = false;
-  bool _hasPendingRequest = false;
+  String _friendStatus =
+      'none'; // 'none', 'pending_sent', 'pending_received', 'friends'
+  List<Post> _posts = [];
+
+  // WebSocket listener
+  StreamSubscription? _webSocketSubscription;
 
   // Temporary image storage for preview
   String? _tempAvatarPath;
@@ -63,6 +75,56 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
     );
     _initProfile();
+    _listenToWebSocket();
+  }
+
+  void _listenToWebSocket() {
+    if (widget.userId == null) return; // Only for other users' profiles
+
+    _webSocketSubscription = webSocketService.stream.listen((message) async {
+      try {
+        final data = jsonDecode(message);
+        final type = data['type'] as String?;
+        final payload = data['payload'];
+
+        // Listen to friend-related events (matching backend broadcast types)
+        final isFriendEvent =
+            type == 'friend_request_received' ||
+            type == 'friend_request_accepted' ||
+            type == 'friend_added' ||
+            type == 'friend_request_declined';
+
+        if (widget.userId != null && payload != null && isFriendEvent) {
+          // Extract user IDs from payload based on event type
+          String? relevantUserId;
+
+          if (type == 'friend_request_received') {
+            // payload: {request_id, from_user_id, displayName, avatar}
+            relevantUserId = payload['from_user_id'] as String?;
+          } else if (type == 'friend_request_accepted') {
+            // payload: {user_id, displayName, avatarUrl}
+            relevantUserId = payload['user_id'] as String?;
+          } else if (type == 'friend_added') {
+            // payload: {user_id, displayName, avatarUrl}
+            relevantUserId = payload['user_id'] as String?;
+          } else if (type == 'friend_request_declined') {
+            // payload: {user_id}
+            relevantUserId = payload['user_id'] as String?;
+          }
+
+          // Check if this event affects the current profile user
+          if (relevantUserId == widget.userId && mounted) {
+            // Reload friend status
+            final currentUser = await _userService.getMe();
+            if (currentUser != null && _user != null && mounted) {
+              await _checkFriendStatus(currentUser, _user!);
+            }
+          }
+        }
+      } catch (e) {
+        print('Error in WebSocket listener: $e');
+      }
+    });
   }
 
   Future<void> _initProfile() async {
@@ -78,6 +140,10 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     setState(() {
       _currentUserId = currentUser.id;
+      // Set _isOwnProfile early if userId is provided
+      if (widget.userId != null) {
+        _isOwnProfile = currentUser.id == widget.userId;
+      }
     });
   }
 
@@ -86,13 +152,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       User? user;
       if (widget.userId == null) {
         user = await _userService.getUserProfile(_currentUserId);
-        _isOwnProfile = true;
+        setState(() {
+          _isOwnProfile = true;
+        });
       } else {
         // Load other user profile
         user = await _userService.getUserProfile(widget.userId!);
         // Check if it's own profile by comparing with current user
         User? currentUser = await _userService.getMe();
-        _isOwnProfile = currentUser?.id == widget.userId;
+        setState(() {
+          _isOwnProfile = currentUser?.id == widget.userId;
+        });
 
         // Check friend status if not own profile
         if (!_isOwnProfile && currentUser != null) {
@@ -133,8 +203,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         final friends = await _userService.getFriends();
         _friendCount = friends.length;
       }
-      // TODO: Load post count from API when available
-      _postCount = 0;
+
+      // Load posts
+      final posts = await _postService.getUserPosts(user.id);
+      setState(() {
+        _posts = posts;
+        _postCount = posts.length;
+      });
     } catch (e) {
       print('Error loading statistics: $e');
     }
@@ -144,25 +219,30 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _animationController.dispose();
     _refreshController.dispose();
+    _webSocketSubscription?.cancel();
     super.dispose();
+  }
+
+  String _formatJoinDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      final formatter = DateFormat('dd/MM/yyyy');
+      return formatter.format(date);
+    } catch (e) {
+      return dateString;
+    }
   }
 
   Future<void> _checkFriendStatus(User currentUser, User profileUser) async {
     try {
-      // Check if they are friends
-      final friends = await _userService.getFriends();
-      _isFriend = friends.any((f) => f.id == profileUser.id);
+      // Check friend status using API
+      final status = await _userService.checkFriendStatus(profileUser.id);
+      print('Friend status updated to: $status');
 
-      // Check pending requests
-      if (!_isFriend) {
-        final pendingRequests = await _userService.getPendingFriendRequests();
-        _hasPendingRequest = pendingRequests.any(
-          (r) =>
-              r['fromUserId'] == currentUser.id &&
-                  r['toUserId'] == profileUser.id ||
-              r['fromUserId'] == profileUser.id &&
-                  r['toUserId'] == currentUser.id,
-        );
+      if (mounted) {
+        setState(() {
+          _friendStatus = status;
+        });
       }
     } catch (e) {
       print('Error checking friend status: $e');
@@ -486,6 +566,52 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
+      floatingActionButton: !_isOwnProfile && !widget.hideMessageButton
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                try {
+                  // Create or get conversation with the user
+                  final newConversation = await _messageService
+                      .getOrCreateConversation([_user!.id], false, null);
+
+                  // Navigate to chat screen
+                  final participants =
+                      (newConversation['participants'] ?? []) as List;
+                  final secureStorage = const SecureStorageService();
+                  final currentUserId = await secureStorage.getUserId();
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(
+                        conversationId:
+                            newConversation['_id'] ?? newConversation['id'],
+                        isGroup: false,
+                        chatName: _user!.displayName,
+                        memberIds: participants.isNotEmpty
+                            ? participants
+                                  .map((p) => p['id']?.toString() ?? '')
+                                  .where((id) => id.isNotEmpty)
+                                  .toList()
+                            : [_user!.id, currentUserId!],
+                        avatarUrl: _user!.avatarUrl,
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    await ShowNotification.showToast(
+                      context,
+                      'Không thể mở cuộc trò chuyện',
+                    );
+                  }
+                }
+              },
+              icon: Icon(Icons.message, color: Colors.white),
+              label: Text('Nhắn tin', style: TextStyle(color: Colors.white)),
+              backgroundColor: Color(0xFF7A2FC0),
+            )
+          : null,
       body: SmartRefresher(
         enablePullDown: true,
         header: ClassicHeader(
@@ -618,20 +744,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                         SizedBox(height: 15),
                         ProfileComponents.buildInfoRow(
-                          Icons.person,
-                          'Tên đăng nhập',
-                          _user!.username,
-                        ),
-                        ProfileComponents.buildInfoRow(
                           Icons.email,
                           'Email',
                           _user!.email,
                         ),
-                        ProfileComponents.buildInfoRow(
-                          Icons.badge,
-                          'Tên hiển thị',
-                          _user!.displayName,
-                        ),
+                        if (_user!.createdAt != null)
+                          ProfileComponents.buildInfoRow(
+                            Icons.calendar_today,
+                            'Ngày tham gia',
+                            _formatJoinDate(_user!.createdAt!),
+                          ),
                       ],
                     ),
                   ),
@@ -641,85 +763,60 @@ class _ProfileScreenState extends State<ProfileScreen>
                     SizedBox(height: 20),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 15),
-                      child: Row(
+                      child: ProfileComponents.buildFriendButton(
+                        context: context,
+                        friendStatus: _friendStatus,
+                        user: _user!,
+                        userService: _userService,
+                        refreshState: setState,
+                        onFriendRequestSent: () async {
+                          // Reload friend status after sending request
+                          final currentUser = await _userService.getMe();
+                          if (currentUser != null && _user != null) {
+                            await _checkFriendStatus(currentUser, _user!);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+
+                  // User's posts section
+                  if (_posts.isNotEmpty) ...[
+                    SizedBox(height: 20),
+                    Container(
+                      margin: EdgeInsets.symmetric(horizontal: 15),
+                      padding: EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                try {
-                                  // Create or get conversation with the user
-                                  final newConversation = await _messageService
-                                      .getOrCreateConversation(
-                                        [_user!.id],
-                                        false,
-                                        null,
-                                      );
-
-                                  // Navigate to chat screen
-                                  final participants =
-                                      (newConversation['participants'] ?? [])
-                                          as List;
-                                  final secureStorage =
-                                      const SecureStorageService();
-                                  final currentUserId = await secureStorage
-                                      .getUserId();
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatScreen(
-                                        conversationId:
-                                            newConversation['_id'] ??
-                                            newConversation['id'],
-                                        isGroup: false,
-                                        chatName: _user!.displayName,
-                                        memberIds: participants.isNotEmpty
-                                            ? participants
-                                                  .map(
-                                                    (p) =>
-                                                        p['id']?.toString() ??
-                                                        '',
-                                                  )
-                                                  .where((id) => id.isNotEmpty)
-                                                  .toList()
-                                            : [_user!.id, currentUserId!],
-                                      ),
-                                    ),
-                                  );
-                                } catch (e) {
-                                  if (mounted) {
-                                    await ShowNotification.showToast(
-                                      context,
-                                      'Không thể mở cuộc trò chuyện',
-                                    );
-                                  }
-                                }
-                              },
-                              icon: Icon(Icons.message, color: Colors.white),
-                              label: Text(
-                                'Nhắn tin',
-                                style: TextStyle(color: Colors.white),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.article,
+                                color: Color(0xFF7A2FC0),
+                                size: 20,
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF7A2FC0),
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                              SizedBox(width: 10),
+                              Text(
+                                'Bài viết',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: ProfileComponents.buildFriendButton(
-                              context: context,
-                              isFriend: _isFriend,
-                              hasPendingRequest: _hasPendingRequest,
-                              user: _user!,
-                              userService: _userService,
-                              refreshState: setState,
-                            ),
-                          ),
+                          SizedBox(height: 15),
+                          ..._posts.map((post) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: EnhancedPostCard(post: post),
+                            );
+                          }).toList(),
                         ],
                       ),
                     ),

@@ -137,7 +137,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     controller: _usernameController,
                     style: GoogleFonts.poppins(),
                     decoration: InputDecoration(
-                      hintText: 'Tên đăng nhập hoặc Email',
+                      hintText: 'Nhập Email để tìm tài khoản',
                       hintStyle: GoogleFonts.poppins(),
                       prefixIcon: const Icon(
                         Icons.person_outline,

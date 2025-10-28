@@ -85,7 +85,12 @@ class WebSocketService {
 
       _channel!.stream.listen(
         (data) {
-          _streamController.add(data);
+          try {
+            // Wrap in try-catch to prevent crashes from unhandled messages
+            _streamController.add(data);
+          } catch (e) {
+            print('Error handling WebSocket message: $e');
+          }
         },
         onDone: () async {
           await _handleDisconnect();

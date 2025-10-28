@@ -116,12 +116,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 20),
             TextField(
               controller: _displayNameController,
+              maxLength: 50,
               decoration: InputDecoration(
                 labelText: 'Tên hiển thị',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
                 prefixIcon: const Icon(Icons.person, color: Color(0xFF7A2FC0)),
+                helperText: 'Tối đa 50 ký tự',
+                counterText: '',
               ),
             ),
             const SizedBox(height: 15),

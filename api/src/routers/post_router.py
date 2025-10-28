@@ -72,6 +72,20 @@ async def get_post_feed(
     # Ánh xạ danh sách kết quả sang schema PostPublic
     return posts
 
+@router.get("/user/{user_id}", response_model=List[PostPublic])
+async def get_user_posts(
+    user_id: str,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user)
+):
+    """Lấy danh sách các bài đăng của một người dùng cụ thể."""
+    try:
+        posts = await PostService.get_user_posts(user_id, limit=limit, skip=skip)
+        return posts
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 @router.post("/{post_id}/react", response_model=PostPublic)
 async def react_to_post(
     post_id: str,

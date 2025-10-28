@@ -73,62 +73,257 @@ class ProfileComponents {
   // ==== Nút kết bạn ====
   static Widget buildFriendButton({
     required BuildContext context,
-    required bool isFriend,
-    required bool hasPendingRequest,
+    required String
+    friendStatus, // 'none', 'pending_sent', 'pending_received', 'friends'
     required dynamic user,
     required UserService userService,
     required Function refreshState,
+    Function? onFriendRequestSent,
   }) {
+    final isFriend = friendStatus == 'friends';
+    final hasPendingRequestSent = friendStatus == 'pending_sent';
+    final hasPendingRequestReceived = friendStatus == 'pending_received';
+    // Nút chặn luôn hiển thị ở dưới
+    final blockButton = ElevatedButton.icon(
+      onPressed: () async {
+        bool? confirm = await ShowNotification.showConfirmDialog(
+          context,
+          title: 'Bạn có chắc muốn chặn ${user.displayName}?',
+          confirmText: 'Chặn',
+          cancelText: 'Hủy',
+          confirmColor: Colors.red,
+        );
+
+        if (confirm == true) {
+          try {
+            await userService.blockUser(user.id);
+            if (context.mounted) {
+              await ShowNotification.showToast(context, 'Đã chặn người dùng');
+              // Pop profile screen to go back
+              Navigator.pop(context);
+            }
+          } catch (e) {
+            if (context.mounted) {
+              await ShowNotification.showToast(
+                context,
+                'Không thể chặn người dùng',
+              );
+            }
+          }
+        }
+      },
+      icon: Icon(Icons.block, color: Colors.red),
+      label: Text('Chặn', style: TextStyle(color: Colors.red)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: Colors.red),
+        ),
+      ),
+    );
+
     if (isFriend) {
-      return ElevatedButton.icon(
-        onPressed: () =>
-            _showFriendOptions(context, user, userService, refreshState),
-        icon: Icon(Icons.check, color: Color(0xFF7A2FC0)),
-        label: Text('Bạn bè', style: TextStyle(color: Color(0xFF7A2FC0))),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: Color(0xFF7A2FC0)),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () => _showFriendOptions(
+              context,
+              user,
+              userService,
+              refreshState,
+              onFriendRequestSent: onFriendRequestSent,
+            ),
+            icon: Icon(Icons.check, color: Color(0xFF7A2FC0)),
+            label: Text('Bạn bè', style: TextStyle(color: Color(0xFF7A2FC0))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: Color(0xFF7A2FC0)),
+              ),
+            ),
           ),
-        ),
+          SizedBox(height: 10),
+          blockButton,
+        ],
       );
-    } else if (hasPendingRequest) {
-      return ElevatedButton.icon(
-        onPressed: null,
-        icon: Icon(Icons.schedule, color: Colors.grey),
-        label: Text('Đã gửi lời mời', style: TextStyle(color: Colors.grey)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey[200],
-          padding: EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+    } else if (hasPendingRequestSent) {
+      // Tôi đã gửi lời mời → Hiển thị nút "Hủy lời mời"
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () async {
+              // Show confirm dialog
+              bool? confirm = await ShowNotification.showConfirmDialog(
+                context,
+                title: 'Hủy lời mời kết bạn?',
+                confirmText: 'Hủy',
+                cancelText: 'Không',
+                confirmColor: Colors.red,
+              );
+
+              if (confirm == true) {
+                try {
+                  await userService.cancelFriendRequest(user.id);
+                  // Call callback to refresh friend status
+                  if (onFriendRequestSent != null) {
+                    await onFriendRequestSent();
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    await ShowNotification.showToast(
+                      context,
+                      'Không thể hủy lời mời',
+                    );
+                  }
+                }
+              }
+            },
+            icon: Icon(Icons.schedule, color: Color(0xFF7A2FC0)),
+            label: Text(
+              'Đã gửi lời mời',
+              style: TextStyle(color: Color(0xFF7A2FC0)),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: Color(0xFF7A2FC0)),
+              ),
+            ),
           ),
-        ),
+          SizedBox(height: 10),
+          blockButton,
+        ],
+      );
+    } else if (hasPendingRequestReceived) {
+      // Người khác đã gửi lời mời → Hiển thị 2 nút "Chấp nhận" và "Từ chối" trên cùng 1 hàng
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await userService.respondToFriendRequestByUser(
+                        user.id,
+                        'accept',
+                      );
+                      if (onFriendRequestSent != null) {
+                        await onFriendRequestSent();
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        await ShowNotification.showToast(
+                          context,
+                          'Không thể chấp nhận lời mời',
+                        );
+                      }
+                    }
+                  },
+                  icon: Icon(Icons.check, size: 18, color: Colors.white),
+                  label: Text(
+                    'Chấp nhận',
+                    style: TextStyle(fontSize: 14, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF7A2FC0),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await userService.respondToFriendRequestByUser(
+                        user.id,
+                        'reject',
+                      );
+                      if (onFriendRequestSent != null) {
+                        await onFriendRequestSent();
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        await ShowNotification.showToast(
+                          context,
+                          'Không thể từ chối lời mời',
+                        );
+                      }
+                    }
+                  },
+                  icon: Icon(Icons.close, size: 18, color: Color(0xFF7A2FC0)),
+                  label: Text(
+                    'Từ chối',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF7A2FC0)),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Color(0xFF7A2FC0),
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(color: Color(0xFF7A2FC0)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+          blockButton,
+        ],
       );
     } else {
-      return ElevatedButton.icon(
-        onPressed: () async {
-          try {
-            await userService.sendFriendRequest(user.id);
-            refreshState(() => {}); // setState callback từ ngoài truyền vào
-            await ShowNotification.showToast(context, 'Đã gửi lời mời kết bạn');
-          } catch (e) {
-            await ShowNotification.showToast(context, 'Không thể gửi lời mời');
-          }
-        },
-        icon: Icon(Icons.person_add),
-        label: Text('Kết bạn'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF7A2FC0),
-          padding: EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: Color(0xFF7A2FC0)),
+      // Chưa có lời mời nào → Hiển thị nút "Kết bạn"
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () async {
+              try {
+                await userService.sendFriendRequest(user.id);
+                // Call callback to refresh friend status
+                if (onFriendRequestSent != null) {
+                  await onFriendRequestSent();
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  await ShowNotification.showToast(
+                    context,
+                    'Không thể gửi lời mời',
+                  );
+                }
+              }
+            },
+            icon: Icon(Icons.person_add),
+            label: Text('Kết bạn'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Color(0xFF7A2FC0),
+              padding: EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: Color(0xFF7A2FC0)),
+              ),
+            ),
           ),
-        ),
+          SizedBox(height: 10),
+          blockButton,
+        ],
       );
     }
   }
@@ -138,8 +333,9 @@ class ProfileComponents {
     BuildContext context,
     dynamic user,
     UserService userService,
-    Function refreshState,
-  ) {
+    Function refreshState, {
+    Function? onFriendRequestSent,
+  }) {
     showModalBottomSheet(
       context: context,
       shape: RoundedRectangleBorder(
@@ -151,43 +347,40 @@ class ProfileComponents {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.block, color: Colors.red),
-              title: Text('Chặn người dùng'),
+              leading: Icon(Icons.person_remove, color: Colors.red),
+              title: Text('Hủy kết bạn', style: TextStyle(color: Colors.red)),
               onTap: () async {
                 bool? confirm = await ShowNotification.showConfirmDialog(
                   context,
-                  title: 'Bạn có chắc muốn chặn ${user.displayName}?',
-                  confirmText: 'Chặn',
-                  cancelText: 'Hủy',
+                  title:
+                      'Bạn có chắc muốn hủy kết bạn với ${user.displayName}?',
+                  confirmText: 'Hủy kết bạn',
+                  cancelText: 'Không',
                   confirmColor: Colors.red,
                 );
 
                 if (confirm == true) {
                   try {
-                    await userService.blockUser(user.id);
-                    await ShowNotification.showToast(
-                      context,
-                      'Đã chặn người dùng',
-                    );
-                    Navigator.pop(context);
+                    await userService.unfriendUser(user.id);
+                    if (context.mounted) {
+                      Navigator.pop(context); // Close bottom sheet
+
+                      // Call callback to refresh friend status
+                      if (onFriendRequestSent != null) {
+                        await onFriendRequestSent();
+                      } else {
+                        refreshState(); // Fallback to just setState
+                      }
+                    }
                   } catch (e) {
-                    await ShowNotification.showToast(
-                      context,
-                      'Không thể chặn người dùng',
-                    );
+                    if (context.mounted) {
+                      await ShowNotification.showToast(
+                        context,
+                        'Không thể hủy kết bạn',
+                      );
+                    }
                   }
                 }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.person_remove, color: Colors.orange),
-              title: Text('Hủy kết bạn'),
-              onTap: () async {
-                Navigator.pop(context);
-                await ShowNotification.showToast(
-                  context,
-                  'Tính năng đang phát triển',
-                );
               },
             ),
             ListTile(
