@@ -15,6 +15,18 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
+class _UserWithStatus {
+  final User user;
+  String status; // 'friends', 'pending_sent', 'pending_received', 'none', 'self'
+  final Map<String, dynamic>? requestData;
+
+  _UserWithStatus({
+    required this.user,
+    required this.status,
+    this.requestData,
+  });
+}
+
 class _SearchScreenState extends State<SearchScreen> {
   final UserService _userService = ServiceLocator.userService;
   final MessageService _messageService = ServiceLocator.messageService;
@@ -22,7 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
 
-  List<User> _searchResults = [];
+  List<_UserWithStatus> _searchResults = [];
   bool _isLoading = false;
   bool _hasSearched = false; // Để biết đã thực hiện tìm kiếm hay chưa
 
@@ -63,8 +75,43 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       final results = await _userService.searchUsers(query);
+      
+      // Check friend status for each user and include request data if pending_received
+      final List<_UserWithStatus> resultsWithStatus = [];
+      final incomingRequests = await _userService.getPendingFriendRequests();
+      
+      for (final user in results) {
+        try {
+          final status = await _userService.checkFriendStatus(user.id);
+          
+          // If status is pending_received, find the request data
+          Map<String, dynamic>? requestData;
+          if (status == 'pending_received') {
+            try {
+              requestData = incomingRequests.firstWhere(
+                (req) => req['fromUserId'] == user.id,
+              );
+            } catch (e) {
+              requestData = null;
+            }
+          }
+          
+          resultsWithStatus.add(_UserWithStatus(
+            user: user,
+            status: status,
+            requestData: requestData,
+          ));
+        } catch (e) {
+          print('Error checking friend status for user ${user.id}: $e');
+          resultsWithStatus.add(_UserWithStatus(
+            user: user,
+            status: 'none',
+          ));
+        }
+      }
+      
       setState(() {
-        _searchResults = results;
+        _searchResults = resultsWithStatus;
       });
     } catch (e) {
       // Handle error, maybe show a snackbar
@@ -117,41 +164,61 @@ class _SearchScreenState extends State<SearchScreen> {
     return ListView.builder(
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
-        final user = _searchResults[index];
+        final userWithStatus = _searchResults[index];
         return _UserSearchResultItem(
-          user: user,
-          messageService: _messageService,
-          secureStorageService: _secureStorageService,
+          user: userWithStatus.user,
+          status: userWithStatus.status,
+          requestData: userWithStatus.requestData,
+          onStatusChanged: () => _performSearch(_searchController.text.trim()),
         );
       },
     );
   }
 }
 
-class _UserSearchResultItem extends StatelessWidget {
+class _UserSearchResultItem extends StatefulWidget {
   final User user;
-  final MessageService messageService;
-  final SecureStorageService secureStorageService;
+  final String status;
+  final Map<String, dynamic>? requestData;
+  final VoidCallback onStatusChanged;
 
   const _UserSearchResultItem({
     required this.user,
-    required this.messageService,
-    required this.secureStorageService,
+    required this.status,
+    this.requestData,
+    required this.onStatusChanged,
   });
+
+  @override
+  State<_UserSearchResultItem> createState() => _UserSearchResultItemState();
+}
+
+class _UserSearchResultItemState extends State<_UserSearchResultItem> {
+  final UserService _userService = ServiceLocator.userService;
+  final MessageService _messageService = ServiceLocator.messageService;
+  final SecureStorageService _secureStorageService = SecureStorageService();
 
   final String _fallbackAvatarUrl =
       'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
 
+  String _currentStatus = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStatus = widget.status;
+  }
+
   void _navigateToChat(BuildContext context) async {
     try {
-      final currentUserId = await secureStorageService.getUserId();
+      final currentUserId = await _secureStorageService.getUserId();
       if (currentUserId == null) {
         // Handle not being logged in
         return;
       }
 
       // Don't allow messaging yourself
-      if (user.id == currentUserId) {
+      if (widget.user.id == currentUserId) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Bạn không thể nhắn tin cho chính mình.'),
@@ -160,8 +227,8 @@ class _UserSearchResultItem extends StatelessWidget {
         return;
       }
 
-      final conversation = await messageService.getOrCreateConversation(
-        [currentUserId, user.id],
+      final conversation = await _messageService.getOrCreateConversation(
+        [currentUserId, widget.user.id],
         false,
         null,
       );
@@ -172,7 +239,7 @@ class _UserSearchResultItem extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => ChatScreen(
               conversationId: conversationId,
-              chatName: user.displayName,
+              chatName: widget.user.displayName,
               isGroup: false,
             ),
           ),
@@ -191,9 +258,152 @@ class _UserSearchResultItem extends StatelessWidget {
   void _navigateToProfile(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ProfileScreen(userId: user.id),
+        builder: (_) => ProfileScreen(userId: widget.user.id),
       ),
     );
+  }
+
+  void _handleSendFriendRequest() async {
+    try {
+      await _userService.sendFriendRequest(widget.user.id);
+      setState(() {
+        _currentStatus = 'pending_sent';
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã gửi lời mời kết bạn'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể gửi lời mời: $e')),
+        );
+      }
+    }
+  }
+
+  void _handleAcceptFriendRequest() async {
+    try {
+      final requestId = widget.requestData?['id'];
+      if (requestId == null) return;
+
+      await _userService.respondToFriendRequest(requestId, 'accept');
+      setState(() {
+        _currentStatus = 'friends';
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã chấp nhận lời mời kết bạn'),
+          ),
+        );
+      }
+      widget.onStatusChanged();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể chấp nhận: $e')),
+        );
+      }
+    }
+  }
+
+  void _handleDeclineFriendRequest() async {
+    try {
+      final requestId = widget.requestData?['id'];
+      if (requestId == null) return;
+
+      await _userService.respondToFriendRequest(requestId, 'reject');
+      setState(() {
+        _currentStatus = 'none';
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã từ chối lời mời kết bạn'),
+          ),
+        );
+      }
+      widget.onStatusChanged();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể từ chối: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildActionButton() {
+    switch (_currentStatus) {
+      case 'friends':
+        return ElevatedButton.icon(
+          onPressed: null,
+          icon: const Icon(Icons.check, color: Color(0xFF7A2FC0)),
+          label: const Text('Bạn bè', style: TextStyle(color: Color(0xFF7A2FC0))),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            side: const BorderSide(color: Color(0xFF7A2FC0)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+        );
+      
+      case 'pending_sent':
+        return ElevatedButton.icon(
+          onPressed: null,
+          icon: const Icon(Icons.schedule, color: Colors.grey),
+          label: const Text('Đã gửi lời mời', style: TextStyle(color: Colors.grey)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.grey[200],
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+        );
+      
+      case 'pending_received':
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton.icon(
+              onPressed: _handleAcceptFriendRequest,
+              icon: const Icon(Icons.check, color: Colors.white),
+              label: const Text('Chấp nhận', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7A2FC0),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: _handleDeclineFriendRequest,
+              icon: const Icon(Icons.close, color: Colors.white),
+              label: const Text('Từ chối', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+          ],
+        );
+      
+      case 'self':
+        return const SizedBox.shrink();
+      
+      default:
+        return ElevatedButton.icon(
+          onPressed: _handleSendFriendRequest,
+          icon: const Icon(Icons.person_add),
+          label: const Text('Kết bạn'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF7A2FC0),
+            side: const BorderSide(color: Color(0xFF7A2FC0)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+        );
+    }
   }
 
   @override
@@ -207,8 +417,8 @@ class _UserSearchResultItem extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundImage: NetworkImage(
-                user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                    ? user.avatarUrl!
+                widget.user.avatarUrl != null && widget.user.avatarUrl!.isNotEmpty
+                    ? widget.user.avatarUrl!
                     : _fallbackAvatarUrl,
               ),
               onBackgroundImageError: (_, __) {}, // Handle image load error
@@ -220,7 +430,7 @@ class _UserSearchResultItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user.displayName,
+                    widget.user.displayName,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -228,29 +438,25 @@ class _UserSearchResultItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '@${user.username}',
+                    '@${widget.user.username}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(
-                Icons.info_outline,
-                color: Color(0xFF7C3AED),
+            _buildActionButton(),
+            if (_currentStatus != 'self' && _currentStatus != 'pending_received') ...[
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(
+                  Icons.message_outlined,
+                  color: Color(0xFF7C3AED),
+                ),
+                tooltip: 'Nhắn tin',
+                onPressed: () => _navigateToChat(context),
               ),
-              tooltip: 'Xem trang cá nhân',
-              onPressed: () => _navigateToProfile(context),
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.message_outlined,
-                color: Color(0xFF7C3AED),
-              ),
-              tooltip: 'Nhắn tin',
-              onPressed: () => _navigateToChat(context),
-            ),
+            ],
           ],
         ),
       ),

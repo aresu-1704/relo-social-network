@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from datetime import datetime
 from ..models import User
 from ..models import FriendRequest
@@ -53,7 +54,7 @@ class UserService:
                 "request_id": str(new_request.id),
                 "from_user_id": str(from_user.id),
                 "displayName": from_user.displayName,
-                "avatar": from_user.avatar
+                "avatarUrl": from_user.avatarUrl
             }
         }
         asyncio.create_task(
@@ -86,9 +87,9 @@ class UserService:
             if not from_user or not to_user:
                 raise ValueError("Không tìm thấy một trong hai người dùng.")
 
-            # Thêm ID bạn bè vào danh sách của nhau
-            from_user.friendIds.append(to_user.id)
-            to_user.friendIds.append(from_user.id)
+            # Thêm ID bạn bè vào danh sách của nhau (convert ObjectId to string)
+            from_user.friendIds.append(str(to_user.id))
+            to_user.friendIds.append(str(from_user.id))
 
             # Lưu các thay đổi vào cơ sở dữ liệu
             await friend_request.save()
@@ -203,9 +204,49 @@ class UserService:
         return {"message": "Người dùng đã được bỏ chặn thành công."}
 
     @staticmethod
+    def _remove_diacritics(text: str) -> str:
+        """
+        Loại bỏ dấu tiếng Việt để tìm kiếm không dấu.
+        """
+        vietnamese_map = {
+            'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+            'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+            'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+            'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+            'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+            'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+            'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+            'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+            'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+            'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+            'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+            'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+            'đ': 'd',
+            'À': 'A', 'Á': 'A', 'Ả': 'A', 'Ã': 'A', 'Ạ': 'A',
+            'Ă': 'A', 'Ằ': 'A', 'Ắ': 'A', 'Ẳ': 'A', 'Ẵ': 'A', 'Ặ': 'A',
+            'Ầ': 'A', 'Ấ': 'A', 'Ẩ': 'A', 'Ẫ': 'A', 'Ậ': 'A',
+            'È': 'E', 'É': 'E', 'Ẻ': 'E', 'Ẽ': 'E', 'Ẹ': 'E',
+            'Ề': 'E', 'Ế': 'E', 'Ể': 'E', 'Ễ': 'E', 'Ệ': 'E',
+            'Ì': 'I', 'Í': 'I', 'Ỉ': 'I', 'Ĩ': 'I', 'Ị': 'I',
+            'Ò': 'O', 'Ó': 'O', 'Ỏ': 'O', 'Õ': 'O', 'Ọ': 'O',
+            'Ô': 'O', 'Ồ': 'O', 'Ố': 'O', 'Ổ': 'O', 'Ỗ': 'O', 'Ộ': 'O',
+            'Ơ': 'O', 'Ờ': 'O', 'Ớ': 'O', 'Ở': 'O', 'Ỡ': 'O', 'Ợ': 'O',
+            'Ù': 'U', 'Ú': 'U', 'Ủ': 'U', 'Ũ': 'U', 'Ụ': 'U',
+            'Ư': 'U', 'Ừ': 'U', 'Ứ': 'U', 'Ử': 'U', 'Ữ': 'U', 'Ự': 'U',
+            'Ỳ': 'Y', 'Ý': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y', 'Ỵ': 'Y',
+            'Đ': 'D'
+        }
+        
+        result = text
+        for vietnamese, replacement in vietnamese_map.items():
+            result = result.replace(vietnamese, replacement)
+        return result
+
+    @staticmethod
     async def search_users(query: str, current_user_id: str):
         """
-        Tìm kiếm người dùng theo username hoặc displayName, loại trừ những người dùng bị chặn.
+        Tìm kiếm người dùng theo username, displayName hoặc bio.
+        Hỗ trợ tìm kiếm không dấu - nếu tìm "Thuan An" sẽ tìm được "Thuận An".
         """
         current_user = await User.get(current_user_id)
         if not current_user:
@@ -216,20 +257,50 @@ class UserService:
         ids_blocking_me = [str(u.id) for u in users_blocking_me]
 
         # Tổng hợp danh sách ID bị chặn
-        excluded_ids = current_user.blockedUserIds + ids_blocking_me
-
-        # Tìm kiếm người dùng
-        users = await User.find(
-            {
-                "$or": [
-                    {"username": {"$regex": query, "$options": "i"}},
-                    {"displayName": {"$regex": query, "$options": "i"}}
-                ],
-                "_id": {"$nin": [ObjectId(uid) for uid in excluded_ids]}
-            }
+        excluded_ids = current_user.blockedUserIds + ids_blocking_me + [current_user_id]  # Exclude self
+        
+        # Normalize the query to search without diacritics
+        query_normalized = UserService._remove_diacritics(query).lower()
+        query_lower = query.lower()
+        
+        # If query is empty, return empty list
+        if not query.strip():
+            return []
+        
+        # Get all non-blocked users (excluding self and blocked users)
+        all_users = await User.find(
+            {"_id": {"$nin": [ObjectId(uid) for uid in excluded_ids]}}
         ).to_list()
-
-        return users
+        
+        # Filter users by matching normalized query
+        matched_users = []
+        for user in all_users:
+            # Get all searchable text fields
+            user_texts = [
+                (user.username or ""),
+                (user.displayName or ""),
+                (user.bio or "")
+            ]
+            
+            # Check if query matches in any field (with or without diacritics)
+            for text in user_texts:
+                if not text:
+                    continue
+                    
+                text_normalized = UserService._remove_diacritics(text).lower()
+                text_lower = text.lower()
+                
+                # Check if query matches exactly or partially
+                # Matches with original diacritics
+                if query_lower in text_lower or text_lower in query_lower:
+                    matched_users.append(user)
+                    break
+                # Matches without diacritics
+                elif query_normalized in text_normalized or text_normalized in query_normalized:
+                    matched_users.append(user)
+                    break
+        
+        return matched_users
 
     @staticmethod
     async def get_users_by_ids(user_ids: list[str]):

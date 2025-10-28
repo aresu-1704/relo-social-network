@@ -37,7 +37,10 @@ class UserUpdate(BaseModel):
 
 
 class UserSearchResult(BaseModel):
-    id: str | None = None
-    displayName: str | None = None
-    username: str | None = None
+    id: str
+    displayName: str
+    username: str
     avatarUrl: str | None = None
+    bio: str | None = None
+    backgroundUrl: str | None = None
+    email: EmailStr | None = None

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/screen/main_screen.dart';
+import 'package:relo/screen/create_group_chat_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
@@ -128,37 +129,100 @@ class _MessagesScreenState extends State<MessagesScreen> {
       return _buildEmptyState();
     }
 
-    return _buildConversationList();
+    return Scaffold(
+      body: _buildConversationList(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreateGroupOptions,
+        backgroundColor: Color(0xFF7A2FC0),
+        child: Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  void _showCreateGroupOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Tạo cuộc trò chuyện',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20),
+            ListTile(
+              leading: Icon(Icons.group, color: Color(0xFF7A2FC0)),
+              title: Text('Tạo nhóm chat'),
+              subtitle: Text('Tạo nhóm trò chuyện với bạn bè'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CreateGroupChatScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.people, color: Color(0xFF7A2FC0)),
+              title: Text('Nhắn tin cá nhân'),
+              subtitle: Text('Tìm kiếm và nhắn tin với người dùng khác'),
+              onTap: () {
+                Navigator.pop(context);
+                context.findAncestorStateOfType<MainScreenState>()?.changeTab(2);
+              },
+            ),
+            SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.message_outlined, size: 80, color: Colors.grey[400]),
-          SizedBox(height: 20),
-          Text(
-            'Bạn chưa có cuộc trò chuyện nào',
-            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-          ),
-          SizedBox(height: 20),
-          ElevatedButton.icon(
-            icon: Icon(Icons.add),
-            label: Text('Hãy thử tìm vài người bạn để trò chuyện nhé'),
-            onPressed: () {
-              context.findAncestorStateOfType<MainScreenState>()?.changeTab(2);
-            },
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Color(0xFF7A2FC0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.message_outlined, size: 80, color: Colors.grey[400]),
+            SizedBox(height: 20),
+            Text(
+              'Bạn chưa có cuộc trò chuyện nào',
+              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
             ),
-          ),
-        ],
+            SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: Icon(Icons.add),
+              label: Text('Hãy thử tìm vài người bạn để trò chuyện nhé'),
+              onPressed: () {
+                context.findAncestorStateOfType<MainScreenState>()?.changeTab(2);
+              },
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Color(0xFF7A2FC0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreateGroupOptions,
+        backgroundColor: Color(0xFF7A2FC0),
+        child: Icon(Icons.add, color: Colors.white),
       ),
     );
   }

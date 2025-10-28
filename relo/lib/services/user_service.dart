@@ -228,4 +228,18 @@ class UserService {
       throw Exception('Không thể xóa tài khoản: $e');
     }
   }
+
+  // Kiểm tra trạng thái kết bạn
+  Future<String> checkFriendStatus(String userId) async {
+    try {
+      final response = await _dio.get('users/$userId/friend-status');
+      if (response.statusCode == 200) {
+        return response.data['status'] as String;
+      } else {
+        throw Exception('Failed to check friend status');
+      }
+    } catch (e) {
+      throw Exception('Failed to check friend status: $e');
+    }
+  }
 }

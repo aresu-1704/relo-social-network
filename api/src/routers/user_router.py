@@ -123,6 +123,29 @@ async def get_friends(current_user: User = Depends(get_current_user)):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+# Tìm kiếm người dùng (MUST come before /{user_id} route)
+@router.get("/search")
+async def search_users(query: str = Query(..., min_length=1), current_user: User = Depends(get_current_user)):
+    """
+    Tìm kiếm người dùng theo username, displayName hoặc bio.
+    Hỗ trợ tìm kiếm không dấu - nếu tìm "Thuan An" sẽ tìm được "Thuận An".
+    """
+    try:
+        users = await UserService.search_users(query, str(current_user.id))
+        return [
+            UserSearchResult(
+                id=str(user.id),
+                username=user.username,
+                displayName=user.displayName,
+                avatarUrl=user.avatarUrl,
+                bio=user.bio,
+                backgroundUrl=user.backgroundUrl,
+                email=user.email
+            ) for user in users
+        ]
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 # Lấy hồ sơ công khai của người dùng
 @router.get("/{user_id}", response_model=UserPublic)
 async def get_user_profile(user_id: str, current_user: User = Depends(get_current_user)):
@@ -160,25 +183,6 @@ async def unblock_user(request: BlockUserRequest, current_user: User = Depends(g
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-# Tìm kiếm người dùng
-@router.get("/search", response_model=List[UserPublic])
-async def search_users(query: str = Query(..., min_length=1), current_user: User = Depends(get_current_user)):
-    """
-    Tìm kiếm người dùng theo username hoặc displayName.
-    """
-    try:
-        users = await UserService.search_users(query, str(current_user.id))
-        return [
-            UserSearchResult(
-                id=str(user.id),
-                username=user.username,
-                avatarUrl=user.avatarUrl,
-                displayName=user.displayName
-            ) for user in users
-        ]
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
 
 # Kiểm tra trạng thái kết bạn
 @router.get("/{user_id}/friend-status")
