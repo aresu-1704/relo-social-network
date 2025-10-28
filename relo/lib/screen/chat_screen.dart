@@ -5,6 +5,7 @@ import 'package:relo/models/message.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
+import 'package:relo/services/user_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -42,6 +43,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final MessageService _messageService = ServiceLocator.messageService;
+  final UserService _userService = ServiceLocator.userService;
   final SecureStorageService _secureStorageService = SecureStorageService();
   final Uuid _uuid = const Uuid();
 
@@ -267,6 +269,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showMessageActions(Message message) {
     final isMe = message.senderId == _currentUserId;
+    final isDeletedAccount = message.senderId == 'deleted';
+
+    // Không hiển thị actions cho tin nhắn từ tài khoản đã bị xóa
+    if (isDeletedAccount) {
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -336,13 +344,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showConversationSettings() {
+    // Kiểm tra nếu đang chat với tài khoản đã bị xóa
+    final isDeletedAccount =
+        widget.chatName == 'Tài khoản không tồn tại' ||
+        (widget.memberIds != null && widget.memberIds!.contains('deleted'));
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) {
         // Danh sách nút hành động động
         final actions = <ActionButton>[
-          if (!widget.isGroup)
+          if (!widget.isGroup && !isDeletedAccount)
             ActionButton(
               icon: LucideIcons.userCircle2,
               label: 'Xem trang cá nhân',
@@ -389,7 +402,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 // TODO: logic đổi tên nhóm
               },
             )
-          else
+          else if (!isDeletedAccount)
             ActionButton(
               icon: LucideIcons.users,
               label: 'Tạo nhóm với ${widget.chatName}',
@@ -416,7 +429,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 // TODO: logic rời nhóm
               },
             )
-          else
+          else if (!isDeletedAccount)
             ActionButton(
               icon: LucideIcons.userX,
               label: 'Chặn người dùng',
@@ -431,7 +444,30 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 if (!result!) return;
                 Navigator.pop(context);
-                // TODO: logic chặn
+
+                // Logic chặn người dùng
+                try {
+                  String friendId = widget.memberIds!.firstWhere(
+                    (id) => id != _currentUserId,
+                  );
+                  await _userService.blockUser(friendId);
+
+                  if (mounted) {
+                    await ShowNotification.showToast(
+                      context,
+                      'Đã chặn người dùng',
+                    );
+                    // Quay về màn hình messages
+                    Navigator.pop(context);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    await ShowNotification.showToast(
+                      context,
+                      'Không thể chặn người dùng',
+                    );
+                  }
+                }
               },
             ),
           ActionButton(

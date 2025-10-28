@@ -230,14 +230,27 @@ class _MessagesScreenState extends State<MessagesScreen> {
           title =
               conversation['name'] ??
               otherParticipants.map((p) => p['displayName']).join(", ");
-          avatar = const AssetImage('assets/icons/group_icon.png');
+          avatar = NetworkImage(
+            conversation['avatarUrl'] ??
+                'https://img.freepik.com/premium-vector/group-chat-icon-3d-vector-illustration-design_48866-1609.jpg',
+          );
         } else {
           final friend = otherParticipants.first;
-          title = friend['displayName'];
-          final avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
-              ? friend['avatarUrl']
-              : 'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
-          avatar = NetworkImage(avatarUrl);
+          final isDeletedAccount =
+              friend['username'] == 'deleted' || friend['id'] == 'deleted';
+
+          if (isDeletedAccount) {
+            title = 'Tài khoản không tồn tại';
+            avatar = const AssetImage(
+              'assets/icons/icon.png',
+            ); // hoặc icon mặc định
+          } else {
+            title = friend['displayName'];
+            final avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
+                ? friend['avatarUrl']
+                : 'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
+            avatar = NetworkImage(avatarUrl);
+          }
         }
 
         final lastMsg = conversation['lastMessage'];

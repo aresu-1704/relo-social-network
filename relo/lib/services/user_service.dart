@@ -204,7 +204,6 @@ class UserService {
   Future<List<User>> getBlockedUsers(String userId) async {
     try {
       final response = await _dio.get('users/blocked-lists/$userId');
-      print(response.data);
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
         return data.map((json) => User.fromJson(json)).toList();

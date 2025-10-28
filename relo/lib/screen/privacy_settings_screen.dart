@@ -3,7 +3,8 @@ import 'package:relo/models/user.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:relo/screen/change_password_screen.dart';
+import 'package:relo/screen/verify_otp_screen.dart';
+import 'package:relo/screen/change_email_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class PrivacySettingsScreen extends StatefulWidget {
@@ -18,11 +19,25 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   final UserService _userService = ServiceLocator.userService;
   final List<User> _blockedUsers = [];
   bool _isLoading = true;
+  String? _currentUsername;
+  String? _currentEmail;
 
   @override
   void initState() {
     super.initState();
     _loadBlockedUsers();
+    _getCurrentUserInfo();
+  }
+
+  Future<void> _getCurrentUserInfo() async {
+    final user = await _userService.getUserById(widget.userId);
+
+    if (user != null) {
+      setState(() {
+        _currentUsername = user.username;
+        _currentEmail = user.email;
+      });
+    }
   }
 
   Future<void> _loadBlockedUsers() async {
@@ -35,7 +50,6 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print(e.toString());
       setState(() => _isLoading = false);
       await ShowNotification.showToast(
         context,
@@ -185,10 +199,56 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                             color: Colors.grey,
                           ),
                           onTap: () {
+                            if (_currentUsername == null) {
+                              ShowNotification.showToast(
+                                context,
+                                'Không thể lấy thông tin tài khoản',
+                              );
+                              return;
+                            }
+
+                            // Chuyển sang màn hình verify OTP (tự động gửi OTP)
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => ChangePasswordScreen(),
+                                builder: (context) => VerifyOTPScreen(
+                                  identifier: _currentUsername!,
+                                  flow: OTPFlow.changePassword,
+                                  autoSend: true,
+                                ),
+                              ),
+                            );
+                          },
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        Divider(),
+                        ListTile(
+                          leading: Icon(
+                            Icons.email_outlined,
+                            color: Colors.grey,
+                          ),
+                          title: Text('Đổi email'),
+                          trailing: Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                          onTap: () {
+                            if (_currentEmail == null) {
+                              ShowNotification.showToast(
+                                context,
+                                'Không thể lấy thông tin tài khoản',
+                              );
+                              return;
+                            }
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChangeEmailScreen(
+                                  userId: widget.userId,
+                                  currentEmail: _currentEmail!,
+                                ),
                               ),
                             );
                           },

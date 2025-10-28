@@ -30,3 +30,41 @@ class UserPublic(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+class SendOTPRequest(BaseModel):
+    identifier: str  # Username hoặc email
+
+class SendOTPResponse(BaseModel):
+    message: str
+    email: str
+
+class VerifyOTPRequest(BaseModel):
+    email: str
+    otp_code: str
+
+class VerifyOTPResponse(BaseModel):
+    message: str
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    new_password: str
+
+class ResetPasswordResponse(BaseModel):
+    message: str
+
+class ChangeEmailVerifyPasswordRequest(BaseModel):
+    user_id: str
+    new_email: EmailStr
+    password: str
+
+class ChangeEmailVerifyPasswordResponse(BaseModel):
+    message: str
+    email: str
+
+class UpdateEmailRequest(BaseModel):
+    user_id: str
+    new_email: EmailStr
+
+class UpdateEmailResponse(BaseModel):
+    message: str

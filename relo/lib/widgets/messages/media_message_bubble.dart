@@ -76,13 +76,24 @@ class MediaMessageBubble extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 6),
                 child: CircleAvatar(
                   radius: 16,
-                  backgroundImage:
-                      (message.avatarUrl != null &&
-                          message.avatarUrl!.isNotEmpty)
+                  backgroundColor: message.senderId == 'deleted'
+                      ? Colors.grey[300]
+                      : null,
+                  backgroundImage: message.senderId == 'deleted'
+                      ? null
+                      : (message.avatarUrl != null &&
+                            message.avatarUrl!.isNotEmpty)
                       ? NetworkImage(message.avatarUrl!)
                       : const NetworkImage(
                           'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
                         ),
+                  child: message.senderId == 'deleted'
+                      ? const Icon(
+                          Icons.person_off,
+                          size: 20,
+                          color: Colors.grey,
+                        )
+                      : null,
                 ),
               ),
             Flexible(
@@ -91,35 +102,54 @@ class MediaMessageBubble extends StatelessWidget {
                     ? CrossAxisAlignment.end
                     : CrossAxisAlignment.start,
                 children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 280),
-                    child: _buildMediaLayout(context, mediaUrls),
-                  ),
-                  const SizedBox(height: 4),
-                  if (isMe && isLastFromMe)
+                  if (message.senderId == 'deleted' && !isMe)
                     Padding(
-                      padding: const EdgeInsets.only(top: 1, right: 0),
-                      child: MessageStatusWidget(message: message),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color.fromARGB(255, 197, 197, 197),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      padding: const EdgeInsets.only(left: 4, bottom: 2),
                       child: Text(
-                        timeString,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.white,
+                        'Tài khoản không tồn tại',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
                     ),
-                  const SizedBox(height: 4),
+                  Column(
+                    crossAxisAlignment: isMe
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        child: _buildMediaLayout(context, mediaUrls),
+                      ),
+                      const SizedBox(height: 4),
+                      if (isMe && isLastFromMe)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1, right: 0),
+                          child: MessageStatusWidget(message: message),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(255, 197, 197, 197),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            timeString,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
                 ],
               ),
             ),

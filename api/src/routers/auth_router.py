@@ -2,7 +2,22 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from ..services import AuthService, jwt_service
-from ..schemas import UserCreate, UserPublic, UserLogin, RefreshTokenRequest
+from ..schemas import (
+    UserCreate,
+    UserPublic,
+    UserLogin,
+    RefreshTokenRequest,
+    SendOTPRequest,
+    SendOTPResponse,
+    VerifyOTPRequest,
+    VerifyOTPResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    ChangeEmailVerifyPasswordRequest,
+    ChangeEmailVerifyPasswordResponse,
+    UpdateEmailRequest,
+    UpdateEmailResponse
+)
 from ..services.jwt_service import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(tags=["Auth"])
@@ -137,3 +152,93 @@ async def refresh_access_token(payload: RefreshTokenRequest):
     )
     
     return {"access_token": new_access_token, "token_type": "bearer"}
+
+@router.post("/send-otp", response_model=SendOTPResponse)
+async def send_otp(request: SendOTPRequest):
+    """
+    Endpoint để gửi mã OTP qua email.
+    - Nhận username hoặc email của người dùng
+    - Nếu là username thì lấy email tương ứng từ database
+    - Tạo mã OTP 6 chữ số và gửi đến email
+    - OTP có hiệu lực trong 5 phút
+    """
+    try:
+        result = await AuthService.send_otp(request.identifier)
+        return SendOTPResponse(
+            message=result["message"],
+            email=result["email"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/verify-otp", response_model=VerifyOTPResponse)
+async def verify_otp(request: VerifyOTPRequest):
+    """
+    Endpoint để xác minh mã OTP.
+    - Nhận email và mã OTP
+    - Kiểm tra OTP có hợp lệ và chưa hết hạn
+    - Đánh dấu OTP đã sử dụng sau khi xác minh thành công
+    """
+    try:
+        result = await AuthService.verify_otp(request.email, request.otp_code)
+        return VerifyOTPResponse(
+            message=result["message"],
+            email=result["email"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+async def reset_password(request: ResetPasswordRequest):
+    """
+    Endpoint để đặt lại mật khẩu mới sau khi xác minh OTP.
+    - Nhận email và mật khẩu mới
+    - Kiểm tra email tồn tại và chưa bị xóa
+    - Hash mật khẩu mới và cập nhật
+    """
+    try:
+        result = await AuthService.reset_password(request.email, request.new_password)
+        return ResetPasswordResponse(
+            message=result["message"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/change-email/verify-password", response_model=ChangeEmailVerifyPasswordResponse)
+async def change_email_verify_password(request: ChangeEmailVerifyPasswordRequest):
+    """
+    Endpoint để xác minh mật khẩu và gửi OTP đến email mới.
+    - Nhận user_id, email mới và mật khẩu
+    - Kiểm tra mật khẩu có đúng
+    - Gửi OTP đến email mới
+    """
+    try:
+        result = await AuthService.change_email_verify_password(
+            request.user_id,
+            request.new_email,
+            request.password
+        )
+        return ChangeEmailVerifyPasswordResponse(
+            message=result["message"],
+            email=result["email"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/change-email/update", response_model=UpdateEmailResponse)
+async def update_email(request: UpdateEmailRequest):
+    """
+    Endpoint để cập nhật email mới sau khi verify OTP.
+    - Nhận user_id và email mới
+    - Cập nhật email trong database
+    """
+    try:
+        result = await AuthService.update_email(
+            request.user_id,
+            request.new_email
+        )
+        return UpdateEmailResponse(
+            message=result["message"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

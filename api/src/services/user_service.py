@@ -244,6 +244,7 @@ class UserService:
     async def get_users_by_ids(user_ids: list[str]):
         """
         Lấy danh sách người dùng bằng ID của họ.
+        Bao gồm cả những tài khoản đã bị xóa.
         """
         if not user_ids:
             return []
@@ -251,7 +252,7 @@ class UserService:
         # Chuyển đổi chuỗi ID thành ObjectId
         object_ids = [ObjectId(uid) for uid in user_ids]
         
-        # Tìm tất cả người dùng có ID trong danh sách
+        # Tìm tất cả người dùng có ID trong danh sách (bao gồm cả deleted)
         users = await User.find({"_id": {"$in": object_ids}}).to_list()
         return users
 

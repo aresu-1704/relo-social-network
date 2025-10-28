@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:relo/services/auth_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key});
+  final String email; // Email từ OTP verification
+
+  const ChangePasswordScreen({super.key, required this.email});
 
   @override
   _ChangePasswordScreenState createState() => _ChangePasswordScreenState();
@@ -10,6 +13,7 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _formKey = GlobalKey<FormState>();
+  final AuthService _authService = AuthService();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -18,7 +22,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
-  
+
   @override
   void dispose() {
     _currentPasswordController.dispose();
@@ -117,14 +121,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Gọi API đổi mật khẩu khi có backend
-      // await _userService.changePassword(
-      //   currentPassword: _currentPasswordController.text,
-      //   newPassword: _newPasswordController.text,
-      // );
-
-      // Simulate API call
-      await Future.delayed(Duration(seconds: 2));
+      // Gọi API reset password
+      await _authService.resetPassword(
+        widget.email,
+        _newPasswordController.text,
+      );
 
       setState(() => _isLoading = false);
 
@@ -137,14 +138,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           buttonColor: Color(0xFF7A2FC0),
         );
 
-        // Navigate back
-        Navigator.pop(context);
+        // Quay về privacy settings (pop 2 lần: verify OTP và change password)
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
 
       if (mounted) {
-        await ShowNotification.showToast(context, 'Đổi mật khẩu thất bại. Vui lòng thử lại.');
+        await ShowNotification.showCustomAlertDialog(
+          context,
+          message: e.toString().replaceFirst('Exception: ', ''),
+          buttonText: 'OK',
+          buttonColor: Color(0xFF7A2FC0),
+        );
       }
     }
   }
