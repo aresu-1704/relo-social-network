@@ -11,6 +11,7 @@ import 'notifications_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
+import 'package:relo/providers/message_provider.dart';
 import 'dart:async';
 
 class MainScreen extends StatefulWidget {
@@ -181,7 +182,14 @@ class MainScreenState extends State<MainScreen> {
               onTap: (int i) {
                 setState(() {
                   _selectedIndex = i;
-                  if (i == 3) {
+                  if (i == 2) {
+                    // Xóa badge khi đã vào MessagesScreen (đã xem rồi)
+                    final messageProvider = Provider.of<MessageProvider>(
+                      context,
+                      listen: false,
+                    );
+                    messageProvider.markAllAsSeen();
+                  } else if (i == 3) {
                     // Mark all notifications as read when opening notifications tab
                     final notificationProvider =
                         Provider.of<NotificationProvider>(
@@ -214,10 +222,43 @@ class MainScreenState extends State<MainScreen> {
                   label: 'Bạn bè',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(
-                    _selectedIndex == 2
-                        ? Icons.chat_bubble
-                        : Icons.chat_bubble_outline,
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        _selectedIndex == 2
+                            ? Icons.chat_bubble
+                            : Icons.chat_bubble_outline,
+                      ),
+                      Consumer<MessageProvider>(
+                        builder: (context, messageProvider, child) {
+                          final unreadCount =
+                              messageProvider.unreadConversationCount;
+                          if (unreadCount > 0) {
+                            return Positioned(
+                              right: -8,
+                              top: -8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
                   ),
                   label: 'Tin nhắn',
                 ),

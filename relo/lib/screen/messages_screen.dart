@@ -9,6 +9,8 @@ import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/utils/format.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:provider/provider.dart';
+import 'package:relo/providers/message_provider.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -38,6 +40,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
     await _getCurrentUserId();
     await fetchConversations();
     _listenToWebSocket();
+    // Refresh message provider count khi vào màn hình
+    if (mounted) {
+      final messageProvider = Provider.of<MessageProvider>(
+        context,
+        listen: false,
+      );
+      messageProvider.refresh();
+    }
   }
 
   Future<void> _getCurrentUserId() async {
@@ -72,6 +82,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
               final updatedConv = conversations.removeAt(index);
               conversations.insert(0, updatedConv);
             });
+
+            // Cập nhật message provider count
+            final messageProvider = Provider.of<MessageProvider>(
+              context,
+              listen: false,
+            );
+            messageProvider.refresh();
           } else {
             // Nếu conversation mới, fetch lại toàn bộ danh sách
             // Điều này thường xảy ra khi người dùng được thêm vào nhóm mới
@@ -390,6 +407,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                 );
                 messageService.markAsSeen(conversation['id'], _currentUserId!);
+                // Cập nhật message provider sau khi mark as seen
+                final messageProvider = Provider.of<MessageProvider>(
+                  context,
+                  listen: false,
+                );
+                messageProvider.refresh();
               },
             ),
             const Divider(color: Color(0xFFD0D0D0), thickness: 1, indent: 70),

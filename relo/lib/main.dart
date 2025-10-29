@@ -9,6 +9,7 @@ import 'package:relo/services/websocket_service.dart';
 import 'package:relo/screen/login_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
+import 'package:relo/providers/message_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -120,6 +121,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => MessageProvider()),
       ],
       child: MaterialApp(
         navigatorKey:

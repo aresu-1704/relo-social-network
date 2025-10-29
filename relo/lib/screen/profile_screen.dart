@@ -27,7 +27,6 @@ import 'package:relo/widgets/posts/post_composer_widget.dart';
 import 'package:relo/screen/create_post_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:relo/services/websocket_service.dart';
-import 'package:dio/dio.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
