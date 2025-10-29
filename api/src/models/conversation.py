@@ -12,6 +12,7 @@ class LastMessage(BaseModel):
 class ParticipantInfo(BaseModel):
     userId: str
     lastMessageDelete: Optional[datetime] = None
+    muteNotifications: bool = False  # True nếu participant tắt thông báo cho conversation này
 
 
 class Conversation(Document):

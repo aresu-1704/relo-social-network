@@ -5,6 +5,8 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/models/user.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:relo/services/auth_service.dart';
+import 'package:relo/services/app_notification_service.dart';
+import 'package:relo/utils/show_notification.dart';
 import 'package:shimmer/shimmer.dart';
 import 'privacy_settings_screen.dart';
 
@@ -128,18 +130,42 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                                       child: const Text('Hủy'),
                                     ),
                                     TextButton(
-                                      onPressed: () {
-                                        authService.logout();
-                                        Navigator.of(context).pop();
-                                        Navigator.of(
-                                          context,
-                                        ).pushAndRemoveUntil(
-                                          MaterialPageRoute(
-                                            builder: (context) => LoginScreen(),
-                                          ),
-                                          (route) => false,
-                                        );
-                                        // Đóng hộp thoại
+                                      onPressed: () async {
+                                        try {
+                                          // Lấy device token để logout
+                                          final notificationService =
+                                              AppNotificationService();
+                                          final deviceToken =
+                                              await notificationService
+                                                  .getDeviceToken();
+
+                                          // Gọi logout với device token
+                                          await authService.logout(
+                                            deviceToken: deviceToken,
+                                          );
+
+                                          if (mounted) {
+                                            Navigator.of(context).pop();
+                                            Navigator.of(
+                                              context,
+                                            ).pushAndRemoveUntil(
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    LoginScreen(),
+                                              ),
+                                              (route) => false,
+                                            );
+                                          }
+                                        } catch (e) {
+                                          // Hiển thị lỗi nếu logout thất bại
+                                          if (mounted) {
+                                            Navigator.of(context).pop();
+                                            ShowNotification.showToast(
+                                              context,
+                                              'Đã xảy ra lỗi, không thể đăng xuất',
+                                            );
+                                          }
+                                        }
                                       },
                                       child: const Text(
                                         'Đăng xuất',
@@ -375,11 +401,29 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
 
         // Logout and navigate to login screen
         if (mounted) {
-          authService.logout();
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => LoginScreen()),
-            (route) => false,
-          );
+          try {
+            // Lấy device token để logout
+            final notificationService = AppNotificationService();
+            final deviceToken = await notificationService.getDeviceToken();
+
+            // Gọi logout với device token
+            await authService.logout(deviceToken: deviceToken);
+
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => LoginScreen()),
+                (route) => false,
+              );
+            }
+          } catch (e) {
+            // Hiển thị lỗi nếu logout thất bại
+            if (mounted) {
+              ShowNotification.showToast(
+                context,
+                'Đã xảy ra lỗi, không thể đăng xuất',
+              );
+            }
+          }
         }
       }
     } catch (e) {

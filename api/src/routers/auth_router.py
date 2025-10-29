@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
+from typing import Optional
 from ..services import AuthService, jwt_service
+from ..security import get_current_user_id
 from ..schemas import (
     UserCreate,
     UserPublic,
@@ -242,3 +244,43 @@ async def update_email(request: UpdateEmailRequest):
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/logout", status_code=200)
+async def logout_user(
+    request: dict = Body(...),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Endpoint để đăng xuất người dùng.
+    - Xóa device token của thiết bị hiện tại khỏi danh sách deviceTokens của user
+    - Chỉ xóa token được gửi đến (nếu có), không xóa tất cả tokens
+    - Trả về 200 nếu thành công
+    """
+    try:
+        from bson import ObjectId
+        from ..models import User
+        
+        device_token = request.get("device_token")
+        
+        # Tìm user theo ID
+        user = await User.find_one(User.id == ObjectId(user_id))
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="Không tìm thấy người dùng"
+            )
+        
+        # Nếu có device_token được gửi đến, xóa nó khỏi list
+        if device_token:
+            if user.deviceTokens and device_token in user.deviceTokens:
+                user.deviceTokens.remove(device_token)
+                await user.save()
+        
+        return {"message": "Đăng xuất thành công"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi khi đăng xuất: {str(e)}"
+        )

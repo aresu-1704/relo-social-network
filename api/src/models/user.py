@@ -11,7 +11,7 @@ class User(Document):
     email: EmailStr = Field(..., description="Địa chỉ email duy nhất của người dùng.")
     hashedPassword: str = Field(..., description="Mật khẩu đã được băm của người dùng.")
     displayName: str = Field(..., description="Tên hiển thị của người dùng.")
-    deviceToken: Optional[str] = Field(default=None, description="Device token để gửi thông báo đẩy.")
+    deviceTokens: List[str] = Field(default_factory=list, description="Danh sách device tokens để gửi thông báo đẩy trên nhiều thiết bị.")
 
     avatarUrl: Optional[str] = Field(default=None, description="URL ảnh đại diện của người dùng.")
     avatarPublicId: Optional[str] = Field(default=None, description="ID công khai của ảnh trên Cloudinary (để xóa hoặc cập nhật ảnh).")

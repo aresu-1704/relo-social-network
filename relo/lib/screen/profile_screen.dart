@@ -184,10 +184,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         _animationController.forward();
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print(e.toString());
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       _refreshController.refreshFailed();
       if (mounted) {
         await ShowNotification.showToast(
@@ -528,11 +529,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (_user == null) {
       return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Color(0xFF7A2FC0),
-          title: Text('Trang cá nhân', style: TextStyle(color: Colors.white)),
-          iconTheme: IconThemeData(color: Colors.white),
-        ),
         body: Center(child: Text('Không thể tải thông tin người dùng')),
       );
     }

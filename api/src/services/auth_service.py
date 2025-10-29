@@ -69,10 +69,13 @@ class AuthService:
         if not AuthService.verify_password(password, user.hashedPassword):
             return None # Mật khẩu không hợp lệ
         
-        # Cập nhật device token nếu được cung cấp
+        # Thêm device token vào list nếu được cung cấp và chưa có trong list
         if device_token:
-            user.deviceToken = device_token
-            await user.save()
+            if user.deviceTokens is None:
+                user.deviceTokens = []
+            if device_token not in user.deviceTokens:
+                user.deviceTokens.append(device_token)
+                await user.save()
         return user
 
     @staticmethod

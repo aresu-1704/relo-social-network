@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "relo-e6b93",
+  "private_key_id": "21605d1805001f4fc6630885bb9eb9adf97ab2b8",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7t/5+H4zFBBcY\nFc5oLEUjgKOp8Zkbswl81n1J8KP7n5et35FV5DS5wDkwJVUBBTUaZpolun6h6Mo3\nGcII8jamAwd/IRJy5jCuiJaefQaVljRBXUFpBThF5QZ8wRmQf7BvFguq1XsNlAjh\nnWK9RHIH8cVln7xSt2I5QHTHgU1npgi8PaPQHcMczaiD7XoigHcTDglOxSyLMcjP\ntCjM6w+oyvTTFglSf95HBdqVChvInQNvJDSySP3prVD4ZOAheX4d3OP1oguJ8NRI\nNerhxL0Yyg4/6r2cREcKAd9uyhDxqSPcIE8uqWfVeBoANH4vOwdjBv2KqI2MYYWm\nSO2AlPbJAgMBAAECggEAFiq9D7G0EtPP0lVI4X5Qz8dyDDBubxnuReKiOugCxUTs\nSWj8JZNkMocjea7+4bb2tV5mV4w1RfNSZb1R73KCx4nWCcoi/pR2LTYN6ztCWsm4\n8/sKLVejdIV+BZ9b4Hdjo0qMKCk7dbgEcHgAX+9EM/H16HE7cN0c6TvWTnTTaii6\nPpWfe87b6NPwQKJrFIFMi5wSbospyZjhwebJXTsm8wDqW+EcIlKmdhlIHklgkI3d\nQx/5Aj1tazrChteNL22ozbL1bBdCqfaZmWm0IqxLyyI3TWtG0I9BDLj2df6eoh1C\nasRY7EYCnNB6Qk4ghoSekI80UFwb8FzZKfWt2sUAAQKBgQDqIMSw055QC9ID+TSt\nRASPUY29SlYYBLEpJO1jei6spwn8nvhncY2yVol9kgRv0FwEDb2faBoVvsuKwMeU\nMCNSCt75rV5174js69vj9oUye8vY18uRt+Vp7VWhrcVmYZ1kdj3aJsbrXkEasiS8\nZG3HCp/e32rx8aL7UqJk4Fq2yQKBgQDNQVYD6Jsc8D1V3E5cXoVluXm+8nw8GJdW\nXuhnT73ejXOmxPQ/8y4E4ZNYoGWKTCDqtNGXCTOEJbc1m60sfCzZO2OyJS1t7wv9\nuMxMLKGsCshXW6oyFVNU/eijRoXzviD3iFPt2T7H7Ndt1GqhlbRwb8Ot+4KI9xvF\n8RzdOkhAAQKBgAv5kRXaPQarFBrP7DnQeMs7yJwd6TlhRA5urRWhcjGyeXhKSTpB\nPJYahv29Mizl407xxPkaQftKvu5h3dNegu/3TmBG1cYCcmZrydtnCHkEi/CTWP4j\nAcDhOrgCQ05xP7ObuJ4nzZTMRVgwNGDOYi8EBBlKJBYr3cIs/9FZCErBAoGBAIN2\nIFhah9aODErM0qeYponTtKVW+7kl6vAX03Qv/6TmJjefF+1JnKTlsZDnEoH0ZnTN\nIRxCeWtfGKvOLKk8UyFDR4RXCXTK0XxM+xSi1V2yfkRtYmG3hOr/wRuqVKsbkFPa\nTh8dsHcuO4CNt0oM70fAXa02VJHS60fpORp8dMABAoGAbX5BUemUAgO59WdoDwSx\nas0vGVNwXbqHJ+BSpM+LoARzSRXdOdQEhw40DcoxkROJB8UQ++1StbAO3f0l2gsD\naC0ImLuFTcNTM8AHXPDyc7U5PhGqSQTGcrr18ofy5nsPZk0K41R+unIO8NcLfDCd\nSQz+Za81dVHxcN94s3FjQf0=\n-----END PRIVATE KEY-----\n",
+  "client_email": "relo-api@relo-e6b93.iam.gserviceaccount.com",
+  "client_id": "117249950955235007345",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/relo-api%40relo-e6b93.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

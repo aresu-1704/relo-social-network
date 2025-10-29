@@ -155,10 +155,31 @@ class AuthService {
     }
   }
 
-  /// Đăng xuất người dùng (xóa tokens ở phía client).
-  Future<void> logout() async {
-    await _storageService.deleteTokens();
-    webSocketService.disconnect();
+  /// Đăng xuất người dùng (gọi API logout và xóa tokens ở phía client).
+  Future<void> logout({String? deviceToken}) async {
+    try {
+      // Gọi API logout để xóa device token trên server
+      final response = await _dio.post(
+        'auth/logout',
+        data: deviceToken != null ? {'device_token': deviceToken} : {},
+      );
+
+      // Chỉ logout khi server trả về 200 (đã xóa device token thành công)
+      if (response.statusCode == 200) {
+        await _storageService.deleteTokens();
+        webSocketService.disconnect();
+      } else {
+        throw Exception('Đã xảy ra lỗi, không thể đăng xuất');
+      }
+    } on DioException catch (e) {
+      // Nếu API logout thất bại, toast lỗi và không logout
+      throw Exception(
+        'Đã xảy ra lỗi, không thể đăng xuất: ${e.response?.data['detail'] ?? 'Lỗi kết nối'}',
+      );
+    } catch (e) {
+      // Các lỗi khác
+      throw Exception('Đã xảy ra lỗi, không thể đăng xuất');
+    }
   }
 
   // Lấy access token mới bằng refresh token.
@@ -192,24 +213,31 @@ class AuthService {
         return newAccessToken;
       } else {
         // A non-200 response that isn't a DioException (unlikely but possible)
-        // should be treated as a session failure.
-        await logout();
+        // Chỉ logout khi là 401 hoặc 403, không logout khi là lỗi khác (400, 500, etc.)
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          await logout();
+        }
         return null;
       }
     } on DioException catch (e) {
-      if (e.response?.statusCode == 403) {
+      // Chỉ logout khi 401 (Unauthorized) hoặc 403 (Forbidden)
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+        if (e.response?.statusCode == 403) {
+          final errorMessage =
+              e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
+          throw AccountDeletedException(errorMessage);
+        }
         await logout();
-        final errorMessage =
-            e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
-        throw AccountDeletedException(errorMessage);
+        return null;
       }
-      // If refresh fails, logout the user
-      await logout();
+      // Các lỗi khác (400, 500, network error, etc.) - KHÔNG logout
+      // Chỉ return null để reconnect sau
       return null;
     } catch (e) {
       if (e is AccountDeletedException) {
         rethrow;
       }
+      // Các lỗi khác (exception không phải DioException) - KHÔNG logout
       return null;
     } finally {
       _isRefreshing = false;

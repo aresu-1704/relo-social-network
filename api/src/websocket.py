@@ -42,6 +42,14 @@ class ConnectionManager:
             json_ready_data = self._serialize_for_json(data)
             for connection in self.active_connections[user_id]:
                 await connection.send_json(json_ready_data)
+    
+    def is_user_online(self, user_id: str) -> bool:
+        """Kiểm tra user có đang online (có WebSocket connection) không."""
+        return user_id in self.active_connections and len(self.active_connections[user_id]) > 0
+    
+    def get_offline_users(self, user_ids: List[str]) -> List[str]:
+        """Lấy danh sách users đang offline từ danh sách user IDs."""
+        return [uid for uid in user_ids if not self.is_user_online(uid)]
 
 # Tạo một instance duy nhất dùng toàn app
 manager = ConnectionManager()

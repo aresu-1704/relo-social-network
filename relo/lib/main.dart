@@ -10,13 +10,33 @@ import 'package:relo/screen/login_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
 import 'package:relo/providers/message_provider.dart';
+import 'package:relo/services/app_notification_service.dart';
+import 'package:relo/screen/chat_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// Background message handler (must be top-level function)
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("📩 Background message: ${message.notification?.title}");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // Setup Firebase background message handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   // Initialize all services
   ServiceLocator.init();
+
+  // Initialize notification service
+  final notificationService = AppNotificationService();
+  await notificationService.initialize();
+
+  // Setup notification callbacks
+  _setupNotificationCallbacks(notificationService);
 
   // Set up WebSocket auth error handler
   webSocketService.setAuthErrorHandler(() async {
@@ -108,6 +128,55 @@ void main() async {
   }
 
   runApp(MyApp(isLoggedIn: isLoggedIn));
+}
+
+/// Setup notification callbacks để xử lý tap và reply
+void _setupNotificationCallbacks(AppNotificationService notificationService) {
+  // Callback khi tap vào notification
+  notificationService.setOnNotificationTapped((String conversationId) {
+    final context = ServiceLocator.navigatorKey.currentContext;
+    if (context == null) return;
+
+    // Navigate tới ChatScreen (isGroup sẽ được xác định trong ChatScreen)
+    ServiceLocator.navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: conversationId,
+          memberIds: const [], // Sẽ được load trong ChatScreen
+          isGroup: false, // Sẽ được xác định trong ChatScreen
+        ),
+      ),
+    );
+  });
+
+  // Callback khi reply từ notification
+  notificationService.setOnNotificationReply((
+    String conversationId,
+    String messageText,
+  ) async {
+    try {
+      // Lấy senderId từ secure storage
+      final storage = const SecureStorageService();
+      final senderId = await storage.getUserId();
+
+      if (senderId == null) {
+        print("❌ Cannot send reply: User not logged in");
+        return;
+      }
+
+      // Gửi tin nhắn reply qua API
+      final messageService = ServiceLocator.messageService;
+
+      await messageService.sendMessage(conversationId, {
+        'type': 'text',
+        'text': messageText,
+      }, senderId);
+
+      print("✅ Reply sent: $messageText to conversation: $conversationId");
+    } catch (e) {
+      print("❌ Error sending reply: $e");
+    }
+  });
 }
 
 class MyApp extends StatelessWidget {
