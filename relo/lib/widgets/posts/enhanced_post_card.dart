@@ -9,16 +9,13 @@ import 'package:relo/services/secure_storage_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:relo/widgets/posts/auto_play_video_widget.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class EnhancedPostCard extends StatefulWidget {
   final Post post;
   final VoidCallback? onPostDeleted;
 
-  const EnhancedPostCard({
-    super.key,
-    required this.post,
-    this.onPostDeleted,
-  });
+  const EnhancedPostCard({super.key, required this.post, this.onPostDeleted});
 
   @override
   State<EnhancedPostCard> createState() => _EnhancedPostCardState();
@@ -69,7 +66,7 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
         postId: _currentPost.id,
         reactionType: reactionType,
       );
-      
+
       if (mounted) {
         setState(() {
           _currentPost = updatedPost;
@@ -77,9 +74,7 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e')),
-        );
+        await ShowNotification.showToast(context, 'Lỗi: $e');
       }
     }
   }
@@ -109,7 +104,10 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
               leading: const Icon(LucideIcons.edit, color: Colors.black87),
               title: const Text(
                 'Chỉnh sửa bài đăng',
-                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -121,7 +119,10 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
               leading: const Icon(LucideIcons.trash2, color: Colors.red),
               title: const Text(
                 'Xóa bài đăng',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -164,10 +165,7 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
               Navigator.pop(context);
               _deletePost();
             },
-            child: const Text(
-              'Xóa',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -178,17 +176,13 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
     try {
       await _postService.deletePost(_currentPost.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã xóa bài đăng')),
-        );
+        await ShowNotification.showToast(context, 'Đã xóa bài đăng');
         // Notify parent to refresh feed
         widget.onPostDeleted?.call();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi xóa bài đăng: $e')),
-        );
+        await ShowNotification.showToast(context, 'Lỗi xóa bài đăng: $e');
       }
     }
   }
@@ -200,7 +194,7 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
 
   Widget _buildMediaItem(String url, {int? index}) {
     final isVideo = _isVideo(url);
-    
+
     Widget mediaWidget;
     if (isVideo) {
       // Use auto-play video widget for news feed
@@ -244,7 +238,7 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
         ),
       );
     }
-    
+
     return mediaWidget;
   }
 
@@ -271,7 +265,11 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
             ),
             Row(
               children: [
-                const Icon(LucideIcons.smile, size: 18, color: Color(0xFF7A2FC0)),
+                const Icon(
+                  LucideIcons.smile,
+                  size: 18,
+                  color: Color(0xFF7A2FC0),
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'Chọn cảm xúc',
@@ -317,120 +315,142 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ==== Header: Avatar + Tên + Thời gian ====
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundImage: _currentPost.authorInfo.avatarUrl != null &&
-                          _currentPost.authorInfo.avatarUrl!.isNotEmpty
-                      ? CachedNetworkImageProvider(_currentPost.authorInfo.avatarUrl!)
-                      : null,
-                  child: _currentPost.authorInfo.avatarUrl == null ||
-                          _currentPost.authorInfo.avatarUrl!.isEmpty
-                      ? Text(
-                          _currentPost.authorInfo.displayName[0].toUpperCase(),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _currentPost.authorInfo.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      Text(
-                        _formatTimeAgo(_currentPost.createdAt),
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                // Only show 3-dot menu if current user is the post author
-                if (_currentUserId != null && _currentUserId == _currentPost.authorId)
-                  IconButton(
-                    icon: const Icon(LucideIcons.moreVertical, size: 20, color: Colors.grey),
-                    onPressed: _showPostOptions,
-                  )
-              ],
-            ),
-          ),
-
-          // ==== Nội dung bài viết ====
-          if (_currentPost.content.isNotEmpty)
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: 0,
+        color: Colors.white,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ==== Header: Avatar + Tên + Thời gian ====
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: Text(
-                _currentPost.content,
-                style: const TextStyle(fontSize: 15, height: 1.4),
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundImage:
+                        _currentPost.authorInfo.avatarUrl != null &&
+                            _currentPost.authorInfo.avatarUrl!.isNotEmpty
+                        ? CachedNetworkImageProvider(
+                            _currentPost.authorInfo.avatarUrl!,
+                          )
+                        : null,
+                    child:
+                        _currentPost.authorInfo.avatarUrl == null ||
+                            _currentPost.authorInfo.avatarUrl!.isEmpty
+                        ? Text(
+                            _currentPost.authorInfo.displayName[0]
+                                .toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currentPost.authorInfo.displayName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Text(
+                          _formatTimeAgo(_currentPost.createdAt),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Only show 3-dot menu if current user is the post author
+                  if (_currentUserId != null &&
+                      _currentUserId == _currentPost.authorId)
+                    IconButton(
+                      icon: const Icon(
+                        LucideIcons.moreVertical,
+                        size: 20,
+                        color: Colors.grey,
+                      ),
+                      onPressed: _showPostOptions,
+                    ),
+                ],
               ),
             ),
 
-          const SizedBox(height: 8),
+            // ==== Nội dung bài viết ====
+            if (_currentPost.content.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Text(
+                  _currentPost.content,
+                  style: const TextStyle(fontSize: 15, height: 1.4),
+                ),
+              ),
 
-          // ==== Media (ảnh/video) ====
-          if (_currentPost.mediaUrls.isNotEmpty)
-            SizedBox(
-              height: 300,
-              child: _currentPost.mediaUrls.length == 1
-                  ? _buildMediaItem(_currentPost.mediaUrls[0], index: 0)
-                  : PageView.builder(
-                      itemCount: _currentPost.mediaUrls.length,
-                      itemBuilder: (context, index) {
-                        return _buildMediaItem(_currentPost.mediaUrls[index], index: index);
-                      },
+            const SizedBox(height: 8),
+
+            // ==== Media (ảnh/video) ====
+            if (_currentPost.mediaUrls.isNotEmpty)
+              SizedBox(
+                height: 300,
+                child: _currentPost.mediaUrls.length == 1
+                    ? _buildMediaItem(_currentPost.mediaUrls[0], index: 0)
+                    : PageView.builder(
+                        itemCount: _currentPost.mediaUrls.length,
+                        itemBuilder: (context, index) {
+                          return _buildMediaItem(
+                            _currentPost.mediaUrls[index],
+                            index: index,
+                          );
+                        },
+                      ),
+              ),
+
+            const SizedBox(height: 8),
+
+            const Divider(height: 1),
+
+            // ==== Reaction button with count on same line ====
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 8,
+              ),
+              child: Row(
+                children: [
+                  _buildReactionButton(),
+                  // Reactions count right next to button with separator
+                  if (_currentPost.reactionCounts.isNotEmpty) ...[
+                    Container(
+                      height: 20,
+                      width: 1,
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      color: Colors.grey[400],
                     ),
-            ),
-
-          const SizedBox(height: 8),
-
-          const Divider(height: 1),
-
-          // ==== Reaction button with count on same line ====
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
-            child: Row(
-              children: [
-                _buildReactionButton(),
-                // Reactions count right next to button with separator
-                if (_currentPost.reactionCounts.isNotEmpty) ...[
-                  Container(
-                    height: 20,
-                    width: 1,
-                    margin: const EdgeInsets.symmetric(horizontal: 12),
-                    color: Colors.grey[400],
-                  ),
-                  _buildReactionIcons(),
-                  const SizedBox(width: 4),
-                  Text(
-                    _getTotalReactions().toString(),
-                    style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                  ),
+                    _buildReactionIcons(),
+                    const SizedBox(width: 4),
+                    Text(
+                      _getTotalReactions().toString(),
+                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                    ),
+                  ],
+                  const Spacer(),
                 ],
-                const Spacer(),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -439,7 +459,7 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
     final currentReaction = _getCurrentUserReaction();
     final hasReacted = currentReaction != null;
     final emoji = hasReacted ? _getEmojiForReaction(currentReaction) : null;
-    
+
     return TextButton.icon(
       onPressed: _showReactionPicker,
       icon: hasReacted
@@ -452,9 +472,14 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
         ),
       ),
       style: TextButton.styleFrom(
-        foregroundColor: hasReacted ? const Color(0xFF7A2FC0) : Colors.grey[700],
-        backgroundColor: hasReacted ? const Color(0xFF7A2FC0).withOpacity(0.15) : Colors.transparent,
+        foregroundColor: hasReacted
+            ? const Color(0xFF7A2FC0)
+            : Colors.grey[700],
+        backgroundColor: hasReacted
+            ? const Color(0xFF7A2FC0).withOpacity(0.1)
+            : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
@@ -511,7 +536,10 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
   }
 
   int _getTotalReactions() {
-    return _currentPost.reactionCounts.values.fold(0, (sum, count) => sum + count);
+    return _currentPost.reactionCounts.values.fold(
+      0,
+      (sum, count) => sum + count,
+    );
   }
 
   /// Lấy reaction type của user hiện tại (nếu có)
@@ -519,7 +547,7 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
     if (_currentUserId == null) {
       return null;
     }
-    
+
     try {
       final userReaction = _currentPost.reactions.firstWhere(
         (r) => r.userId == _currentUserId,

@@ -5,6 +5,7 @@ from ..models import User
 from ..models import FriendRequest
 from ..schemas import UserUpdate
 from ..websocket import manager
+from ..services.notification_service import NotificationService
 from bson import ObjectId
 import base64
 import tempfile
@@ -119,6 +120,15 @@ class UserService:
             # Xóa friend request khỏi database sau khi đã chấp nhận
             await friend_request.delete()
             
+            # Tạo notification cho người gửi yêu cầu (người được chấp nhận)
+            await NotificationService.create_notification(
+                user_id=friend_request.fromUserId,
+                notification_type="friend_request_accepted",
+                title="Đã chấp nhận lời mời kết bạn",
+                message=f"{to_user.displayName} đã chấp nhận lời mời kết bạn của bạn",
+                metadata={"userId": str(to_user.id), "displayName": to_user.displayName, "avatarUrl": to_user.avatarUrl}
+            )
+            
             # Gửi thông báo real-time đến cả hai người
             # Gửi cho người gửi yêu cầu
             notification_payload_from = {
@@ -149,6 +159,16 @@ class UserService:
         elif response == 'reject':
             # Từ chối yêu cầu - xóa khỏi database
             await friend_request.delete()
+            
+            # Tạo notification cho người gửi yêu cầu (người bị từ chối)
+            to_user = await User.get(friend_request.toUserId)
+            await NotificationService.create_notification(
+                user_id=friend_request.fromUserId,
+                notification_type="friend_request_rejected",
+                title="Đã từ chối lời mời kết bạn",
+                message=f"{to_user.displayName} đã từ chối lời mời kết bạn của bạn",
+                metadata={"userId": str(to_user.id), "displayName": to_user.displayName, "avatarUrl": to_user.avatarUrl}
+            )
             
             # Broadcast notification đến người gửi yêu cầu
             from_user = await User.get(friend_request.fromUserId)

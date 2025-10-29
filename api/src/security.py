@@ -45,6 +45,10 @@ async def get_user_from_token(token: str) -> User:
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     return await get_user_from_token(token)
 
+async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
+    user = await get_user_from_token(token)
+    return str(user.id)
+
 async def get_current_user_ws(websocket: WebSocket) -> User:
 
     token = websocket.query_params.get("token")

@@ -12,10 +12,11 @@ from .message import Message
 from .post import Post
 from .friend_request import FriendRequest
 from .otp import OTP
+from .notification import Notification
 
 # Danh sách các model Beanie sẽ được khởi tạo
 # Thêm tất cả các model của bạn vào đây
-DOCUMENT_MODELS: list[Type] = [User, Conversation, Message, Post, FriendRequest, OTP]
+DOCUMENT_MODELS: list[Type] = [User, Conversation, Message, Post, FriendRequest, OTP, Notification]
 
 client = None  # 🔹 client global, dùng 1 lần suốt vòng đời app
 

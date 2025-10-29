@@ -23,6 +23,8 @@ import 'package:relo/utils/image_picker_settings.dart';
 import 'package:relo/widgets/profiles/profile_header.dart';
 import 'package:relo/widgets/profiles/profile_components.dart';
 import 'package:relo/widgets/posts/enhanced_post_card.dart';
+import 'package:relo/widgets/posts/post_composer_widget.dart';
+import 'package:relo/screen/create_post_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:relo/services/websocket_service.dart';
 
@@ -780,47 +782,75 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ],
 
-                  // User's posts section
-                  if (_posts.isNotEmpty) ...[
-                    SizedBox(height: 20),
-                    Container(
-                      margin: EdgeInsets.symmetric(horizontal: 15),
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.article,
-                                color: Color(0xFF7A2FC0),
-                                size: 20,
+                  // Posts section with composer (own profile) or just posts (other profile)
+                  SizedBox(height: 20),
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 15),
+                    padding: EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header "Bài viết"
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.article,
+                              color: Color(0xFF7A2FC0),
+                              size: 20,
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Bài viết',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Bài viết',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 15),
+
+                        // Post composer for own profile
+                        if (_isOwnProfile) ...[
+                          PostComposerWidget(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CreatePostScreen(),
                                 ),
-                              ),
-                            ],
+                              );
+                              if (result == true) {
+                                // Reload profile to show new post
+                                await _loadUserProfile();
+                              }
+                            },
                           ),
-                          SizedBox(height: 15),
+                          SizedBox(height: _posts.isNotEmpty ? 15 : 0),
+                        ],
+
+                        // Post cards
+                        if (_posts.isNotEmpty)
                           ..._posts.map((post) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12.0),
-                              child: EnhancedPostCard(post: post),
+                              child: EnhancedPostCard(
+                                post: post,
+                                onPostDeleted: _isOwnProfile
+                                    ? () async {
+                                        await _loadUserProfile();
+                                      }
+                                    : null,
+                              ),
                             );
                           }).toList(),
-                        ],
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
 
                   SizedBox(height: 100), // Bottom padding
                 ],
