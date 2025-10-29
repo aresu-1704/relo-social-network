@@ -42,6 +42,14 @@ class ConnectionManager:
             json_ready_data = self._serialize_for_json(data)
             for connection in self.active_connections[user_id]:
                 await connection.send_json(json_ready_data)
+    
+    def is_user_online(self, user_id: str) -> bool:
+        """Kiểm tra user có đang online (có WebSocket connection) không."""
+        return user_id in self.active_connections and len(self.active_connections[user_id]) > 0
+    
+    def get_offline_users(self, user_ids: List[str]) -> List[str]:
+        """Lấy danh sách users đang offline từ danh sách user IDs."""
+        return [uid for uid in user_ids if not self.is_user_online(uid)]
 
 # Tạo một instance duy nhất dùng toàn app
 manager = ConnectionManager()
@@ -54,9 +62,8 @@ async def websocket_endpoint(websocket: WebSocket, user: User = Depends(get_curr
         while True:
             # Chờ tin nhắn từ client
             data = await websocket.receive_text()
-            # For now, just print it. In the future, this would handle incoming messages.
-            print(f"Message from {user_id}: {data}")
+            # Handle incoming messages if needed in the future
     except WebSocketDisconnect:
-        print(f"Client {user_id} disconnected")
+        pass
     finally:
         manager.disconnect(user_id, websocket)

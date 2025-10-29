@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import timedelta
+from datetime import timedelta, datetime
+from typing import Optional
 from ..services import AuthService, jwt_service
+from ..security import get_current_user_id
 from ..schemas import (
     UserCreate,
     UserPublic,
@@ -242,3 +244,72 @@ async def update_email(request: UpdateEmailRequest):
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/logout", status_code=200)
+async def logout_user(
+    request: dict = Body(...),
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Endpoint để đăng xuất người dùng.
+    - Xóa device token của thiết bị hiện tại khỏi danh sách deviceTokens của user
+    - Chỉ xóa token được gửi đến (nếu có), không xóa tất cả tokens
+    - Trả về 200 nếu thành công
+    """
+    try:
+        from bson import ObjectId
+        from ..models import User
+        
+        device_token = request.get("device_token")
+        
+        # Tìm user theo ID
+        user = await User.find_one(User.id == ObjectId(user_id))
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="Không tìm thấy người dùng"
+            )
+        
+        # Nếu có device_token được gửi đến, xóa nó khỏi list
+        if device_token and device_token.strip():
+            # Đảm bảo deviceTokens là list
+            if user.deviceTokens is None:
+                user.deviceTokens = []
+            
+            # Log để debug
+            print(f"📱 Logout: User {user_id}, Device token: {device_token[:20]}...")
+            print(f"📱 Current deviceTokens count: {len(user.deviceTokens)}")
+            
+            # Xóa device token nếu có trong list
+            if device_token in user.deviceTokens:
+                original_count = len(user.deviceTokens)
+                user.deviceTokens.remove(device_token)
+                print(f"✅ Device token removed. Count: {original_count} -> {len(user.deviceTokens)}")
+                
+                # Save user với updatedAt
+                user.updatedAt = datetime.utcnow() + timedelta(hours=7)
+                
+                # Sử dụng replace() thay vì save() để đảm bảo update được ghi vào database
+                await user.replace()
+                
+                # Verify sau khi save
+                updated_user = await User.find_one(User.id == ObjectId(user_id))
+                if updated_user:
+                    print(f"✅ User saved successfully. Verified count: {len(updated_user.deviceTokens)}")
+                else:
+                    print(f"⚠️ Could not verify user after save")
+            else:
+                print(f"⚠️ Device token not found in list.")
+                print(f"   Searching for: {device_token[:20] if len(device_token) > 20 else device_token}...")
+                print(f"   Available tokens ({len(user.deviceTokens)}): {[token[:20] + '...' if len(token) > 20 else token for token in (user.deviceTokens or [])]}")
+        else:
+            print(f"⚠️ No device_token provided in logout request")
+        
+        return {"message": "Đăng xuất thành công"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi khi đăng xuất: {str(e)}"
+        )

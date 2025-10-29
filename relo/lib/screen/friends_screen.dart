@@ -103,9 +103,11 @@ class _FriendsScreenState extends State<FriendsScreen>
       }
     }
     await Future.wait(tasks);
-    setState(() {
-      _allImagesLoaded = true;
-    });
+    if (mounted) {
+      setState(() {
+        _allImagesLoaded = true;
+      });
+    }
   }
 
   @override

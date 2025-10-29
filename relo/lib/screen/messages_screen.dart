@@ -111,6 +111,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 conversations[index]['avatarUrl'] =
                     conversationData['avatarUrl'];
               }
+              // Cập nhật mute status nếu có
+              if (conversationData['participantsInfo'] != null) {
+                conversations[index]['participantsInfo'] =
+                    conversationData['participantsInfo'];
+              }
             });
           } else {
             // Nếu không tìm thấy, reload danh sách
@@ -306,6 +311,19 @@ class _MessagesScreenState extends State<MessagesScreen> {
         final seen = (conversation['seenIds'] ?? []).contains(_currentUserId);
         final isMine = lastMsg?['senderId'] == _currentUserId;
 
+        // Lấy mute status từ participantsInfo
+        final participantsInfo = conversation['participantsInfo'] as List?;
+        bool isMuted = false;
+        if (participantsInfo != null && _currentUserId != null) {
+          final myInfo = participantsInfo.firstWhere(
+            (p) => p['userId'] == _currentUserId,
+            orElse: () => null,
+          );
+          if (myInfo != null) {
+            isMuted = myInfo['muteNotifications'] ?? false;
+          }
+        }
+
         if (conversation['lastMessage'] == null) {
           return const SizedBox.shrink();
         }
@@ -337,30 +355,53 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 ),
               ),
               trailing: updatedAt != null
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          Format.formatZaloTime(updatedAt),
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 10,
-                            fontWeight: (isMine || seen)
-                                ? FontWeight.normal
-                                : FontWeight.bold,
-                          ),
-                        ),
-                        if (!isMine && !seen)
-                          Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
+                        if (isMuted)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Icon(
+                              Icons.notifications_off,
+                              size: 16,
+                              color: Colors.grey[600],
                             ),
                           ),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              Format.formatZaloTime(updatedAt),
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 10,
+                                fontWeight: (isMine || seen)
+                                    ? FontWeight.normal
+                                    : FontWeight.bold,
+                              ),
+                            ),
+                            if (!isMine && !seen)
+                              Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
+                    )
+                  : isMuted
+                  ? Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Icon(
+                        Icons.notifications_off,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
                     )
                   : null,
               onTap: () async {
@@ -402,6 +443,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
                             (c) => c['id'] == conversationId,
                           );
                         });
+                      },
+                      onMuteToggled: () {
+                        // Reload conversations để cập nhật mute icon
+                        fetchConversations();
                       },
                     ),
                   ),

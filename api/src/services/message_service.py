@@ -6,6 +6,7 @@ from ..websocket import manager
 from ..schemas import SimpleMessagePublic, LastMessagePublic, ConversationWithParticipants
 from ..schemas.user_schema import UserPublic
 from .user_service import UserService
+from .fcm_service import FCMService
 from ..utils import upload_to_cloudinary
 from fastapi import UploadFile
 from ..utils import map_message_to_public_dict, map_conversation_to_public_dict
@@ -212,6 +213,92 @@ class MessageService:
             for uid in [p.userId for p in conversation.participants]
         ]
         await asyncio.gather(*tasks)
+
+        # Gửi push notification cho users offline không tắt thông báo
+        async def send_push_notifications():
+            try:
+                # Lấy danh sách participants không tắt thông báo và không phải sender
+                participants_to_notify = [
+                    p.userId for p in conversation.participants
+                    if p.userId != sender_id and not p.muteNotifications
+                ]
+                
+                if not participants_to_notify:
+                    return
+                
+                # Lấy danh sách users offline
+                offline_user_ids = manager.get_offline_users(participants_to_notify)
+                
+                if not offline_user_ids:
+                    return
+                
+                # Lấy thông tin sender để hiển thị
+                sender_name = "Người dùng"  # Default
+                sender_avatar = None
+                if sender and not is_sender_deleted:
+                    sender_name = sender.displayName or sender.username
+                    sender_avatar = sender.avatarUrl
+                
+                # Lấy thông tin conversation
+                conversation_name = None
+                if conversation.isGroup:
+                    conversation_name = conversation.name or "Nhóm"
+                else:
+                    # Nếu là chat 1-1, tìm tên của người kia
+                    other_participant_id = next(
+                        (p.userId for p in conversation.participants if p.userId != sender_id),
+                        None
+                    )
+                    if other_participant_id:
+                        try:
+                            other_user = await User.get(other_participant_id)
+                            if other_user:
+                                conversation_name = other_user.displayName or other_user.username
+                        except:
+                            pass
+                
+                # Lấy message content và image URL để hiển thị
+                message_content = ""
+                message_type = "text"
+                image_url = None
+                if isinstance(message.content, dict):
+                    content_type = message.content.get("type", "text")
+                    message_type = content_type
+                    if content_type == "text":
+                        message_content = message.content.get("text", "")
+                    elif content_type == "image":
+                        message_content = "📷 Đã gửi ảnh"
+                        image_url = message.content.get("url")
+                    elif content_type == "media":
+                        message_content = "🖼️ Đã gửi media"
+                        urls = message.content.get("urls", [])
+                        if urls:
+                            image_url = urls[0]  # Lấy ảnh đầu tiên
+                    elif content_type == "audio":
+                        message_content = "🎤 Đã gửi tin nhắn thoại"
+                    elif content_type == "file":
+                        message_content = "📁 Đã gửi file"
+                    else:
+                        message_content = "Đã gửi tin nhắn"
+                
+                # Gửi push notification
+                await FCMService.send_message_notification(
+                    conversation_id=conversation_id,
+                    sender_id=sender_id,
+                    sender_name=sender_name,
+                    sender_avatar=sender_avatar,
+                    message_content=message_content,
+                    message_type=message_type,
+                    image_url=image_url,
+                    conversation_name=conversation_name,
+                    is_group=conversation.isGroup,
+                    offline_user_ids=offline_user_ids
+                )
+            except Exception as e:
+                print(f"⚠️ Error sending push notifications: {e}")
+        
+        # Gửi notification trong background (không block response)
+        asyncio.create_task(send_push_notifications())
 
         return message
     
@@ -612,6 +699,40 @@ class MessageService:
         # Chạy broadcast trong background
         asyncio.create_task(broadcast_member_left())
         
+        # Gửi push notification cho users offline không tắt thông báo
+        async def send_push_notifications_leave():
+            try:
+                # Lấy danh sách participants không tắt thông báo (không phải user rời)
+                participants_to_notify = [
+                    p.userId for p in conversation.participants
+                    if p.userId != user_id and not p.muteNotifications
+                ]
+                
+                if not participants_to_notify:
+                    return
+                
+                # Lấy danh sách users offline
+                offline_user_ids = manager.get_offline_users(participants_to_notify)
+                
+                if not offline_user_ids:
+                    return
+                
+                user_name = user.displayName if user else "Người dùng"
+                group_name = conversation.name or "Nhóm"
+                
+                await FCMService.send_group_notification(
+                    conversation_id=conversation_id,
+                    notification_type="member_left",
+                    title=group_name,
+                    body=f"{user_name} vừa rời khỏi nhóm",
+                    offline_user_ids=offline_user_ids,
+                    metadata={"user_id": user_id, "user_name": user_name}
+                )
+            except Exception as e:
+                print(f"⚠️ Error sending push notifications for member left: {e}")
+        
+        asyncio.create_task(send_push_notifications_leave())
+        
         return {"message": "Bạn đã rời khỏi nhóm thành công."}
     
     @staticmethod
@@ -704,7 +825,78 @@ class MessageService:
         # Chạy broadcast trong background
         asyncio.create_task(broadcast_member_added())
         
+        # Gửi push notification cho users offline không tắt thông báo
+        async def send_push_notifications_add():
+            try:
+                # Lấy danh sách participants không tắt thông báo (bao gồm cả member được thêm mới)
+                participants_to_notify = [
+                    p.userId for p in conversation.participants
+                    if not p.muteNotifications
+                ]
+                
+                if not participants_to_notify:
+                    return
+                
+                # Lấy danh sách users offline
+                offline_user_ids = manager.get_offline_users(participants_to_notify)
+                
+                if not offline_user_ids:
+                    return
+                
+                group_name = conversation.name or "Nhóm"
+                member_name = member.displayName if member else "Người dùng"
+                
+                await FCMService.send_group_notification(
+                    conversation_id=conversation_id,
+                    notification_type="member_added",
+                    title=group_name,
+                    body=f"{adder_name} đã thêm {member_name} vào nhóm",
+                    offline_user_ids=offline_user_ids,
+                    metadata={
+                        "member_id": member_id,
+                        "member_name": member_name,
+                        "added_by": added_by,
+                        "adder_name": adder_name
+                    }
+                )
+            except Exception as e:
+                print(f"⚠️ Error sending push notifications for member added: {e}")
+        
+        asyncio.create_task(send_push_notifications_add())
+        
         return {"message": "Thành viên đã được thêm vào nhóm thành công."}
+    
+    @staticmethod
+    async def toggle_mute_notifications(conversation_id: str, user_id: str, muted: bool):
+        """
+        Bật/tắt thông báo cho conversation của user.
+        
+        Args:
+            conversation_id: ID của conversation
+            user_id: ID của user
+            muted: True để tắt thông báo, False để bật thông báo
+        """
+        conversation = await Conversation.get(conversation_id)
+        if not conversation:
+            raise ValueError("Cuộc trò chuyện không tồn tại.")
+        
+        # Tìm participant info của user
+        participant = next(
+            (p for p in conversation.participants if p.userId == user_id),
+            None
+        )
+        
+        if not participant:
+            raise PermissionError("Bạn không thuộc cuộc trò chuyện này.")
+        
+        # Cập nhật muteNotifications
+        participant.muteNotifications = muted
+        await conversation.save()
+        
+        return {
+            "message": "Đã tắt thông báo" if muted else "Đã bật thông báo",
+            "muted": muted
+        }
     
     @staticmethod
     async def update_group_avatar(conversation_id: str, user_id: str, avatar_file):

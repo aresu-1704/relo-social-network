@@ -24,3 +24,5 @@ api/src/__pycache__/
 .env.development.local
 .env.test.local
 .env.production.local
+
+/api/relo-api.json

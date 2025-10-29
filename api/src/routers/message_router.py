@@ -251,3 +251,25 @@ async def add_member_to_group(
         raise HTTPException(status_code=400, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+
+class MuteConversationRequest(BaseModel):
+    muted: bool
+
+@router.put("/conversations/{conversation_id}/mute")
+async def toggle_mute_conversation(
+    conversation_id: str,
+    request: MuteConversationRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Bật/tắt thông báo cho conversation."""
+    try:
+        result = await MessageService.toggle_mute_notifications(
+            conversation_id=conversation_id,
+            user_id=str(current_user.id),
+            muted=request.muted
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))

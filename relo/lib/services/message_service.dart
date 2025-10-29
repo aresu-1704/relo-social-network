@@ -239,4 +239,21 @@ class MessageService {
       throw Exception('Failed to add member to group: $e');
     }
   }
+
+  // Bật/tắt thông báo cho conversation
+  Future<bool> toggleMuteConversation(String conversationId, bool muted) async {
+    try {
+      final response = await _dio.put(
+        'messages/conversations/$conversationId/mute',
+        data: {'muted': muted},
+      );
+      return response.data['muted'] as bool? ?? muted;
+    } on DioException catch (e) {
+      throw Exception(
+        'Failed to toggle mute: ${e.response?.data ?? e.message}',
+      );
+    } catch (e) {
+      throw Exception('Failed to toggle mute: $e');
+    }
+  }
 }

@@ -34,6 +34,7 @@ class ChatScreen extends StatefulWidget {
   final void Function(String conversationId)? onConversationSeen;
   final void Function()? onLeftGroup;
   final void Function(String userId)? onUserBlocked;
+  final void Function()? onMuteToggled;
 
   const ChatScreen({
     super.key,
@@ -45,6 +46,7 @@ class ChatScreen extends StatefulWidget {
     this.memberCount,
     this.onLeftGroup,
     this.onUserBlocked,
+    this.onMuteToggled,
     this.avatarUrl,
   });
 
@@ -85,6 +87,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // Member IDs (cho group chat) - cập nhật realtime
   List<String>? _memberIds;
+
+  // Mute notifications status
+  bool _isMuted = false;
 
   @override
   void initState() {
@@ -250,6 +255,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (_conversationId != null) {
         await _loadMessages(isInitial: true);
+        // Load mute status from conversations list
+        await _loadMuteStatus();
         // Check block status asynchronously after loading messages
         _checkBlockStatus();
       } else {
@@ -263,6 +270,33 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMuteStatus() async {
+    if (_currentUserId == null || _conversationId == null) return;
+    try {
+      final conversations = await _messageService.fetchConversations();
+      final conversation = conversations.firstWhere(
+        (c) => c['id'] == _conversationId,
+        orElse: () => null,
+      );
+      if (conversation != null) {
+        final participantsInfo = conversation['participantsInfo'] as List?;
+        if (participantsInfo != null) {
+          final myInfo = participantsInfo.firstWhere(
+            (p) => p['userId'] == _currentUserId,
+            orElse: () => null,
+          );
+          if (myInfo != null && mounted) {
+            setState(() {
+              _isMuted = myInfo['muteNotifications'] ?? false;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading mute status: $e');
     }
   }
 
@@ -685,7 +719,20 @@ class _ChatScreenState extends State<ChatScreen> {
           memberIds: _memberIds,
           isDeletedAccount: isDeletedAccount,
           isBlocked: _isBlocked,
+          initialMuted: _isMuted,
           conversationId: _conversationId!,
+          onMuteToggled: (muted) async {
+            // Cập nhật local state
+            setState(() {
+              _isMuted = muted;
+            });
+            // Reload mute status từ server
+            await _loadMuteStatus();
+            // Callback để MessagesScreen reload conversations
+            if (widget.onMuteToggled != null) {
+              widget.onMuteToggled!();
+            }
+          },
           onViewProfile: (friendId) {
             Navigator.push(
               context,
