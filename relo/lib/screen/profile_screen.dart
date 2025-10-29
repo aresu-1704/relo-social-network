@@ -23,6 +23,8 @@ import 'package:relo/utils/image_picker_settings.dart';
 import 'package:relo/widgets/profiles/profile_header.dart';
 import 'package:relo/widgets/profiles/profile_components.dart';
 import 'package:relo/widgets/posts/enhanced_post_card.dart';
+import 'package:relo/widgets/posts/post_composer_widget.dart';
+import 'package:relo/screen/create_post_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:relo/services/websocket_service.dart';
 
@@ -371,13 +373,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         return;
       }
 
-      // Create base64 string
-      final String mimeType = image.path.toLowerCase().endsWith('.png')
-          ? 'image/png'
-          : 'image/jpeg';
-      final base64String = base64Encode(bytes);
-      final base64Image = 'data:$mimeType;base64,$base64String';
-
       // Clear image cache
       final String? oldUrl = isAvatar ? _user?.avatarUrl : _user?.backgroundUrl;
       if (oldUrl != null) {
@@ -389,25 +384,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       // Upload image
       User? updatedUser;
       if (isAvatar) {
-        updatedUser = await _userService.updateAvatar(base64Image);
+        updatedUser = await _userService.updateAvatar(image.path);
       } else {
-        updatedUser = await _userService.updateBackground(base64Image);
+        updatedUser = await _userService.updateBackground(image.path);
         await Future.delayed(Duration(seconds: 1));
       }
 
+      if (!mounted) return;
       Navigator.pop(context);
 
-      // Handle URL for cache busting (background only)
-      final String? newUrl;
-      if (!isAvatar && updatedUser.backgroundUrl != null) {
-        newUrl =
-            '${updatedUser.backgroundUrl}?t=${DateTime.now().millisecondsSinceEpoch}';
-      } else {
-        newUrl = isAvatar ? updatedUser.avatarUrl : updatedUser.backgroundUrl;
-      }
-
+      // Clear temp paths
       setState(() {
-        _user = updatedUser;
         if (isAvatar) {
           _tempAvatarPath = null;
         } else {
@@ -415,28 +402,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
       });
 
-      // Prefetch new image
-      if (newUrl != null && mounted) {
-        for (int i = 0; i < 3; i++) {
-          try {
-            await precacheImage(CachedNetworkImageProvider(newUrl), context);
-            break;
-          } catch (e) {
-            if (i == 2) print('Precache failed after 3 attempts: $e');
-            await Future.delayed(Duration(milliseconds: 500));
-          }
-        }
-      }
+      // Reload toàn bộ profile để cập nhật avatar trong posts
+      await _loadUserProfile();
 
       if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (mounted) {
-            await ShowNotification.showToast(
-              context,
-              '${isAvatar ? 'Ảnh đại diện' : 'Ảnh bìa'} đã được cập nhật thành công!',
-            );
-          }
-        });
+        await ShowNotification.showToast(
+          context,
+          '${isAvatar ? 'Ảnh đại diện' : 'Ảnh bìa'} đã được cập nhật thành công!',
+        );
       }
     } catch (e) {
       setState(() {
@@ -780,47 +753,75 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ],
 
-                  // User's posts section
-                  if (_posts.isNotEmpty) ...[
-                    SizedBox(height: 20),
-                    Container(
-                      margin: EdgeInsets.symmetric(horizontal: 15),
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.article,
-                                color: Color(0xFF7A2FC0),
-                                size: 20,
+                  // Posts section with composer (own profile) or just posts (other profile)
+                  SizedBox(height: 20),
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 15),
+                    padding: EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header "Bài viết"
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.article,
+                              color: Color(0xFF7A2FC0),
+                              size: 20,
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Bài viết',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Bài viết',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 15),
+
+                        // Post composer for own profile
+                        if (_isOwnProfile) ...[
+                          PostComposerWidget(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CreatePostScreen(),
                                 ),
-                              ),
-                            ],
+                              );
+                              if (result == true) {
+                                // Reload profile to show new post
+                                await _loadUserProfile();
+                              }
+                            },
                           ),
-                          SizedBox(height: 15),
+                          SizedBox(height: _posts.isNotEmpty ? 15 : 0),
+                        ],
+
+                        // Post cards
+                        if (_posts.isNotEmpty)
                           ..._posts.map((post) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12.0),
-                              child: EnhancedPostCard(post: post),
+                              child: EnhancedPostCard(
+                                post: post,
+                                onPostDeleted: _isOwnProfile
+                                    ? () async {
+                                        await _loadUserProfile();
+                                      }
+                                    : null,
+                              ),
                             );
                           }).toList(),
-                        ],
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
 
                   SizedBox(height: 100), // Bottom padding
                 ],

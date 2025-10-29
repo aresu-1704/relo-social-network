@@ -1,51 +1,49 @@
-import 'package:json_annotation/json_annotation.dart';
-
-part 'notification.g.dart';
-
-enum NotificationType { friendRequestAccepted, friendAdded }
-
-@JsonSerializable()
-class AppNotification {
+class Notification {
   final String id;
-  final NotificationType type;
+  final String userId;
+  final String type;
   final String title;
   final String message;
-  final DateTime createdAt;
+  final Map<String, dynamic> metadata;
   final bool isRead;
-  final Map<String, dynamic>? metadata; // userId, username, etc.
+  final String createdAt;
 
-  AppNotification({
+  Notification({
     required this.id,
+    required this.userId,
     required this.type,
     required this.title,
     required this.message,
+    required this.metadata,
+    required this.isRead,
     required this.createdAt,
-    this.isRead = false,
-    this.metadata,
   });
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) =>
-      _$AppNotificationFromJson(json);
-
-  Map<String, dynamic> toJson() => _$AppNotificationToJson(this);
-
-  AppNotification copyWith({
-    String? id,
-    NotificationType? type,
-    String? title,
-    String? message,
-    DateTime? createdAt,
-    bool? isRead,
-    Map<String, dynamic>? metadata,
-  }) {
-    return AppNotification(
-      id: id ?? this.id,
-      type: type ?? this.type,
-      title: title ?? this.title,
-      message: message ?? this.message,
-      createdAt: createdAt ?? this.createdAt,
-      isRead: isRead ?? this.isRead,
-      metadata: metadata ?? this.metadata,
+  factory Notification.fromJson(Map<String, dynamic> json) {
+    return Notification(
+      id: json['id'] ?? '',
+      userId: json['userId'] ?? '',
+      type: json['type'] ?? '',
+      title: json['title'] ?? '',
+      message: json['message'] ?? '',
+      metadata: json['metadata'] != null
+          ? Map<String, dynamic>.from(json['metadata'])
+          : {},
+      isRead: json['isRead'] ?? false,
+      createdAt: json['createdAt'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'type': type,
+      'title': title,
+      'message': message,
+      'metadata': metadata,
+      'isRead': isRead,
+      'createdAt': createdAt,
+    };
   }
 }

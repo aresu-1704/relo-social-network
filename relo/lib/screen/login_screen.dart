@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/screen/register_screen.dart';
 import 'package:relo/screen/forgot_password_screen.dart';
 import 'package:relo/services/auth_service.dart';
-import 'package:relo/services/notification_service.dart';
+import 'package:relo/services/app_notification_service.dart';
 import 'package:relo/screen/main_screen.dart';
 import 'package:relo/services/websocket_service.dart';
 
@@ -17,7 +17,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final AuthService _authService = AuthService();
-  final NotificationService _notificationService = NotificationService();
+  final AppNotificationService _notificationService = AppNotificationService();
 
   bool _isLoading = false;
   final TextEditingController _usernameController = TextEditingController();

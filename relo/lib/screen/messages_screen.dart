@@ -9,6 +9,8 @@ import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/utils/format.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:provider/provider.dart';
+import 'package:relo/providers/message_provider.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -38,6 +40,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
     await _getCurrentUserId();
     await fetchConversations();
     _listenToWebSocket();
+    // Refresh message provider count khi vào màn hình
+    if (mounted) {
+      final messageProvider = Provider.of<MessageProvider>(
+        context,
+        listen: false,
+      );
+      messageProvider.refresh();
+    }
   }
 
   Future<void> _getCurrentUserId() async {
@@ -46,6 +56,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _listenToWebSocket() {
+    // Cancel subscription cũ nếu có
+    _webSocketSubscription?.cancel();
+
     _webSocketSubscription = webSocketService.stream.listen((message) {
       final data = jsonDecode(message);
 
@@ -69,8 +82,38 @@ class _MessagesScreenState extends State<MessagesScreen> {
               final updatedConv = conversations.removeAt(index);
               conversations.insert(0, updatedConv);
             });
+
+            // Cập nhật message provider count
+            final messageProvider = Provider.of<MessageProvider>(
+              context,
+              listen: false,
+            );
+            messageProvider.refresh();
           } else {
-            // Nếu conversation mới, fetch lại
+            // Nếu conversation mới, fetch lại toàn bộ danh sách
+            // Điều này thường xảy ra khi người dùng được thêm vào nhóm mới
+            Future.microtask(() => fetchConversations());
+          }
+        }
+      } else if (data['type'] == 'conversation_updated') {
+        // Xử lý khi conversation được cập nhật (ví dụ: đổi avatar, thêm thành viên)
+        final conversationData = data['payload']?['conversation'];
+        if (conversationData != null) {
+          final conversationId = conversationData['id'];
+          final index = conversations.indexWhere(
+            (c) => c['id'] == conversationId,
+          );
+
+          if (index != -1) {
+            // Cập nhật conversation hiện có
+            setState(() {
+              if (conversationData['avatarUrl'] != null) {
+                conversations[index]['avatarUrl'] =
+                    conversationData['avatarUrl'];
+              }
+            });
+          } else {
+            // Nếu không tìm thấy, reload danh sách
             fetchConversations();
           }
         }
@@ -364,6 +407,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                 );
                 messageService.markAsSeen(conversation['id'], _currentUserId!);
+                // Cập nhật message provider sau khi mark as seen
+                final messageProvider = Provider.of<MessageProvider>(
+                  context,
+                  listen: false,
+                );
+                messageProvider.refresh();
               },
             ),
             const Divider(color: Color(0xFFD0D0D0), thickness: 1, indent: 70),

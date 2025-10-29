@@ -11,17 +11,29 @@ from fastapi import UploadFile
 from ..utils import map_message_to_public_dict, map_conversation_to_public_dict
 
 class MessageService:
+    
+    @staticmethod
+    async def get_conversation_by_id(conversation_id: str):
+        """Lấy conversation theo ID."""
+        try:
+            conversation = await Conversation.get(conversation_id)
+            return conversation
+        except Exception as e:
+            print(f"Error getting conversation by ID: {e}")
+            return None
 
     @staticmethod
     async def create_notification_message(
         conversation_id: str,
         notification_type: str,
         text: str,
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
+        broadcast: bool = True
     ):
         """
         Tạo một notification message trong conversation.
         notification_type: 'name_changed', 'avatar_changed', 'member_left', 'member_added'
+        broadcast: Nếu True thì tự động broadcast, nếu False thì để caller tự broadcast
         """
         notification_content = {
             "type": "notification",
@@ -51,21 +63,22 @@ class MessageService:
             conversation.seenIds = []
             await conversation.save()
             
-            # Broadcast notification message
-            message_data = map_message_to_public_dict(message)
-            conversation_data = map_conversation_to_public_dict(conversation)
-            
-            tasks = [
-                manager.broadcast_to_user(
-                    uid,
-                    {
-                        "type": "new_message",
-                        "payload": {"message": message_data, "conversation": conversation_data}
-                    }
-                )
-                for uid in [p.userId for p in conversation.participants]
-            ]
-            await asyncio.gather(*tasks)
+            # Chỉ broadcast nếu được yêu cầu
+            if broadcast:
+                message_data = map_message_to_public_dict(message)
+                conversation_data = map_conversation_to_public_dict(conversation)
+                
+                tasks = [
+                    manager.broadcast_to_user(
+                        uid,
+                        {
+                            "type": "new_message",
+                            "payload": {"message": message_data, "conversation": conversation_data}
+                        }
+                    )
+                    for uid in [p.userId for p in conversation.participants]
+                ]
+                await asyncio.gather(*tasks)
         
         return message
 
@@ -103,6 +116,18 @@ class MessageService:
                 name=name,
             )
             await conversation.insert()
+            
+            # Nếu là nhóm, tạo tin nhắn system
+            if is_group and name:
+                try:
+                    await MessageService.create_notification_message(
+                        conversation_id=str(conversation.id),
+                        notification_type="group_created",
+                        text=f"Nhóm '{name}' đã được tạo",
+                        metadata={"group_name": name}
+                    )
+                except Exception as e:
+                    print(f"Failed to create notification message: {e}")
 
         return conversation
 
@@ -526,13 +551,66 @@ class MessageService:
         conversation.participants = [p for p in conversation.participants if p.userId != user_id]
         await conversation.save()
         
-        # Tạo notification message
-        await MessageService.create_notification_message(
+        # Tạo notification message (không broadcast tự động, sẽ broadcast sau)
+        notification_message = await MessageService.create_notification_message(
             conversation_id=conversation_id,
             notification_type="member_left",
             text=f"{user.displayName if user else 'Người dùng'} vừa rời khỏi nhóm",
-            metadata={"user_id": user_id, "display_name": user.displayName if user else ""}
+            metadata={"user_id": user_id, "display_name": user.displayName if user else ""},
+            broadcast=False  # Tắt broadcast tự động, sẽ broadcast thủ công sau
         )
+        
+        # Broadcast tin nhắn đến tất cả thành viên còn lại trong nhóm
+        async def broadcast_member_left():
+            try:
+                participant_ids = [p.userId for p in conversation.participants]
+                
+                # Format cho MessagesScreen (expect conversation data)
+                conversation_data = {
+                    "id": conversation_id,
+                    "lastMessage": {
+                        "id": str(notification_message.id),
+                        "senderId": "system",
+                        "content": notification_message.content,
+                        "createdAt": notification_message.createdAt.isoformat(),
+                    },
+                    "updatedAt": notification_message.createdAt.isoformat(),
+                    "seenIds": [],
+                    "participantCount": len(participant_ids),
+                    "participantIds": participant_ids
+                }
+                
+                # Format cho ChatScreen (expect message data)
+                message_data = {
+                    "id": str(notification_message.id),
+                    "conversationId": conversation_id,
+                    "senderId": "system",
+                    "content": notification_message.content,
+                    "avatarUrl": "",
+                    "createdAt": notification_message.createdAt.isoformat(),
+                }
+                
+                # Thêm metadata về số lượng thành viên và danh sách thành viên
+                metadata = {
+                    "participantCount": len(participant_ids),
+                    "participantIds": participant_ids
+                }
+                
+                await asyncio.gather(*[
+                    manager.broadcast_to_user(participant_id, {
+                        "type": "new_message",
+                        "payload": {
+                            "conversation": conversation_data,
+                            "message": message_data,
+                            "metadata": metadata
+                        }
+                    }) for participant_id in participant_ids
+                ])
+            except Exception as e:
+                print(f"Failed to broadcast member left message: {e}")
+        
+        # Chạy broadcast trong background
+        asyncio.create_task(broadcast_member_left())
         
         return {"message": "Bạn đã rời khỏi nhóm thành công."}
     
@@ -562,12 +640,125 @@ class MessageService:
         conversation.participants.append(ParticipantInfo(userId=member_id))
         await conversation.save()
         
-        # Tạo notification message
-        await MessageService.create_notification_message(
+        # Lấy thông tin người thêm
+        adder = await User.get(added_by)
+        adder_name = adder.displayName if adder else "Người dùng"
+        
+        # Tạo 1 notification message duy nhất cho tất cả (không broadcast tự động, sẽ broadcast sau)
+        notification_message = await MessageService.create_notification_message(
             conversation_id=conversation_id,
             notification_type="member_added",
-            text=f"{member.displayName} vừa được thêm vào nhóm",
-            metadata={"member_id": member_id, "member_name": member.displayName, "added_by": added_by}
+            text=f"{adder_name} đã thêm {member.displayName} vào nhóm",
+            metadata={"member_id": member_id, "member_name": member.displayName, "added_by": added_by},
+            broadcast=False  # Tắt broadcast tự động, sẽ broadcast thủ công sau
         )
         
+        # Broadcast tin nhắn đến tất cả thành viên trong nhóm
+        async def broadcast_member_added():
+            try:
+                participant_ids = [p.userId for p in conversation.participants]
+                
+                # Format cho MessagesScreen (expect conversation data)
+                conversation_data = {
+                    "id": conversation_id,
+                    "lastMessage": {
+                        "id": str(notification_message.id),
+                        "senderId": "system",
+                        "content": notification_message.content,
+                        "createdAt": notification_message.createdAt.isoformat(),
+                    },
+                    "updatedAt": notification_message.createdAt.isoformat(),
+                    "seenIds": [],
+                    "participantCount": len(participant_ids),
+                    "participantIds": participant_ids
+                }
+                
+                # Format cho ChatScreen (expect message data)
+                message_data = {
+                    "id": str(notification_message.id),
+                    "conversationId": conversation_id,
+                    "senderId": "system",
+                    "content": notification_message.content,
+                    "avatarUrl": "",
+                    "createdAt": notification_message.createdAt.isoformat(),
+                }
+                
+                # Thêm metadata về số lượng thành viên và danh sách thành viên
+                metadata = {
+                    "participantCount": len(participant_ids),
+                    "participantIds": participant_ids
+                }
+                
+                for participant_id in participant_ids:
+                    await manager.broadcast_to_user(participant_id, {
+                        "type": "new_message",
+                        "payload": {
+                            "conversation": conversation_data,
+                            "message": message_data,
+                            "metadata": metadata
+                        }
+                    })
+            except Exception as e:
+                print(f"Failed to broadcast member added message: {e}")
+        
+        # Chạy broadcast trong background
+        asyncio.create_task(broadcast_member_added())
+        
         return {"message": "Thành viên đã được thêm vào nhóm thành công."}
+    
+    @staticmethod
+    async def update_group_avatar(conversation_id: str, user_id: str, avatar_file):
+        """Cập nhật ảnh đại diện của nhóm."""
+        try:
+            conversation = await Conversation.get(conversation_id)
+            if not conversation:
+                raise ValueError("Cuộc trò chuyện không tồn tại")
+            
+            if not conversation.isGroup:
+                raise ValueError("Chỉ có thể đổi ảnh nhóm")
+            
+            # Kiểm tra user có trong nhóm không
+            participant_ids = [p.userId for p in conversation.participants]
+            if user_id not in participant_ids:
+                raise PermissionError("Bạn không có quyền chỉnh sửa nhóm này")
+            
+            # Upload ảnh mới lên Cloudinary
+            from ..utils.upload_to_cloudinary import upload_to_cloudinary
+            result = await upload_to_cloudinary(avatar_file, folder="group_avatars")
+            avatar_url = result["url"]
+            
+            # Cập nhật avatar trong database
+            conversation.avatarUrl = avatar_url
+            await conversation.save()
+            
+            # Tạo notification message
+            notification_message = await MessageService.create_notification_message(
+                conversation_id=conversation_id,
+                notification_type="avatar_changed",
+                text="Ảnh nhóm đã được thay đổi",
+                metadata={"changed_by": user_id}
+            )
+            
+            # Broadcast cập nhật conversation đến tất cả thành viên
+            async def broadcast_avatar_changed():
+                try:
+                    participant_ids = [p.userId for p in conversation.participants]
+                    
+                    for participant_id in participant_ids:
+                        await manager.broadcast_to_user(participant_id, {
+                            "type": "conversation_updated",
+                            "payload": {
+                                "conversation": {
+                                    "id": conversation_id,
+                                    "avatarUrl": avatar_url
+                                }
+                            }
+                        })
+                except Exception as e:
+                    print(f"Failed to broadcast avatar changed: {e}")
+            
+            asyncio.create_task(broadcast_avatar_changed())
+            
+            return {"avatarUrl": avatar_url}
+        except Exception as e:
+            raise Exception(f"Không thể cập nhật ảnh nhóm: {e}")

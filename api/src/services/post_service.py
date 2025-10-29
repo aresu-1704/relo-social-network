@@ -51,6 +51,32 @@ class PostService:
             )
             await new_post.save()
 
+            # Tạo notification cho tất cả bạn bè (chạy nền không block)
+            async def create_notifications_in_background():
+                if author.friendIds:
+                    from ..services.notification_service import NotificationService
+                    # Create notification tasks
+                    notification_tasks = [
+                        NotificationService.create_notification(
+                            user_id=friend_id,
+                            notification_type="new_post",
+                            title="Bài viết mới",
+                            message=f"{author.displayName} đã đăng một bài viết mới",
+                            metadata={
+                                "authorId": str(author.id),
+                                "authorDisplayName": author.displayName,
+                                "authorAvatarUrl": author.avatarUrl,
+                                "postId": str(new_post.id)
+                            }
+                        )
+                        for friend_id in author.friendIds
+                    ]
+                    # Run all notifications
+                    await asyncio.gather(*notification_tasks, return_exceptions=True)
+            
+            # Start notification task in background
+            asyncio.create_task(create_notifications_in_background())
+
             # Gửi thông báo real-time
             notification_payload = {
                 "type": "new_post",
@@ -61,12 +87,17 @@ class PostService:
                 }
             }
 
-            broadcast_tasks = [
-                manager.broadcast_to_user(fid, notification_payload)
-                for fid in author.friendIds
-            ]
-            if broadcast_tasks:
-                asyncio.create_task(asyncio.gather(*broadcast_tasks))
+            # Broadcast notification to all friends (chạy nền không block)
+            async def broadcast_notifications_in_background():
+                if author.friendIds:
+                    for fid in author.friendIds:
+                        try:
+                            await manager.broadcast_to_user(fid, notification_payload)
+                        except Exception as e:
+                            print(f"Error broadcasting to user {fid}: {e}")
+            
+            # Start broadcast task in background
+            asyncio.create_task(broadcast_notifications_in_background())
 
             return new_post
 
@@ -178,12 +209,19 @@ class PostService:
         if not post:
             raise ValueError("Không tìm thấy bài đăng.")
         
+        # Lấy thông tin user đang react
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
         # Tìm phản ứng hiện có của người dùng
         existing_reaction_index = -1
         for i, reaction in enumerate(post.reactions):
             if reaction.userId == user_id:
                 existing_reaction_index = i
                 break
+
+        is_new_reaction = existing_reaction_index == -1
 
         if existing_reaction_index != -1:
             # Nếu người dùng đã phản ứng
@@ -214,6 +252,47 @@ class PostService:
         
         # Lưu bài đăng đã cập nhật
         await post.save()
+        
+        # Tạo notification và broadcast WebSocket nếu có người mới thả reaction
+        if is_new_reaction and post.authorId != user_id:
+            # Lấy thông tin tác giả bài viết
+            author = await User.get(post.authorId)
+            if author and author.status != 'deleted':
+                # Import here to avoid circular import
+                from ..services.notification_service import NotificationService
+                
+                # Create notification in background
+                async def create_reaction_notification():
+                    await NotificationService.create_notification(
+                        user_id=post.authorId,
+                        notification_type="post_reaction",
+                        title="Có người thích bài viết của bạn",
+                        message=f"{user.displayName} đã thích bài viết của bạn",
+                        metadata={
+                            "userId": str(user.id),
+                            "userDisplayName": user.displayName,
+                            "userAvatarUrl": user.avatarUrl,
+                            "postId": post_id,
+                            "reactionType": reaction_type
+                        }
+                    )
+                    
+                    # Broadcast via WebSocket
+                    notification_payload = {
+                        "type": "post_reaction",
+                        "payload": {
+                            "userId": str(user.id),
+                            "userDisplayName": user.displayName,
+                            "userAvatarUrl": user.avatarUrl,
+                            "postId": post_id,
+                            "reactionType": reaction_type
+                        }
+                    }
+                    await manager.broadcast_to_user(post.authorId, notification_payload)
+                
+                # Start notification task in background
+                asyncio.create_task(create_reaction_notification())
+        
         return post
 
     @staticmethod

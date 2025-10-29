@@ -3,6 +3,7 @@ import 'package:relo/services/post_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/widgets/media_picker_sheet.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:relo/utils/show_notification.dart';
 import 'dart:io';
 
 class CreatePostScreen extends StatefulWidget {
@@ -56,11 +57,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   bool _isVideoFile(File file) {
     final path = file.path.toLowerCase();
-    return path.endsWith('.mp4') || 
-           path.endsWith('.mov') || 
-           path.endsWith('.avi') || 
-           path.endsWith('.mkv') ||
-           path.endsWith('.m4v');
+    return path.endsWith('.mp4') ||
+        path.endsWith('.mov') ||
+        path.endsWith('.avi') ||
+        path.endsWith('.mkv') ||
+        path.endsWith('.m4v');
   }
 
   Future<void> _createPost() async {
@@ -87,7 +88,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     const maxSize = 150 * 1024 * 1024; // 150MB in bytes
     if (totalSize > maxSize) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tổng dung lượng không được vượt quá 150MB')),
+        const SnackBar(
+          content: Text('Tổng dung lượng không được vượt quá 150MB'),
+        ),
       );
       return;
     }
@@ -96,7 +99,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
     try {
       // Lấy danh sách đường dẫn file
-      final List<String> filePaths = _selectedImages.map((file) => file.path).toList();
+      final List<String> filePaths = _selectedImages
+          .map((file) => file.path)
+          .toList();
 
       await _postService.createPost(
         content: content,
@@ -105,16 +110,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       if (mounted) {
         Navigator.pop(context, true); // Return true to indicate success
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã đăng bài viết thành công!')),
+        await ShowNotification.showToast(
+          context,
+          'Đã đăng bài viết thành công!',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isPosting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi đăng bài: $e')),
-        );
+        await ShowNotification.showToast(context, 'Lỗi đăng bài: $e');
       }
     }
   }
@@ -183,11 +187,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
                       itemCount: _selectedImages.length,
                       itemBuilder: (context, index) {
                         return Stack(
@@ -252,14 +257,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey[300]!),
-              ),
+              border: Border(top: BorderSide(color: Colors.grey[300]!)),
             ),
             child: ElevatedButton.icon(
               onPressed: _pickMedia,
               icon: const Icon(LucideIcons.image, size: 20),
-              label: const Text('Thêm ảnh/video', style: TextStyle(fontSize: 16)),
+              label: const Text(
+                'Thêm ảnh/video',
+                style: TextStyle(fontSize: 16),
+              ),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
                 backgroundColor: const Color(0xFF7A2FC0),

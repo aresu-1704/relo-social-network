@@ -149,6 +149,28 @@ async def delete_conversation(
 class UpdateGroupNameRequest(BaseModel):
     new_name: str
 
+@router.put("/conversations/{conversation_id}/avatar")
+async def update_group_avatar(
+    conversation_id: str,
+    avatar: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Cập nhật ảnh đại diện của nhóm."""
+    try:
+        result = await MessageService.update_group_avatar(
+            conversation_id=conversation_id,
+            user_id=str(current_user.id),
+            avatar_file=avatar
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put("/conversations/{conversation_id}/name")
 async def update_group_name(
     conversation_id: str,
@@ -210,11 +232,15 @@ async def leave_group(
 @router.post("/conversations/{conversation_id}/members")
 async def add_member_to_group(
     conversation_id: str,
-    member_id: str,
+    request: dict,
     current_user: User = Depends(get_current_user)
 ):
     """Thêm thành viên vào nhóm."""
     try:
+        member_id = request.get('member_id')
+        if not member_id:
+            raise HTTPException(status_code=400, detail="member_id is required")
+        
         result = await MessageService.add_member_to_group(
             conversation_id=conversation_id,
             added_by=str(current_user.id),

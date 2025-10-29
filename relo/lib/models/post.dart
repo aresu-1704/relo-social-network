@@ -29,12 +29,15 @@ class Post {
       authorInfo: AuthorInfo.fromJson(json['authorInfo']),
       content: json['content'] ?? '',
       mediaUrls: List<String>.from(json['mediaUrls'] ?? []),
-      reactions: (json['reactions'] as List<dynamic>?)
+      reactions:
+          (json['reactions'] as List<dynamic>?)
               ?.map((r) => Reaction.fromJson(r))
               .toList() ??
           [],
       reactionCounts: Map<String, int>.from(json['reactionCounts'] ?? {}),
-      createdAt: DateTime.parse(json['createdAt']),
+      createdAt: json['createdAt'] is String
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
     );
   }
 }

@@ -1,10 +1,12 @@
 import asyncio
 import os
 from datetime import datetime
+from typing import List
 from ..models import User
 from ..models import FriendRequest
 from ..schemas import UserUpdate
 from ..websocket import manager
+from ..services.notification_service import NotificationService
 from bson import ObjectId
 import base64
 import tempfile
@@ -119,6 +121,15 @@ class UserService:
             # Xóa friend request khỏi database sau khi đã chấp nhận
             await friend_request.delete()
             
+            # Tạo notification cho người gửi yêu cầu (người được chấp nhận)
+            await NotificationService.create_notification(
+                user_id=friend_request.fromUserId,
+                notification_type="friend_request_accepted",
+                title="Đã chấp nhận lời mời kết bạn",
+                message=f"{to_user.displayName} đã chấp nhận lời mời kết bạn của bạn",
+                metadata={"userId": str(to_user.id), "displayName": to_user.displayName, "avatarUrl": to_user.avatarUrl}
+            )
+            
             # Gửi thông báo real-time đến cả hai người
             # Gửi cho người gửi yêu cầu
             notification_payload_from = {
@@ -150,6 +161,16 @@ class UserService:
             # Từ chối yêu cầu - xóa khỏi database
             await friend_request.delete()
             
+            # Tạo notification cho người gửi yêu cầu (người bị từ chối)
+            to_user = await User.get(friend_request.toUserId)
+            await NotificationService.create_notification(
+                user_id=friend_request.fromUserId,
+                notification_type="friend_request_rejected",
+                title="Đã từ chối lời mời kết bạn",
+                message=f"{to_user.displayName} đã từ chối lời mời kết bạn của bạn",
+                metadata={"userId": str(to_user.id), "displayName": to_user.displayName, "avatarUrl": to_user.avatarUrl}
+            )
+            
             # Broadcast notification đến người gửi yêu cầu
             from_user = await User.get(friend_request.fromUserId)
             if from_user:
@@ -167,6 +188,21 @@ class UserService:
         
         return friend_request
     
+    @staticmethod
+    async def get_users_by_ids(user_ids: List[str]) -> List[User]:
+        """Lấy danh sách người dùng theo danh sách ID."""
+        try:
+            # Convert string IDs to ObjectId với validation
+            object_ids = []
+            for user_id in user_ids:
+                if ObjectId.is_valid(user_id):
+                    object_ids.append(ObjectId(user_id))
+            
+            users = await User.find({"_id": {"$in": object_ids}}).to_list()
+            return users
+        except Exception as e:
+            raise Exception(f"Failed to get users by IDs: {e}")
+
     @staticmethod
     async def respond_to_friend_request_by_from_user(from_user_id: str, current_user_id: str, response: str):
         """

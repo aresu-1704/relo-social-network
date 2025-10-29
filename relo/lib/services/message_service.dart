@@ -13,7 +13,8 @@ class MessageService {
       final response = await _dio.get('messages/conversations');
       return response.data;
     } on DioException catch (e) {
-      throw Exception('Failed to fetch conversations: $e');
+      print('Failed to fetch conversations: $e');
+      return [];
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
     }
@@ -150,7 +151,7 @@ class MessageService {
     try {
       await _dio.post('messages/conversations/$conversationId/seen');
     } on DioException catch (e) {
-      throw Exception('Failed to mark as seen: $e');
+      print('Failed to mark as seen: $e');
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
     }
@@ -198,15 +199,21 @@ class MessageService {
   }
 
   // Cập nhật ảnh đại diện nhóm
-  Future<void> updateGroupAvatar(
+  Future<String> updateGroupAvatar(
     String conversationId,
-    String avatarUrl,
+    String imagePath,
   ) async {
     try {
-      await _dio.put(
+      final formData = FormData.fromMap({
+        'avatar': await MultipartFile.fromFile(imagePath),
+      });
+
+      final response = await _dio.put(
         'messages/conversations/$conversationId/avatar',
-        data: {'avatar_url': avatarUrl},
+        data: formData,
       );
+
+      return response.data['avatarUrl'];
     } catch (e) {
       throw Exception('Failed to update group avatar: $e');
     }
@@ -218,6 +225,18 @@ class MessageService {
       await _dio.post('messages/conversations/$conversationId/leave');
     } catch (e) {
       throw Exception('Failed to leave group: $e');
+    }
+  }
+
+  // Thêm thành viên vào nhóm
+  Future<void> addMemberToGroup(String conversationId, String memberId) async {
+    try {
+      await _dio.post(
+        'messages/conversations/$conversationId/members',
+        data: {'member_id': memberId},
+      );
+    } catch (e) {
+      throw Exception('Failed to add member to group: $e');
     }
   }
 }

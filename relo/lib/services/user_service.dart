@@ -282,4 +282,23 @@ class UserService {
       return 'none';
     }
   }
+
+  // Lấy danh sách người dùng theo danh sách ID
+  Future<List<User>> getUsersByIds(List<String> userIds) async {
+    try {
+      final response = await _dio.post(
+        'users/batch',
+        data: {'user_ids': userIds}, // Gửi object với key user_ids
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => User.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load users');
+      }
+    } catch (e) {
+      throw Exception('Failed to load users: $e');
+    }
+  }
 }

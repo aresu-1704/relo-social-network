@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:relo/screen/profile_screen.dart';
 import 'package:relo/screen/profile_setting_screen.dart';
 import 'package:relo/screen/search_screen.dart';
+import 'create_group_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 import 'newsfeed_screen.dart';
@@ -10,6 +11,7 @@ import 'notifications_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
+import 'package:relo/providers/message_provider.dart';
 import 'dart:async';
 
 class MainScreen extends StatefulWidget {
@@ -70,28 +72,43 @@ class MainScreenState extends State<MainScreen> {
         elevation: 0,
         title: Row(
           children: [
+            // Search button
             Expanded(
-              child: SizedBox(
-                height: 31,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SearchScreen()),
-                    );
-                  },
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SearchScreen()),
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.only(left: 8, top: 8, bottom: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.search, color: Colors.white70),
-                      SizedBox(width: 12),
+                      Icon(Icons.search, color: Colors.white70, size: 20),
+                      SizedBox(width: 8),
                       Text(
                         'Tìm kiếm',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                        style: TextStyle(color: Colors.white70, fontSize: 15),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
+            // Create group button
+            if (_selectedIndex == 2) // Only show in Messages tab
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: BoxConstraints(),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CreateGroupScreen(),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.group_add, color: Colors.white70, size: 24),
+              ),
             // Settings button - Only show in Profile tab
             if (_selectedIndex == 4)
               IconButton(
@@ -103,7 +120,7 @@ class MainScreenState extends State<MainScreen> {
                     ),
                   );
                 },
-                icon: Icon(Icons.settings, color: Colors.white70),
+                icon: Icon(Icons.settings, color: Colors.white70, size: 24),
               ),
           ],
         ),
@@ -165,7 +182,14 @@ class MainScreenState extends State<MainScreen> {
               onTap: (int i) {
                 setState(() {
                   _selectedIndex = i;
-                  if (i == 3) {
+                  if (i == 2) {
+                    // Xóa badge khi đã vào MessagesScreen (đã xem rồi)
+                    final messageProvider = Provider.of<MessageProvider>(
+                      context,
+                      listen: false,
+                    );
+                    messageProvider.markAllAsSeen();
+                  } else if (i == 3) {
                     // Mark all notifications as read when opening notifications tab
                     final notificationProvider =
                         Provider.of<NotificationProvider>(
@@ -198,10 +222,43 @@ class MainScreenState extends State<MainScreen> {
                   label: 'Bạn bè',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(
-                    _selectedIndex == 2
-                        ? Icons.chat_bubble
-                        : Icons.chat_bubble_outline,
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        _selectedIndex == 2
+                            ? Icons.chat_bubble
+                            : Icons.chat_bubble_outline,
+                      ),
+                      Consumer<MessageProvider>(
+                        builder: (context, messageProvider, child) {
+                          final unreadCount =
+                              messageProvider.unreadConversationCount;
+                          if (unreadCount > 0) {
+                            return Positioned(
+                              right: -8,
+                              top: -8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
                   ),
                   label: 'Tin nhắn',
                 ),

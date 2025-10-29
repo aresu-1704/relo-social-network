@@ -601,18 +601,12 @@ class _FriendsScreenState extends State<FriendsScreen>
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundImage:
-                  group['avatarUrl'] != null &&
-                      group['avatarUrl'].toString().isNotEmpty
-                  ? NetworkImage(group['avatarUrl'].toString())
-                  : null,
+              backgroundImage: NetworkImage(
+                group['avatarUrl'] ??
+                    'https://img.freepik.com/premium-vector/group-chat-icon-3d-vector-illustration-design_48866-1609.jpg',
+              ),
               onBackgroundImageError: (_, __) {},
               backgroundColor: Colors.grey[300],
-              child:
-                  group['avatarUrl'] == null ||
-                      group['avatarUrl'].toString().isEmpty
-                  ? const Icon(Icons.group, color: Colors.white)
-                  : null,
             ),
             const SizedBox(width: 16),
             Expanded(

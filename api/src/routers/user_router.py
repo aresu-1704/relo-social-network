@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
 from typing import List
 from ..services import UserService
 from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate, UserSearchResult
@@ -8,6 +8,37 @@ from ..models import User
 from ..security import get_current_user
 
 router = APIRouter(tags=["User"])
+
+# Lấy thông tin nhiều người dùng theo danh sách ID
+@router.post("/batch", response_model=List[UserPublic])
+async def get_users_by_ids(
+    request: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Lấy thông tin nhiều người dùng theo danh sách ID."""
+    try:
+        user_ids = request.get('user_ids', [])
+        if not user_ids:
+            user_ids = request  # Fallback: assume request is the array itself
+        
+        users = await UserService.get_users_by_ids(user_ids)
+        # Convert User objects to dict để tránh Pydantic validation error
+        user_dicts = []
+        for user in users:
+            user_dict = {
+                "id": str(user.id),
+                "username": user.username,
+                "email": user.email,
+                "displayName": user.displayName,
+                "avatarUrl": user.avatarUrl,
+                "backgroundUrl": user.backgroundUrl,
+                "bio": user.bio,
+                "createdAt": user.createdAt.isoformat() if user.createdAt else None
+            }
+            user_dicts.append(user_dict)
+        return user_dicts
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Lấy hồ sơ của người dùng hiện tại
 @router.get("/me", response_model=UserPublic)

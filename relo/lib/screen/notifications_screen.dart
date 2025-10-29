@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
-import 'package:relo/models/notification.dart';
-import 'package:relo/utils/format.dart';
+import 'package:relo/models/notification.dart' as models;
+import 'package:intl/intl.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -28,12 +28,17 @@ class NotificationsScreen extends StatelessWidget {
             );
           }
 
-          return ListView.builder(
-            itemCount: provider.notifications.length,
-            itemBuilder: (context, index) {
-              final notification = provider.notifications[index];
-              return _buildNotificationItem(context, notification, provider);
+          return RefreshIndicator(
+            onRefresh: () async {
+              await provider.refresh();
             },
+            child: ListView.builder(
+              itemCount: provider.notifications.length,
+              itemBuilder: (context, index) {
+                final notification = provider.notifications[index];
+                return _buildNotificationItem(context, notification, provider);
+              },
+            ),
           );
         },
       ),
@@ -42,7 +47,7 @@ class NotificationsScreen extends StatelessWidget {
 
   Widget _buildNotificationItem(
     BuildContext context,
-    AppNotification notification,
+    models.Notification notification,
     NotificationProvider provider,
   ) {
     final isUnread = !notification.isRead;
@@ -53,13 +58,22 @@ class NotificationsScreen extends StatelessWidget {
           provider.markAsRead(notification.id);
         }
 
-        // Navigate to profile if needed
-        if (notification.metadata?['userId'] != null) {
-          // TODO: Navigate to user profile
+        // Navigate based on notification type
+        final metadata = notification.metadata;
+
+        if (metadata['userId'] != null &&
+            (notification.type == 'friend_request_accepted' ||
+                notification.type == 'friend_added')) {
+          // Navigate to user profile
+          // You can implement this later
+        } else if (metadata['postId'] != null &&
+            notification.type == 'new_post') {
+          // Navigate to post
+          // You can implement this later
         }
       },
       child: Container(
-        color: isUnread ? const Color(0xFFF3E5F5) : Colors.white,
+        color: isUnread ? const Color(0xFFF9F9F9) : Colors.white,
         padding: const EdgeInsets.all(16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,10 +81,12 @@ class NotificationsScreen extends StatelessWidget {
             // Avatar
             CircleAvatar(
               radius: 24,
-              backgroundColor: const Color(0xFF7A2FC0).withOpacity(0.2),
+              backgroundColor: _getNotificationIconColor(
+                notification.type,
+              ).withOpacity(0.1),
               child: Icon(
                 _getNotificationIcon(notification.type),
-                color: const Color(0xFF7A2FC0),
+                color: _getNotificationIconColor(notification.type),
                 size: 24,
               ),
             ),
@@ -97,10 +113,10 @@ class NotificationsScreen extends StatelessWidget {
                       ),
                       if (isUnread)
                         Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF7A2FC0),
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -115,14 +131,16 @@ class NotificationsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    Format.formatZaloTime(notification.createdAt),
+                    _formatTimestamp(notification.createdAt),
                     style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                   ),
                 ],
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+              icon: Icon(Icons.close, size: 18, color: Colors.grey[400]),
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(),
               onPressed: () {
                 provider.deleteNotification(notification.id);
               },
@@ -133,11 +151,57 @@ class NotificationsScreen extends StatelessWidget {
     );
   }
 
-  IconData _getNotificationIcon(NotificationType type) {
+  IconData _getNotificationIcon(String type) {
     switch (type) {
-      case NotificationType.friendRequestAccepted:
-      case NotificationType.friendAdded:
-        return Icons.person_add;
+      case 'friend_request_accepted':
+      case 'friend_request_rejected':
+        return Icons.person_add_rounded;
+      case 'friend_added':
+        return Icons.people_rounded;
+      case 'new_post':
+        return Icons.article_rounded;
+      case 'post_reaction':
+        return Icons.favorite_rounded;
+      default:
+        return Icons.notifications_rounded;
+    }
+  }
+
+  Color _getNotificationIconColor(String type) {
+    switch (type) {
+      case 'friend_request_accepted':
+      case 'friend_request_rejected':
+        return Colors.blue;
+      case 'friend_added':
+        return Colors.green;
+      case 'new_post':
+        return Colors.purple;
+      case 'post_reaction':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatTimestamp(String isoString) {
+    try {
+      final dateTime = DateTime.parse(isoString);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+
+      if (difference.inMinutes < 1) {
+        return 'Vừa xong';
+      } else if (difference.inHours < 1) {
+        return '${difference.inMinutes} phút trước';
+      } else if (difference.inDays < 1) {
+        return '${difference.inHours} giờ trước';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays} ngày trước';
+      } else {
+        return DateFormat('dd/MM/yyyy').format(dateTime);
+      }
+    } catch (e) {
+      return '';
     }
   }
 }

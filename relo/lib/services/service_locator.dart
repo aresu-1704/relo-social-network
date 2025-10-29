@@ -8,6 +8,7 @@ import 'package:relo/services/user_service.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/post_service.dart';
+import 'package:relo/services/notification_service.dart';
 
 class ServiceLocator {
   // Global navigator key to allow navigation from outside the widget tree
@@ -20,6 +21,7 @@ class ServiceLocator {
   static late final UserService userService;
   static late final MessageService messageService;
   static late final PostService postService;
+  static late final NotificationService notificationService;
   static late final ConnectivityService connectivityService;
   static late final AppConnectivityService appConnectivityService;
 
@@ -97,6 +99,7 @@ class ServiceLocator {
     userService = UserService(dio);
     messageService = MessageService(dio);
     postService = PostService(dio);
+    notificationService = NotificationService(dio);
 
     // Initialize the connectivity service
     connectivityService = ConnectivityService();
