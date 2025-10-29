@@ -8,6 +8,7 @@ import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/app_notification_service.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'privacy_settings_screen.dart';
 
 class ProfileSettingScreen extends StatefulWidget {
@@ -90,10 +91,12 @@ class _ProfileSettingScreenState extends State<ProfileSettingScreen> {
                       children: [
                         CircleAvatar(
                           radius: 25,
-                          backgroundImage: NetworkImage(
-                            _currentUser?.avatarUrl ??
-                                'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
+                          backgroundImage: CachedNetworkImageProvider(
+                            (_currentUser?.avatarUrl ?? '').isNotEmpty
+                                ? _currentUser!.avatarUrl!
+                                : 'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w',
                           ),
+                          backgroundColor: Colors.grey[300],
                         ),
                         SizedBox(width: 16),
                         Column(

@@ -74,7 +74,11 @@ class FCMService:
         conversation_id: Optional[str] = None,
         sender_id: Optional[str] = None,
         sender_name: Optional[str] = None,
-        message_type: Optional[str] = None
+        message_type: Optional[str] = None,
+        sender_avatar: Optional[str] = None,
+        image_url: Optional[str] = None,
+        conversation_name: Optional[str] = None,
+        is_group: bool = False
     ) -> List[str]:
         """
         Gửi push notification tới danh sách device tokens.
@@ -136,8 +140,11 @@ class FCMService:
                         "conversation_id": conversation_id or "",
                         "sender_id": sender_id or "",
                         "sender_name": sender_name or "",
-                        "content_type": message_type or "text",  # Đổi từ message_type vì FCM reserve key này
-                        "has_reply": "true" if conversation_id else "false",  # Flag để client biết có reply action
+                        "sender_avatar": sender_avatar or "",
+                        "content_type": message_type or "text",
+                        "has_reply": "true" if conversation_id else "false",
+                        "conversation_name": conversation_name or "",
+                        "is_group": "true" if is_group else "false",
                         **{str(k): str(v) for k, v in (data or {}).items()}
                     },
                     "android": {
@@ -145,7 +152,10 @@ class FCMService:
                         "notification": {
                             "channel_id": "relo_channel",
                             "sound": "default",
-                            "click_action": "FLUTTER_NOTIFICATION_CLICK"
+                            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                            "image": image_url if image_url else None,
+                            "icon": "ic_launcher",
+                            "color": "#8B38D7"  # Màu theme của app
                         }
                     },
                     "apns": {
@@ -157,7 +167,7 @@ class FCMService:
                             }
                         },
                         "fcm_options": {
-                            "image": None
+                            "image": image_url if image_url else None
                         }
                     }
                 }
@@ -188,7 +198,11 @@ class FCMService:
         sender_name: str,
         message_content: str,
         message_type: str,
-        offline_user_ids: List[str]
+        offline_user_ids: List[str],
+        sender_avatar: Optional[str] = None,
+        image_url: Optional[str] = None,
+        conversation_name: Optional[str] = None,
+        is_group: bool = False
     ) -> int:
         """
         Gửi push notification cho tin nhắn mới tới các users offline.
@@ -218,15 +232,20 @@ class FCMService:
         if not all_device_tokens:
             return 0
         
-        # Rút gọn message content nếu quá dài
-        display_content = message_content[:100]
-        if len(message_content) > 100:
-            display_content += "..."
+        # Format title và body theo style Zalo
+        # Title: Tên người gửi hoặc tên nhóm
+        if is_group and conversation_name:
+            title = conversation_name
+            body = f"{sender_name}: {message_content}"
+        else:
+            title = sender_name
+            body = message_content
         
-        title = sender_name
-        body = display_content
+        # Rút gọn body nếu quá dài
+        if len(body) > 100:
+            body = body[:100] + "..."
         
-        # Gửi notification
+        # Gửi notification với avatar và image preview
         successful_tokens = await FCMService.send_notification(
             device_tokens=all_device_tokens,
             title=title,
@@ -234,7 +253,11 @@ class FCMService:
             conversation_id=conversation_id,
             sender_id=sender_id,
             sender_name=sender_name,
-            message_type=message_type
+            message_type=message_type,
+            sender_avatar=sender_avatar,
+            image_url=image_url,
+            conversation_name=conversation_name,
+            is_group=is_group
         )
         
         return len(successful_tokens)

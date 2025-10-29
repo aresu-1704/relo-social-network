@@ -9,7 +9,9 @@ import 'package:relo/utils/show_notification.dart';
 import 'package:relo/widgets/text_form_field.dart';
 
 class CreateGroupScreen extends StatefulWidget {
-  const CreateGroupScreen({super.key});
+  final String? initialFriendId; // ID của người bạn sẽ được pre-select
+
+  const CreateGroupScreen({super.key, this.initialFriendId});
 
   @override
   State<CreateGroupScreen> createState() => _CreateGroupScreenState();
@@ -30,6 +32,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void initState() {
     super.initState();
+    // Pre-select initial friend nếu có
+    if (widget.initialFriendId != null) {
+      _selectedFriendIds.add(widget.initialFriendId!);
+    }
     _loadFriends();
   }
 
@@ -43,9 +49,22 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   Future<void> _loadFriends() async {
     try {
       final friends = await _userService.getFriends();
+
+      // Đảm bảo initialFriendId vẫn được select sau khi load friends
+      final selectedIds = Set<String>.from(_selectedFriendIds);
+      if (widget.initialFriendId != null &&
+          widget.initialFriendId!.isNotEmpty) {
+        // Kiểm tra xem initialFriendId có trong danh sách bạn bè không
+        final friendExists = friends.any((f) => f.id == widget.initialFriendId);
+        if (friendExists) {
+          selectedIds.add(widget.initialFriendId!);
+        }
+      }
+
       setState(() {
         _friends = friends;
         _filteredFriends = friends;
+        _selectedFriendIds = selectedIds;
         _isLoading = false;
       });
     } catch (e) {
@@ -147,10 +166,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       // Navigate to chat screen
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        Navigator.of(context).pop(); // Close create group screen
 
-        await Navigator.push(
-          context,
+        // Close create group screen và navigate tới ChatScreen mới
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => ChatScreen(
               conversationId: conversation['id'],
@@ -162,9 +180,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             ),
           ),
         );
-      }
 
-      await ShowNotification.showToast(context, 'Nhóm đã được tạo thành công');
+        // Show success toast
+        await ShowNotification.showToast(
+          context,
+          'Nhóm đã được tạo thành công',
+        );
+      }
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog

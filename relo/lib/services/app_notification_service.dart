@@ -1,5 +1,9 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class AppNotificationService {
   static final AppNotificationService _instance =
@@ -32,7 +36,6 @@ class AppNotificationService {
       _setupMessageHandlers();
 
       _isInitialized = true;
-      print("✅ Notification service initialized");
     } catch (e) {
       print("❌ Error initializing notifications: $e");
     }
@@ -101,15 +104,19 @@ class AppNotificationService {
 
   /// Setup reply action cho Android
   Future<void> _setupReplyAction() async {
-    final androidImplementation = _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    try {
+      final androidImplementation = _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
 
-    if (androidImplementation != null) {
-      // Chưa có direct API để setup reply trong flutter_local_notifications
-      // Reply action sẽ được xử lý từ FCM payload đã có actions trong backend
-      print("✅ Android reply action ready");
+      if (androidImplementation != null) {
+        // Chưa có direct API để setup reply trong flutter_local_notifications
+        // Reply action sẽ được xử lý từ FCM payload đã có actions trong backend
+        print("✅ Android reply action ready");
+      }
+    } catch (e) {
+      print("Error setting up reply action: $e");
     }
   }
 
@@ -145,8 +152,32 @@ class AppNotificationService {
   /// Parse payload string thành Map
   Map<String, dynamic> _parsePayload(String payload) {
     try {
-      // Payload có thể là string representation của Map
-      // Ví dụ: "{conversation_id: abc123, type: message}"
+      // Thử parse như JSON trước
+      if (payload.trim().startsWith('{')) {
+        // Remove quotes và parse như JSON-like
+        final cleaned = payload
+            .replaceAll('{', '')
+            .replaceAll('}', '')
+            .replaceAll('"', '')
+            .replaceAll(' ', '');
+
+        final Map<String, dynamic> result = {};
+        final pairs = cleaned.split(',');
+
+        for (final pair in pairs) {
+          if (pair.contains(':')) {
+            final keyValue = pair.split(':');
+            if (keyValue.length == 2) {
+              final key = keyValue[0].trim();
+              final value = keyValue[1].trim();
+              result[key] = value;
+            }
+          }
+        }
+        return result;
+      }
+
+      // Fallback: parse format cũ "key: value, key2: value2"
       final cleaned = payload
           .replaceAll('{', '')
           .replaceAll('}', '')
@@ -257,6 +288,61 @@ class AppNotificationService {
     }
   }
 
+  /// Download image từ URL về local để hiển thị trong notification
+  Future<String?> _downloadImageForNotification(String imageUrl) async {
+    try {
+      // Validate imageUrl
+      if (imageUrl.isEmpty) {
+        print('⚠️ Invalid image URL: empty string');
+        return null;
+      }
+
+      final uri = Uri.tryParse(imageUrl);
+      if (uri == null || !uri.hasScheme) {
+        print('⚠️ Invalid image URL: $imageUrl');
+        return null;
+      }
+
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode == 200) {
+        final tempDir = await getTemporaryDirectory();
+        final fileName = imageUrl.split('/').last.split('?').first;
+
+        // Validate fileName
+        if (fileName.isEmpty) {
+          // Fallback to hash-based filename
+          final hash = imageUrl.hashCode.abs().toString();
+          final extension = imageUrl.toLowerCase().contains('.png')
+              ? '.png'
+              : imageUrl.toLowerCase().contains('.jpg') ||
+                    imageUrl.toLowerCase().contains('.jpeg')
+              ? '.jpg'
+              : '.png';
+          final filePath = '${tempDir.path}/notification_$hash$extension';
+          final file = File(filePath);
+          await file.writeAsBytes(response.bodyBytes);
+
+          // Validate file was created successfully
+          if (await file.exists()) {
+            return filePath;
+          }
+        } else {
+          final filePath = '${tempDir.path}/notification_$fileName';
+          final file = File(filePath);
+          await file.writeAsBytes(response.bodyBytes);
+
+          // Validate file was created successfully
+          if (await file.exists()) {
+            return filePath;
+          }
+        }
+      }
+    } catch (e) {
+      print("⚠️ Error downloading image for notification: $e");
+    }
+    return null;
+  }
+
   /// Show local notification
   Future<void> _showLocalNotification(RemoteMessage message) async {
     final notification = message.notification;
@@ -265,14 +351,37 @@ class AppNotificationService {
     final data = message.data;
     final conversationId = data['conversation_id'] as String?;
     final hasReply = data['has_reply'] == 'true';
+    final senderAvatar = data['sender_avatar'] as String?;
+    // final imageUrl = data['image_url'] as String?; // Reserved for future use
+    final senderName =
+        data['sender_name'] as String? ?? notification.title ?? '';
 
-    // Tạo payload từ data
-    final payload = data.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+    // Download avatar để hiển thị largeIcon
+    String? avatarPath;
+    if (senderAvatar != null && senderAvatar.isNotEmpty) {
+      avatarPath = await _downloadImageForNotification(senderAvatar);
+      // Validate avatarPath trước khi sử dụng
+      if (avatarPath != null && avatarPath.isEmpty) {
+        print('⚠️ Invalid avatar path: empty string');
+        avatarPath = null;
+      }
+    }
 
-    // Android notification với reply action nếu có conversation_id
+    // Parse payload đúng cách (JSON string thay vì format key:value)
+    String payload;
+    try {
+      // Thử parse như JSON trước
+      payload = data.entries.map((e) => '"${e.key}":"${e.value}"').join(',');
+      payload = '{$payload}';
+    } catch (e) {
+      // Fallback về format cũ
+      payload = data.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+    }
+
+    // Sử dụng BigTextStyle để hiển thị đẹp hơn kiểu Zalo
     AndroidNotificationDetails androidDetails;
     if (hasReply && conversationId != null) {
-      // Thêm reply action cho Android với input text
+      // Notification với reply action và BigTextStyle
       androidDetails = AndroidNotificationDetails(
         'relo_channel',
         'Relo Notifications',
@@ -281,24 +390,41 @@ class AppNotificationService {
         priority: Priority.high,
         showWhen: true,
         category: AndroidNotificationCategory.message,
-        // Thêm reply action với input text cho Android
+        styleInformation: BigTextStyleInformation(
+          notification.body ?? '',
+          contentTitle: notification.title ?? senderName,
+          htmlFormatBigText: false,
+        ),
+        largeIcon: avatarPath != null
+            ? FilePathAndroidBitmap(avatarPath)
+            : null,
         actions: [
           const AndroidNotificationAction(
             'REPLY',
             'Trả lời',
-            showsUserInterface: false,
+            showsUserInterface: true, // Hiển thị input field khi reply
+            titleColor: Color(0xFF7A2FC0),
             cancelNotification: false,
           ),
         ],
       );
     } else {
-      androidDetails = const AndroidNotificationDetails(
+      // Notification không có reply action
+      androidDetails = AndroidNotificationDetails(
         'relo_channel',
         'Relo Notifications',
         channelDescription: 'Notifications from Relo social network',
         importance: Importance.high,
         priority: Priority.high,
         showWhen: true,
+        styleInformation: BigTextStyleInformation(
+          notification.body ?? '',
+          contentTitle: notification.title ?? senderName,
+          htmlFormatBigText: false,
+        ),
+        largeIcon: avatarPath != null
+            ? FilePathAndroidBitmap(avatarPath)
+            : null,
       );
     }
 
@@ -317,8 +443,14 @@ class AppNotificationService {
       iOS: iosDetails,
     );
 
+    // Sử dụng conversation_id để group notifications (nếu có)
+    // Điều này giúp Android tự động group notifications từ cùng một conversation
+    final notificationId = conversationId != null && conversationId.isNotEmpty
+        ? conversationId.hashCode
+        : notification.hashCode;
+
     await _localNotifications.show(
-      notification.hashCode,
+      notificationId,
       notification.title,
       notification.body,
       details,

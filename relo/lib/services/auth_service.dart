@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/constants.dart';
 import 'package:relo/services/websocket_service.dart';
+import 'package:relo/services/service_locator.dart';
 
 /// Custom exception cho tài khoản đã bị xóa
 class AccountDeletedException implements Exception {
@@ -156,13 +157,54 @@ class AuthService {
   }
 
   /// Đăng xuất người dùng (gọi API logout và xóa tokens ở phía client).
-  Future<void> logout({String? deviceToken}) async {
+  /// skipApiCall: Nếu true, chỉ xóa tokens ở client, không gọi API (dùng để tránh recursive)
+  Future<void> logout({String? deviceToken, bool skipApiCall = false}) async {
     try {
+      // Nếu skip API call, chỉ xóa tokens ở client
+      if (skipApiCall) {
+        print('📱 Logout: Skipping API call, clearing local tokens only');
+        await _storageService.deleteTokens();
+        webSocketService.disconnect();
+        return;
+      }
+
       // Gọi API logout để xóa device token trên server
-      final response = await _dio.post(
-        'auth/logout',
-        data: deviceToken != null ? {'device_token': deviceToken} : {},
+      // Sử dụng Dio từ ServiceLocator để có interceptor tự động refresh token
+      final requestData = deviceToken != null && deviceToken.isNotEmpty
+          ? {'device_token': deviceToken}
+          : {};
+
+      print(
+        '📱 Logout request - Device token: ${deviceToken != null ? "${deviceToken.substring(0, deviceToken.length > 20 ? 20 : deviceToken.length)}..." : "null"}',
       );
+
+      // Lấy Dio từ ServiceLocator để có interceptor tự động refresh token
+      // Nếu ServiceLocator chưa init, fallback về _dio riêng
+      Dio dioInstance;
+      try {
+        dioInstance = ServiceLocator.dio;
+        print('📱 Using DioApiService Dio (with interceptor)');
+      } catch (e) {
+        // Nếu ServiceLocator chưa init, dùng Dio riêng và thử refresh manually
+        print(
+          '⚠️ ServiceLocator not available, using local Dio and manual refresh',
+        );
+
+        // Thử refresh token trước
+        final refreshed = await refreshToken();
+        final token = refreshed ?? await accessToken;
+        if (token == null) {
+          print('⚠️ Cannot get valid token, clearing local tokens');
+          await _storageService.deleteTokens();
+          webSocketService.disconnect();
+          return;
+        }
+
+        dioInstance = _dio;
+      }
+
+      // Gọi API logout - interceptor sẽ tự động xử lý token refresh nếu cần
+      final response = await dioInstance.post('auth/logout', data: requestData);
 
       // Chỉ logout khi server trả về 200 (đã xóa device token thành công)
       if (response.statusCode == 200) {
@@ -172,12 +214,43 @@ class AuthService {
         throw Exception('Đã xảy ra lỗi, không thể đăng xuất');
       }
     } on DioException catch (e) {
-      // Nếu API logout thất bại, toast lỗi và không logout
-      throw Exception(
-        'Đã xảy ra lỗi, không thể đăng xuất: ${e.response?.data['detail'] ?? 'Lỗi kết nối'}',
+      // Nếu API logout thất bại (401, 403, etc.),
+      // vẫn xóa tokens ở client để đảm bảo logout local
+      print(
+        '⚠️ Logout API failed: ${e.response?.statusCode}, clearing local tokens anyway',
       );
+
+      // Xóa tokens ở client ngay cả khi API thất bại
+      // (Người dùng vẫn muốn logout, dù server không thể xóa device token)
+      try {
+        await _storageService.deleteTokens();
+        webSocketService.disconnect();
+
+        // Nếu là 401/403, có thể token đã hết hạn, vẫn cho phép logout
+        if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+          // Token hết hạn nhưng vẫn logout được ở client
+          return;
+        }
+
+        // Các lỗi khác, vẫn throw exception để thông báo
+        throw Exception(
+          'Đã xảy ra lỗi, không thể đăng xuất: ${e.response?.data['detail'] ?? 'Lỗi kết nối'}',
+        );
+      } catch (storageError) {
+        // Nếu xóa tokens cũng fail, vẫn throw exception gốc
+        throw Exception(
+          'Đã xảy ra lỗi, không thể đăng xuất: ${e.response?.data['detail'] ?? 'Lỗi kết nối'}',
+        );
+      }
     } catch (e) {
-      // Các lỗi khác
+      // Các lỗi khác - cố gắng xóa tokens ở client
+      print('⚠️ Unexpected error during logout: $e, clearing local tokens');
+      try {
+        await _storageService.deleteTokens();
+        webSocketService.disconnect();
+      } catch (_) {
+        // Ignore errors khi xóa tokens
+      }
       throw Exception('Đã xảy ra lỗi, không thể đăng xuất');
     }
   }
@@ -194,7 +267,8 @@ class AuthService {
       final refreshToken = await _storageService.getRefreshToken();
       if (refreshToken == null) {
         // This isn't a network error, but a state error. No token, so can't refresh.
-        await logout();
+        // Không gọi logout() để tránh recursive, chỉ return null
+        print('⚠️ No refresh token available');
         return null;
       }
 
@@ -215,7 +289,8 @@ class AuthService {
         // A non-200 response that isn't a DioException (unlikely but possible)
         // Chỉ logout khi là 401 hoặc 403, không logout khi là lỗi khác (400, 500, etc.)
         if (response.statusCode == 401 || response.statusCode == 403) {
-          await logout();
+          // Gọi logout với skipApiCall=true để tránh recursive
+          await logout(skipApiCall: true);
         }
         return null;
       }
@@ -227,7 +302,8 @@ class AuthService {
               e.response?.data['detail'] ?? 'Tài khoản đã bị xóa.';
           throw AccountDeletedException(errorMessage);
         }
-        await logout();
+        // Gọi logout với skipApiCall=true để tránh recursive
+        await logout(skipApiCall: true);
         return null;
       }
       // Các lỗi khác (400, 500, network error, etc.) - KHÔNG logout

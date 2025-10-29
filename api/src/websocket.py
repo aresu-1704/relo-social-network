@@ -62,9 +62,8 @@ async def websocket_endpoint(websocket: WebSocket, user: User = Depends(get_curr
         while True:
             # Chờ tin nhắn từ client
             data = await websocket.receive_text()
-            # For now, just print it. In the future, this would handle incoming messages.
-            print(f"Message from {user_id}: {data}")
+            # Handle incoming messages if needed in the future
     except WebSocketDisconnect:
-        print(f"Client {user_id} disconnected")
+        pass
     finally:
         manager.disconnect(user_id, websocket)

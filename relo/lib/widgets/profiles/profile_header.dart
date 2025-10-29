@@ -38,7 +38,8 @@ class ProfileHeader extends StatelessWidget {
           child: Container(
             height: 200,
             decoration: BoxDecoration(
-              image: tempBackgroundPath != null
+              image:
+                  (tempBackgroundPath != null && tempBackgroundPath!.isNotEmpty)
                   ? DecorationImage(
                       image: FileImage(File(tempBackgroundPath!)),
                       fit: BoxFit.cover,
@@ -50,7 +51,8 @@ class ProfileHeader extends StatelessWidget {
                           )
                         : null),
               gradient:
-                  (tempBackgroundPath == null &&
+                  ((tempBackgroundPath == null ||
+                          tempBackgroundPath!.isEmpty) &&
                       (backgroundUrl == null || backgroundUrl!.isEmpty))
                   ? LinearGradient(
                       begin: Alignment.topCenter,
@@ -61,7 +63,8 @@ class ProfileHeader extends StatelessWidget {
             ),
             child:
                 isOwnProfile &&
-                    tempBackgroundPath == null &&
+                    (tempBackgroundPath == null ||
+                        tempBackgroundPath!.isEmpty) &&
                     (backgroundUrl == null || backgroundUrl!.isEmpty)
                 ? Center(
                     child: Column(
@@ -110,14 +113,17 @@ class ProfileHeader extends StatelessWidget {
                         backgroundColor: Colors.white,
                         child: CircleAvatar(
                           radius: 43,
-                          backgroundImage: tempAvatarPath != null
+                          backgroundImage:
+                              (tempAvatarPath != null &&
+                                  tempAvatarPath!.isNotEmpty)
                               ? FileImage(File(tempAvatarPath!))
                               : (avatarUrl != null && avatarUrl!.isNotEmpty
                                         ? CachedNetworkImageProvider(avatarUrl!)
                                         : null)
                                     as ImageProvider?,
                           child:
-                              (tempAvatarPath == null &&
+                              ((tempAvatarPath == null ||
+                                      tempAvatarPath!.isEmpty) &&
                                   (avatarUrl == null || avatarUrl!.isEmpty))
                               ? Icon(Icons.person, size: 50, color: Colors.grey)
                               : null,
