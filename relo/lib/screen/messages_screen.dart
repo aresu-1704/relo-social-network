@@ -46,6 +46,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _listenToWebSocket() {
+    // Cancel subscription cũ nếu có
+    _webSocketSubscription?.cancel();
+
     _webSocketSubscription = webSocketService.stream.listen((message) {
       final data = jsonDecode(message);
 
@@ -70,7 +73,30 @@ class _MessagesScreenState extends State<MessagesScreen> {
               conversations.insert(0, updatedConv);
             });
           } else {
-            // Nếu conversation mới, fetch lại
+            // Nếu conversation mới, fetch lại toàn bộ danh sách
+            // Điều này thường xảy ra khi người dùng được thêm vào nhóm mới
+            Future.microtask(() => fetchConversations());
+          }
+        }
+      } else if (data['type'] == 'conversation_updated') {
+        // Xử lý khi conversation được cập nhật (ví dụ: đổi avatar, thêm thành viên)
+        final conversationData = data['payload']?['conversation'];
+        if (conversationData != null) {
+          final conversationId = conversationData['id'];
+          final index = conversations.indexWhere(
+            (c) => c['id'] == conversationId,
+          );
+
+          if (index != -1) {
+            // Cập nhật conversation hiện có
+            setState(() {
+              if (conversationData['avatarUrl'] != null) {
+                conversations[index]['avatarUrl'] =
+                    conversationData['avatarUrl'];
+              }
+            });
+          } else {
+            // Nếu không tìm thấy, reload danh sách
             fetchConversations();
           }
         }

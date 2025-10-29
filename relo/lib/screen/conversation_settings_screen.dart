@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:relo/services/service_locator.dart';
 
 class ConversationSettingsScreen extends StatelessWidget {
   final bool isGroup;
@@ -13,10 +15,11 @@ class ConversationSettingsScreen extends StatelessWidget {
   final Function()? onLeaveGroup;
   final Function()? onChangeGroupName;
   final Function(String)? onBlockUser;
+  final Function()? onAddMember;
+  final Function()? onViewMembers;
   final Function()? onDeleteConversation;
-  final String conversationId;
 
-  const ConversationSettingsScreen({
+  ConversationSettingsScreen({
     super.key,
     required this.isGroup,
     this.chatName,
@@ -29,9 +32,58 @@ class ConversationSettingsScreen extends StatelessWidget {
     this.onLeaveGroup,
     this.onChangeGroupName,
     this.onBlockUser,
+    this.onAddMember,
+    this.onViewMembers,
     this.onDeleteConversation,
     required this.conversationId,
   });
+
+  final String conversationId;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  Future<void> _changeGroupAvatar(BuildContext context) async {
+    BuildContext? dialogContext;
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (image == null) return;
+
+      // Show loading
+      dialogContext = context;
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogBuildContext) =>
+            const Center(child: CircularProgressIndicator()),
+      );
+
+      final messageService = ServiceLocator.messageService;
+      final avatarUrl = await messageService.updateGroupAvatar(
+        conversationId,
+        image.path,
+      );
+
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading
+        await ShowNotification.showToast(context, 'Đã cập nhật ảnh nhóm');
+        Navigator.of(context).pop(); // Close settings
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading
+        await ShowNotification.showToast(
+          context,
+          'Không thể cập nhật ảnh nhóm: $e',
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +131,19 @@ class ConversationSettingsScreen extends StatelessWidget {
                   onViewProfile!(friendId);
                 },
               ),
+            if (isGroup && onViewMembers != null)
+              _buildListTile(
+                context: context,
+                icon: Icons.people_outlined,
+                title: 'Danh sách thành viên',
+                subtitle: 'Xem tất cả thành viên trong nhóm',
+                onTap: () {
+                  Navigator.pop(context);
+                  if (onViewMembers != null) {
+                    onViewMembers!();
+                  }
+                },
+              ),
 
             // === CÀI ĐẶT NHÓM ===
             if (isGroup) ...[
@@ -101,11 +166,7 @@ class ConversationSettingsScreen extends StatelessWidget {
                 title: 'Đổi ảnh nhóm',
                 subtitle: 'Thay đổi ảnh đại diện',
                 onTap: () {
-                  Navigator.pop(context);
-                  ShowNotification.showToast(
-                    context,
-                    'Chức năng đang phát triển',
-                  );
+                  _changeGroupAvatar(context);
                 },
               ),
               _buildListTile(
@@ -115,10 +176,9 @@ class ConversationSettingsScreen extends StatelessWidget {
                 subtitle: 'Mời thêm người vào nhóm',
                 onTap: () {
                   Navigator.pop(context);
-                  ShowNotification.showToast(
-                    context,
-                    'Chức năng đang phát triển',
-                  );
+                  if (onAddMember != null) {
+                    onAddMember!();
+                  }
                 },
               ),
             ],
@@ -170,49 +230,51 @@ class ConversationSettingsScreen extends StatelessWidget {
               ),
 
             // === CÀNH BÁO ===
-            const SizedBox(height: 8),
-            _buildSectionTitle('Cảnh báo'),
-            _buildListTile(
-              context: context,
-              icon: Icons.block,
-              title: isBlocked ? 'Bỏ chặn người dùng' : 'Chặn người dùng',
-              subtitle: isBlocked
-                  ? 'Gỡ chặn người dùng này'
-                  : 'Chặn tin nhắn và cuộc gọi',
-              titleColor: const Color(0xFFFF5252),
-              iconColor: const Color(0xFFFF5252),
-              onTap: !isDeletedAccount && !isBlocked
-                  ? () async {
-                      final result = await ShowNotification.showConfirmDialog(
-                        context,
-                        title: 'Bạn muốn chặn người dùng này?',
-                        confirmText: 'Chặn',
-                        cancelText: 'Hủy',
-                        confirmColor: Colors.red,
-                      );
-
-                      if (!result!) return;
-                      Navigator.pop(context);
-
-                      if (onBlockUser != null && memberIds != null) {
-                        String friendId = memberIds!.firstWhere(
-                          (id) => id != currentUserId,
-                          orElse: () => '',
+            if (!isGroup) ...[
+              const SizedBox(height: 8),
+              _buildSectionTitle('Cảnh báo'),
+              _buildListTile(
+                context: context,
+                icon: Icons.block,
+                title: isBlocked ? 'Bỏ chặn người dùng' : 'Chặn người dùng',
+                subtitle: isBlocked
+                    ? 'Gỡ chặn người dùng này'
+                    : 'Chặn tin nhắn và cuộc gọi',
+                titleColor: const Color(0xFFFF5252),
+                iconColor: const Color(0xFFFF5252),
+                onTap: !isDeletedAccount && !isBlocked
+                    ? () async {
+                        final result = await ShowNotification.showConfirmDialog(
+                          context,
+                          title: 'Bạn muốn chặn người dùng này?',
+                          confirmText: 'Chặn',
+                          cancelText: 'Hủy',
+                          confirmColor: Colors.red,
                         );
 
-                        if (friendId.isEmpty) {
-                          await ShowNotification.showToast(
-                            context,
-                            'Không tìm thấy người dùng',
-                          );
-                          return;
-                        }
+                        if (!result!) return;
+                        Navigator.pop(context);
 
-                        onBlockUser!(friendId);
+                        if (onBlockUser != null && memberIds != null) {
+                          String friendId = memberIds!.firstWhere(
+                            (id) => id != currentUserId,
+                            orElse: () => '',
+                          );
+
+                          if (friendId.isEmpty) {
+                            await ShowNotification.showToast(
+                              context,
+                              'Không tìm thấy người dùng',
+                            );
+                            return;
+                          }
+
+                          onBlockUser!(friendId);
+                        }
                       }
-                    }
-                  : null,
-            ),
+                    : null,
+              ),
+            ],
             if (isGroup)
               _buildListTile(
                 context: context,
@@ -229,8 +291,12 @@ class ConversationSettingsScreen extends StatelessWidget {
                     cancelText: 'Hủy',
                     confirmColor: Colors.red,
                   );
+                  try {
+                    if (!result!) return;
+                  } catch (e) {
+                    print('Error in _leaveGroup: $e');
+                  }
 
-                  if (!result!) return;
                   Navigator.pop(context);
                   if (onLeaveGroup != null) {
                     onLeaveGroup!();

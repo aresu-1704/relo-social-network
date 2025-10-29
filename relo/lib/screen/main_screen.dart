@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:relo/screen/profile_screen.dart';
 import 'package:relo/screen/profile_setting_screen.dart';
 import 'package:relo/screen/search_screen.dart';
+import 'create_group_screen.dart';
 import 'messages_screen.dart';
 import 'friends_screen.dart';
 import 'newsfeed_screen.dart';
@@ -70,28 +71,43 @@ class MainScreenState extends State<MainScreen> {
         elevation: 0,
         title: Row(
           children: [
+            // Search button
             Expanded(
-              child: SizedBox(
-                height: 31,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SearchScreen()),
-                    );
-                  },
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SearchScreen()),
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.only(left: 8, top: 8, bottom: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.search, color: Colors.white70),
-                      SizedBox(width: 12),
+                      Icon(Icons.search, color: Colors.white70, size: 20),
+                      SizedBox(width: 8),
                       Text(
                         'Tìm kiếm',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                        style: TextStyle(color: Colors.white70, fontSize: 15),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
+            // Create group button
+            if (_selectedIndex == 2) // Only show in Messages tab
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: BoxConstraints(),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CreateGroupScreen(),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.group_add, color: Colors.white70, size: 24),
+              ),
             // Settings button - Only show in Profile tab
             if (_selectedIndex == 4)
               IconButton(
@@ -103,7 +119,7 @@ class MainScreenState extends State<MainScreen> {
                     ),
                   );
                 },
-                icon: Icon(Icons.settings, color: Colors.white70),
+                icon: Icon(Icons.settings, color: Colors.white70, size: 24),
               ),
           ],
         ),

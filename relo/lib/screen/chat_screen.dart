@@ -20,6 +20,8 @@ import 'package:relo/screen/profile_screen.dart';
 import 'package:relo/widgets/messages/block_composer.dart';
 import 'package:relo/screen/conversation_settings_screen.dart';
 import 'package:relo/screen/forward_message_screen.dart';
+import 'package:relo/screen/add_member_screen.dart';
+import 'package:relo/screen/group_members_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -78,9 +80,17 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isBlockedByMe = false;
   String? _blockedUserId;
 
+  // Member count (cho group chat)
+  int? _memberCount;
+
+  // Member IDs (cho group chat) - cập nhật realtime
+  List<String>? _memberIds;
+
   @override
   void initState() {
     super.initState();
+    _memberCount = widget.memberCount;
+    _memberIds = widget.memberIds != null ? List.from(widget.memberIds!) : null;
     _loadInitialData();
     _scrollController.addListener(_onScroll);
     _listenToWebSocket();
@@ -96,6 +106,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _listenToWebSocket() {
+    // Cancel subscription cũ nếu có
+    _webSocketSubscription?.cancel();
+
     _webSocketSubscription = webSocketService.stream.listen((message) async {
       try {
         final data = jsonDecode(message);
@@ -107,23 +120,73 @@ class _ChatScreenState extends State<ChatScreen> {
 
         if (data['type'] == 'new_message') {
           final msgData = data['payload']?['message'];
-          if (msgData == null) return;
+          if (msgData == null) {
+            print('ChatScreen: msgData is null');
+            return;
+          }
 
           // Nếu message từ chính mình, không cần xử lý
-          if (msgData['senderId'] == _currentUserId) return;
+          if (msgData['senderId'] == _currentUserId) {
+            return;
+          }
 
           // Chỉ xử lý message từ conversation hiện tại
-          if (msgData['conversationId'] != _conversationId) return;
+          if (msgData['conversationId'] != _conversationId) {
+            return;
+          }
+
+          // Kiểm tra message đã tồn tại chưa để tránh duplicate
+          final messageId = msgData['id'] ?? '';
+          final existingIndex = _messages.indexWhere((m) => m.id == messageId);
+          if (existingIndex != -1) return; // Message đã tồn tại, bỏ qua
+
+          // Cập nhật số lượng thành viên và danh sách thành viên nếu có trong metadata hoặc conversation data
+          final metadata = data['payload']?['metadata'];
+          final conversationData = data['payload']?['conversation'];
+          if (metadata != null) {
+            setState(() {
+              if (metadata['participantCount'] != null) {
+                _memberCount = metadata['participantCount'];
+              }
+              if (metadata['participantIds'] != null && widget.isGroup) {
+                _memberIds = List<String>.from(metadata['participantIds']);
+              }
+            });
+          } else if (conversationData != null) {
+            setState(() {
+              if (conversationData['participantCount'] != null) {
+                _memberCount = conversationData['participantCount'];
+              }
+              if (conversationData['participantIds'] != null &&
+                  widget.isGroup) {
+                _memberIds = List<String>.from(
+                  conversationData['participantIds'],
+                );
+              }
+            });
+          }
 
           // Mark as seen khi message đến từ conversation đang mở
           await _messageService.markAsSeen(_conversationId!, _currentUserId!);
           widget.onConversationSeen?.call(_conversationId!);
 
+          // Parse content - đảm bảo là Map
+          final rawContent = msgData['content'];
+          Map<String, dynamic> parsedContent;
+          if (rawContent is Map<String, dynamic>) {
+            parsedContent = rawContent;
+          } else if (rawContent is String) {
+            // Backward compatibility
+            parsedContent = {'type': 'text', 'text': rawContent};
+          } else {
+            parsedContent = {'type': 'unsupported'};
+          }
+
           final newMsg = Message(
-            id: msgData['id'] ?? '',
+            id: messageId,
             conversationId: msgData['conversationId'],
             senderId: msgData['senderId'],
-            content: msgData['content'] ?? '',
+            content: parsedContent,
             avatarUrl: msgData['avatarUrl'] ?? '',
             timestamp:
                 DateTime.tryParse(msgData['createdAt'] ?? '') ?? DateTime.now(),
@@ -160,8 +223,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
           // Only update if it's relevant to this conversation
           final isRelevant =
-              widget.memberIds != null &&
-              widget.memberIds!.contains(blockedUserId);
+              _memberIds != null && _memberIds!.contains(blockedUserId);
 
           if (isRelevant) {
             // Re-check block status (silently, no toast)
@@ -232,11 +294,11 @@ class _ChatScreenState extends State<ChatScreen> {
         } catch (e) {
           // Ignore errors
         }
-      } else if (widget.isGroup && widget.memberIds != null) {
+      } else if (widget.isGroup && _memberIds != null) {
         // Chat nhóm: Check xem có ai trong group bị mình block không
         List<String> blockedInGroup = [];
 
-        for (String memberId in widget.memberIds!) {
+        for (String memberId in _memberIds!) {
           if (memberId != _currentUserId) {
             try {
               final blockStatus = await _userService.checkBlockStatus(memberId);
@@ -610,7 +672,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // Kiểm tra nếu đang chat với tài khoản đã bị xóa
     final isDeletedAccount =
         widget.chatName == 'Tài khoản không tồn tại' ||
-        (widget.memberIds != null && widget.memberIds!.contains('deleted'));
+        (_memberIds != null && _memberIds!.contains('deleted'));
 
     Navigator.push(
       context,
@@ -620,7 +682,7 @@ class _ChatScreenState extends State<ChatScreen> {
           chatName: widget.chatName,
           avatarUrl: widget.avatarUrl,
           currentUserId: _currentUserId,
-          memberIds: widget.memberIds,
+          memberIds: _memberIds,
           isDeletedAccount: isDeletedAccount,
           isBlocked: _isBlocked,
           conversationId: _conversationId!,
@@ -630,6 +692,28 @@ class _ChatScreenState extends State<ChatScreen> {
               MaterialPageRoute(
                 builder: (context) =>
                     ProfileScreen(userId: friendId, hideMessageButton: true),
+              ),
+            );
+          },
+          onAddMember: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddMemberScreen(
+                  conversationId: _conversationId!,
+                  currentMemberIds: _memberIds ?? [],
+                ),
+              ),
+            );
+          },
+          onViewMembers: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupMembersScreen(
+                  memberIds: _memberIds ?? [],
+                  groupName: widget.chatName ?? 'Nhóm',
+                ),
               ),
             );
           },
@@ -707,9 +791,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (widget.isGroup)
+                  if (widget.isGroup && _memberCount != null)
                     Text(
-                      '${widget.memberCount!} thành viên',
+                      '$_memberCount thành viên',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 12,

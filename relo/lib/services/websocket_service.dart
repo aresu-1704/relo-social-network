@@ -8,7 +8,7 @@ import 'auth_service.dart';
 
 class WebSocketService {
   WebSocketChannel? _channel;
-  final StreamController<dynamic> _streamController =
+  StreamController<dynamic> _streamController =
       StreamController<dynamic>.broadcast();
   bool _isManualDisconnect = false;
   final AuthService _authService = AuthService();
@@ -24,6 +24,12 @@ class WebSocketService {
   Future<void> connect() async {
     _isManualDisconnect = false;
     _reconnectAttempts = 0;
+
+    // Tạo StreamController mới nếu cái cũ đã bị đóng
+    if (_streamController.isClosed) {
+      _streamController = StreamController<dynamic>.broadcast();
+    }
+
     await _connect();
 
     Connectivity().onConnectivityChanged.listen((status) {
@@ -70,6 +76,13 @@ class WebSocketService {
     }
 
     await _channel?.sink.close(status.normalClosure);
+    _channel = null;
+
+    // Tạo StreamController mới nếu cái cũ đã bị đóng
+    if (_streamController.isClosed) {
+      _streamController = StreamController<dynamic>.broadcast();
+    }
+
     await _connect();
   }
 
@@ -87,7 +100,9 @@ class WebSocketService {
         (data) {
           try {
             // Wrap in try-catch to prevent crashes from unhandled messages
-            _streamController.add(data);
+            if (!_streamController.isClosed) {
+              _streamController.add(data);
+            }
           } catch (e) {
             print('Error handling WebSocket message: $e');
           }
@@ -96,7 +111,9 @@ class WebSocketService {
           await _handleDisconnect();
         },
         onError: (error) async {
-          _streamController.addError(error);
+          if (!_streamController.isClosed) {
+            _streamController.addError(error);
+          }
           await _handleDisconnect();
         },
       );

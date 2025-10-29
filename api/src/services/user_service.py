@@ -1,6 +1,7 @@
 import asyncio
 import os
 from datetime import datetime
+from typing import List
 from ..models import User
 from ..models import FriendRequest
 from ..schemas import UserUpdate
@@ -187,6 +188,21 @@ class UserService:
         
         return friend_request
     
+    @staticmethod
+    async def get_users_by_ids(user_ids: List[str]) -> List[User]:
+        """Lấy danh sách người dùng theo danh sách ID."""
+        try:
+            # Convert string IDs to ObjectId với validation
+            object_ids = []
+            for user_id in user_ids:
+                if ObjectId.is_valid(user_id):
+                    object_ids.append(ObjectId(user_id))
+            
+            users = await User.find({"_id": {"$in": object_ids}}).to_list()
+            return users
+        except Exception as e:
+            raise Exception(f"Failed to get users by IDs: {e}")
+
     @staticmethod
     async def respond_to_friend_request_by_from_user(from_user_id: str, current_user_id: str, response: str):
         """
