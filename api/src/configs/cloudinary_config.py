@@ -12,4 +12,3 @@ def init_cloudinary():
         api_secret="TBeB6Fca3ozXAyQYTaLcN8DvKY8",
         secure=True
     )
-    print("✅ Cloudinary initialized: dxusasr4c")

@@ -6,7 +6,6 @@ import 'package:relo/services/message_service.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/utils/show_notification.dart';
-import 'package:relo/widgets/text_form_field.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final String? initialFriendId; // ID của người bạn sẽ được pre-select
@@ -27,7 +26,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   bool _isLoading = true;
   Set<String> _selectedFriendIds = {};
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _groupNameController = TextEditingController();
 
   @override
   void initState() {
@@ -42,7 +40,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _groupNameController.dispose();
     super.dispose();
   }
 
@@ -119,17 +116,17 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Future<void> _createGroup() async {
-    if (_selectedFriendIds.isEmpty) {
-      await ShowNotification.showToast(
-        context,
-        'Vui lòng chọn ít nhất 1 bạn bè',
-      );
-      return;
-    }
+    // Tính tổng số người: current user + selected friends
+    final totalMembers = 1 + _selectedFriendIds.length;
 
-    final groupName = _groupNameController.text.trim();
-    if (groupName.isEmpty) {
-      await ShowNotification.showToast(context, 'Vui lòng nhập tên nhóm');
+    // Cần ít nhất 3 người (1 người dùng hiện tại + 2 bạn bè)
+    if (totalMembers < 3) {
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: 'Vui lòng chọn ít nhất 2 bạn bè để tạo nhóm',
+        buttonText: 'Đóng',
+        buttonColor: const Color(0xFF7A2FC0),
+      );
       return;
     }
 
@@ -152,11 +149,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       // Create participant list (current user + selected friends)
       final participantIds = [currentUserId, ..._selectedFriendIds.toList()];
 
-      // Create group
+      // Create group with default name
       final conversation = await _messageService.getOrCreateConversation(
         participantIds,
         true, // isGroup
-        groupName.trim(),
+        'Cuộc trò chuyện', // Default group name
       );
 
       if (conversation.isEmpty || conversation['id'] == null) {
@@ -173,7 +170,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             builder: (context) => ChatScreen(
               conversationId: conversation['id'],
               isGroup: true,
-              chatName: groupName,
+              chatName: 'Nhóm mới',
               memberIds: participantIds,
               memberCount: participantIds.length,
               avatarUrl: conversation['avatarUrl'],
@@ -226,26 +223,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         color: const Color(0xFFF5F5F5),
         child: Column(
           children: [
-            // Group name input
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: BuildTextFormField.buildTextFormField(
-                controller: _groupNameController,
-                hintText: 'Nhập tên nhóm',
-                icon: Icons.group,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập tên nhóm';
-                  }
-                  if (value.trim().length < 2) {
-                    return 'Tên nhóm phải có ít nhất 2 ký tự';
-                  }
-                  return null;
-                },
-                maxLength: 50,
-              ),
-            ),
             // Search bar
             Container(
               color: Colors.white,
@@ -334,49 +311,43 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     return InkWell(
       onTap: () => _toggleFriendSelection(friend.id),
       child: Container(
-        color: isSelected ? const Color(0xFFE8E0F5) : Colors.white,
+        color: isSelected ? Colors.grey[300] : Colors.white,
         child: ListTile(
-          leading: Stack(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty
-                    ? NetworkImage(friend.avatarUrl!)
-                    : null,
-                child: friend.avatarUrl == null || friend.avatarUrl!.isEmpty
-                    ? Text(
-                        friend.displayName.isNotEmpty
-                            ? friend.displayName[0].toUpperCase()
-                            : '#',
-                      )
-                    : null,
-              ),
-              if (isSelected)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7A2FC0),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ),
-            ],
+          leading: CircleAvatar(
+            backgroundImage:
+                friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty
+                ? NetworkImage(friend.avatarUrl!)
+                : null,
+            child: friend.avatarUrl == null || friend.avatarUrl!.isEmpty
+                ? Text(
+                    friend.displayName.isNotEmpty
+                        ? friend.displayName[0].toUpperCase()
+                        : '#',
+                  )
+                : null,
           ),
           title: Text(
             friend.displayName,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w500,
-              color: isSelected ? const Color(0xFF7A2FC0) : Colors.black87,
+              color: Colors.black87,
             ),
             overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? const Color(0xFF7A2FC0) : Colors.grey,
+                width: 2,
+              ),
+              color: isSelected ? const Color(0xFF7A2FC0) : Colors.transparent,
+            ),
+            child: isSelected
+                ? const Icon(Icons.check, color: Colors.white, size: 16)
+                : null,
           ),
         ),
       ),

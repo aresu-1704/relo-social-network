@@ -184,7 +184,7 @@ class MessageService:
         if sender_id not in ['system', 'deleted']:
             try:
                 sender = await User.get(sender_id)
-            except:
+            except Exception as e:
                 sender = None
 
         # Kiểm tra nếu sender đã bị xóa
@@ -226,11 +226,13 @@ class MessageService:
                 if not participants_to_notify:
                     return
                 
-                # Lấy danh sách users offline
-                offline_user_ids = manager.get_offline_users(participants_to_notify)
+                # TẠM BỎ: Gửi push notification cho tất cả users (kể cả đang online)
+                # offline_user_ids = manager.get_offline_users(participants_to_notify)
+                # if not offline_user_ids:
+                #     return
                 
-                if not offline_user_ids:
-                    return
+                # Gửi cho tất cả participants (không phân biệt online/offline)
+                offline_user_ids = participants_to_notify
                 
                 # Lấy thông tin sender để hiển thị
                 sender_name = "Người dùng"  # Default
@@ -295,7 +297,7 @@ class MessageService:
                     offline_user_ids=offline_user_ids
                 )
             except Exception as e:
-                print(f"⚠️ Error sending push notifications: {e}")
+                pass
         
         # Gửi notification trong background (không block response)
         asyncio.create_task(send_push_notifications())
@@ -711,11 +713,13 @@ class MessageService:
                 if not participants_to_notify:
                     return
                 
-                # Lấy danh sách users offline
-                offline_user_ids = manager.get_offline_users(participants_to_notify)
+                # TẠM BỎ: Gửi push notification cho tất cả users (kể cả đang online)
+                # offline_user_ids = manager.get_offline_users(participants_to_notify)
+                # if not offline_user_ids:
+                #     return
                 
-                if not offline_user_ids:
-                    return
+                # Gửi cho tất cả participants (không phân biệt online/offline)
+                offline_user_ids = participants_to_notify
                 
                 user_name = user.displayName if user else "Người dùng"
                 group_name = conversation.name or "Nhóm"
@@ -729,7 +733,7 @@ class MessageService:
                     metadata={"user_id": user_id, "user_name": user_name}
                 )
             except Exception as e:
-                print(f"⚠️ Error sending push notifications for member left: {e}")
+                pass
         
         asyncio.create_task(send_push_notifications_leave())
         
@@ -837,11 +841,13 @@ class MessageService:
                 if not participants_to_notify:
                     return
                 
-                # Lấy danh sách users offline
-                offline_user_ids = manager.get_offline_users(participants_to_notify)
+                # TẠM BỎ: Gửi push notification cho tất cả users (kể cả đang online)
+                # offline_user_ids = manager.get_offline_users(participants_to_notify)
+                # if not offline_user_ids:
+                #     return
                 
-                if not offline_user_ids:
-                    return
+                # Gửi cho tất cả participants (không phân biệt online/offline)
+                offline_user_ids = participants_to_notify
                 
                 group_name = conversation.name or "Nhóm"
                 member_name = member.displayName if member else "Người dùng"
@@ -860,7 +866,7 @@ class MessageService:
                     }
                 )
             except Exception as e:
-                print(f"⚠️ Error sending push notifications for member added: {e}")
+                pass
         
         asyncio.create_task(send_push_notifications_add())
         
@@ -947,7 +953,7 @@ class MessageService:
                             }
                         })
                 except Exception as e:
-                    print(f"Failed to broadcast avatar changed: {e}")
+                    pass
             
             asyncio.create_task(broadcast_avatar_changed())
             

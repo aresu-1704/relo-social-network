@@ -15,13 +15,6 @@ async def create_post(
 ):
     """Tạo một bài đăng mới. Yêu cầu xác thực người dùng."""
     try:
-        # Debug logging
-        print(f"📝 Content received: '{content}', length: {len(content) if content else 0}")
-        print(f"📎 Files received: {files}")
-        if files:
-            print(f"   Files count: {len(files)}")
-            for i, f in enumerate(files):
-                print(f"   File {i+1}: {f.filename}, size: {f.size}")
         
         # Validate: cần ít nhất content hoặc files
         has_content = content and content.strip()
@@ -48,10 +41,8 @@ async def create_post(
             createdAt=new_post.createdAt.isoformat()
         )
     except ValueError as e:
-        print(f"❌ Validation error: {e}")
         raise HTTPException(status_code=400, detail=f"Lỗi validation: {str(e)}")
     except Exception as e:
-        print(f"❌ Server error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")

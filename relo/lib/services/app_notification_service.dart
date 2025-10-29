@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
@@ -20,6 +23,9 @@ class AppNotificationService {
   // Callback để xử lý navigation và reply
   Function(String conversationId)? onNotificationTapped;
   Function(String conversationId, String messageText)? onNotificationReply;
+
+  // Debug: Kiểm tra callback đã được setup chưa
+  bool get hasReplyCallback => onNotificationReply != null;
 
   /// Initialize notification service
   Future<void> initialize() async {
@@ -95,7 +101,7 @@ class AppNotificationService {
 
     await _localNotifications.initialize(
       settings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
+      onDidReceiveNotificationResponse: _onNotificationResponse,
     );
 
     // Setup reply action cho Android
@@ -113,23 +119,39 @@ class AppNotificationService {
       if (androidImplementation != null) {
         // Chưa có direct API để setup reply trong flutter_local_notifications
         // Reply action sẽ được xử lý từ FCM payload đã có actions trong backend
-        print("✅ Android reply action ready");
       }
     } catch (e) {
       print("Error setting up reply action: $e");
     }
   }
 
-  /// Handle notification tap
-  void _onNotificationTapped(NotificationResponse response) {
-    print("Notification tapped: ${response.payload}");
-    print("Action ID: ${response.actionId}, Input: ${response.input}");
+  /// Handle notification tap và reply action
+  static void _onNotificationResponse(NotificationResponse response) {
+    // Get instance để truy cập callback
+    final instance = AppNotificationService._instance;
+    instance._handleNotificationResponseImpl(response);
+  }
 
-    // Xử lý reply action
-    if (response.actionId == 'REPLY' && response.payload != null) {
-      // Lấy text từ input field của notification
-      final replyText = response.input ?? '';
-      _handleReply(response.payload!, inputText: replyText);
+  /// Implementation của notification response handler
+  void _handleNotificationResponseImpl(NotificationResponse response) {
+    // Xử lý reply action - mở chat screen như tap notification thông thường
+    final actionId = response.actionId?.toUpperCase().trim() ?? '';
+    final isReplyAction = actionId == 'REPLY' || actionId.contains('REPLY');
+
+    // Nếu là reply action, xử lý như tap notification để mở chat screen
+    if (isReplyAction &&
+        response.payload != null &&
+        response.payload!.isNotEmpty) {
+      try {
+        final data = _parsePayload(response.payload!);
+        final conversationId = data['conversation_id'] as String?;
+
+        if (conversationId != null && onNotificationTapped != null) {
+          onNotificationTapped!(conversationId);
+        }
+      } catch (e) {
+        // Silent fail
+      }
       return;
     }
 
@@ -152,13 +174,22 @@ class AppNotificationService {
   /// Parse payload string thành Map
   Map<String, dynamic> _parsePayload(String payload) {
     try {
-      // Thử parse như JSON trước
+      // Thử parse như JSON đúng cách trước
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (e) {
+        // Not valid JSON, try manual parse
+      }
+
+      // Thử parse như JSON-like string (với quotes)
       if (payload.trim().startsWith('{')) {
-        // Remove quotes và parse như JSON-like
+        // Remove outer braces và parse
         final cleaned = payload
             .replaceAll('{', '')
             .replaceAll('}', '')
-            .replaceAll('"', '')
             .replaceAll(' ', '');
 
         final Map<String, dynamic> result = {};
@@ -166,10 +197,16 @@ class AppNotificationService {
 
         for (final pair in pairs) {
           if (pair.contains(':')) {
-            final keyValue = pair.split(':');
-            if (keyValue.length == 2) {
-              final key = keyValue[0].trim();
-              final value = keyValue[1].trim();
+            final parts = pair.split(':');
+            if (parts.length >= 2) {
+              var key = parts[0].trim().replaceAll('"', '').replaceAll("'", '');
+              var value = parts.sublist(1).join(':').trim();
+              // Remove quotes nếu có
+              if (value.startsWith('"') && value.endsWith('"')) {
+                value = value.substring(1, value.length - 1);
+              } else if (value.startsWith("'") && value.endsWith("'")) {
+                value = value.substring(1, value.length - 1);
+              }
               result[key] = value;
             }
           }
@@ -177,51 +214,25 @@ class AppNotificationService {
         return result;
       }
 
-      // Fallback: parse format cũ "key: value, key2: value2"
-      final cleaned = payload
-          .replaceAll('{', '')
-          .replaceAll('}', '')
-          .replaceAll(' ', '');
-
+      // Fallback: parse format đơn giản "key: value, key2: value2"
+      final cleaned = payload.replaceAll(' ', '');
       final Map<String, dynamic> result = {};
       final pairs = cleaned.split(',');
 
       for (final pair in pairs) {
-        final keyValue = pair.split(':');
-        if (keyValue.length == 2) {
-          final key = keyValue[0].trim();
-          final value = keyValue[1].trim();
-          result[key] = value;
+        if (pair.contains(':')) {
+          final keyValue = pair.split(':');
+          if (keyValue.length == 2) {
+            final key = keyValue[0].trim();
+            final value = keyValue[1].trim();
+            result[key] = value;
+          }
         }
       }
 
       return result;
     } catch (e) {
-      print("Error parsing payload: $e");
       return {};
-    }
-  }
-
-  /// Handle reply action
-  void _handleReply(String payload, {String? inputText}) {
-    try {
-      final data = _parsePayload(payload);
-      final conversationId = data['conversation_id'] as String?;
-
-      if (conversationId != null && onNotificationReply != null) {
-        // Reply text sẽ được lấy từ notification action input
-        final replyText = inputText ?? '';
-        if (replyText.isNotEmpty) {
-          onNotificationReply!(conversationId, replyText);
-          print(
-            "✅ Reply action triggered for conversation: $conversationId with text: $replyText",
-          );
-        } else {
-          print("⚠️ Reply action triggered but no input text provided");
-        }
-      }
-    } catch (e) {
-      print("Error handling reply: $e");
     }
   }
 
@@ -229,8 +240,6 @@ class AppNotificationService {
   void _setupMessageHandlers() {
     // Foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("📩 Foreground message: ${message.notification?.title}");
-      print("📩 Message data: ${message.data}");
       _showLocalNotification(message);
 
       // Xử lý reply nếu có
@@ -243,15 +252,12 @@ class AppNotificationService {
 
     // Background message tap
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("📩 Opened from background: ${message.notification?.title}");
-      print("📩 Message data: ${message.data}");
       _handleNotificationTap(message.data);
     });
 
     // Kiểm tra notification khi app được mở từ terminated state
     _firebaseMessaging.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
-        print("📩 App opened from terminated state");
         _handleNotificationTap(message.data);
       }
     });
@@ -288,18 +294,50 @@ class AppNotificationService {
     }
   }
 
+  /// Load ảnh mặc định từ assets và copy vào temp directory
+  Future<String?> _loadDefaultAvatarFromAssets() async {
+    try {
+      // Thử load ảnh từ assets/none_images/avatar.jpg trước
+      ByteData data;
+      try {
+        data = await rootBundle.load('assets/none_images/avatar.jpg');
+      } catch (e) {
+        // Fallback: thử dùng icon.png
+        try {
+          data = await rootBundle.load('assets/icons/icon.png');
+        } catch (e2) {
+          return null;
+        }
+      }
+
+      final Uint8List bytes = data.buffer.asUint8List();
+
+      // Copy vào temp directory
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/default_avatar.jpg';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      // Validate file was created successfully
+      if (await file.exists()) {
+        return filePath;
+      }
+    } catch (e) {
+      // Silent fail
+    }
+    return null;
+  }
+
   /// Download image từ URL về local để hiển thị trong notification
   Future<String?> _downloadImageForNotification(String imageUrl) async {
     try {
       // Validate imageUrl
       if (imageUrl.isEmpty) {
-        print('⚠️ Invalid image URL: empty string');
         return null;
       }
 
       final uri = Uri.tryParse(imageUrl);
       if (uri == null || !uri.hasScheme) {
-        print('⚠️ Invalid image URL: $imageUrl');
         return null;
       }
 
@@ -338,7 +376,7 @@ class AppNotificationService {
         }
       }
     } catch (e) {
-      print("⚠️ Error downloading image for notification: $e");
+      // Silent fail
     }
     return null;
   }
@@ -360,11 +398,38 @@ class AppNotificationService {
     String? avatarPath;
     if (senderAvatar != null && senderAvatar.isNotEmpty) {
       avatarPath = await _downloadImageForNotification(senderAvatar);
-      // Validate avatarPath trước khi sử dụng
       if (avatarPath != null && avatarPath.isEmpty) {
-        print('⚠️ Invalid avatar path: empty string');
         avatarPath = null;
       }
+    }
+
+    // Nếu không có avatar từ URL, sử dụng ảnh mặc định từ assets
+    if (avatarPath == null) {
+      avatarPath = await _loadDefaultAvatarFromAssets();
+    }
+
+    // Format message content giống MessagesScreen
+    final contentType = data['content_type'] as String? ?? 'text';
+    final messageContent = notification.body ?? '';
+    String formattedContent;
+
+    switch (contentType) {
+      case 'audio':
+        formattedContent = '🎤 [Tin nhắn thoại]';
+        break;
+      case 'media':
+        formattedContent = '🖼️ [Đa phương tiện]';
+        break;
+      case 'file':
+        formattedContent = '📁 [Tệp tin]';
+        break;
+      case 'delete':
+        formattedContent = '[Tin nhắn đã bị thu hồi]';
+        break;
+      default:
+        formattedContent = messageContent.isNotEmpty
+            ? messageContent
+            : 'Đã gửi tin nhắn';
     }
 
     // Parse payload đúng cách (JSON string thay vì format key:value)
@@ -378,10 +443,10 @@ class AppNotificationService {
       payload = data.entries.map((e) => '${e.key}: ${e.value}').join(', ');
     }
 
-    // Sử dụng BigTextStyle để hiển thị đẹp hơn kiểu Zalo
+    // Sử dụng MessagingStyle để hiển thị avatar bên trái (Android 7.0+)
     AndroidNotificationDetails androidDetails;
     if (hasReply && conversationId != null) {
-      // Notification với reply action và BigTextStyle
+      // Notification với reply action và inline reply
       androidDetails = AndroidNotificationDetails(
         'relo_channel',
         'Relo Notifications',
@@ -390,20 +455,35 @@ class AppNotificationService {
         priority: Priority.high,
         showWhen: true,
         category: AndroidNotificationCategory.message,
-        styleInformation: BigTextStyleInformation(
-          notification.body ?? '',
-          contentTitle: notification.title ?? senderName,
-          htmlFormatBigText: false,
+        styleInformation: MessagingStyleInformation(
+          Person(
+            name: senderName,
+            icon: avatarPath != null
+                ? BitmapFilePathAndroidIcon(avatarPath)
+                : null,
+          ),
+          messages: [
+            Message(
+              formattedContent,
+              DateTime.now(),
+              Person(
+                name: senderName,
+                icon: avatarPath != null
+                    ? BitmapFilePathAndroidIcon(avatarPath)
+                    : null,
+              ),
+            ),
+          ],
         ),
         largeIcon: avatarPath != null
             ? FilePathAndroidBitmap(avatarPath)
             : null,
         actions: [
-          const AndroidNotificationAction(
+          AndroidNotificationAction(
             'REPLY',
             'Trả lời',
-            showsUserInterface: true, // Hiển thị input field khi reply
-            titleColor: Color(0xFF7A2FC0),
+            showsUserInterface: true, // Mở app khi bấm reply
+            titleColor: const Color(0xFF7A2FC0),
             cancelNotification: false,
           ),
         ],
@@ -417,10 +497,25 @@ class AppNotificationService {
         importance: Importance.high,
         priority: Priority.high,
         showWhen: true,
-        styleInformation: BigTextStyleInformation(
-          notification.body ?? '',
-          contentTitle: notification.title ?? senderName,
-          htmlFormatBigText: false,
+        styleInformation: MessagingStyleInformation(
+          Person(
+            name: senderName,
+            icon: avatarPath != null
+                ? BitmapFilePathAndroidIcon(avatarPath)
+                : null,
+          ),
+          messages: [
+            Message(
+              formattedContent,
+              DateTime.now(),
+              Person(
+                name: senderName,
+                icon: avatarPath != null
+                    ? BitmapFilePathAndroidIcon(avatarPath)
+                    : null,
+              ),
+            ),
+          ],
         ),
         largeIcon: avatarPath != null
             ? FilePathAndroidBitmap(avatarPath)
@@ -444,7 +539,6 @@ class AppNotificationService {
     );
 
     // Sử dụng conversation_id để group notifications (nếu có)
-    // Điều này giúp Android tự động group notifications từ cùng một conversation
     final notificationId = conversationId != null && conversationId.isNotEmpty
         ? conversationId.hashCode
         : notification.hashCode;
@@ -462,10 +556,8 @@ class AppNotificationService {
   Future<String?> getDeviceToken() async {
     try {
       String? token = await _firebaseMessaging.getToken();
-      print("🔑 FCM Token: $token");
       return token;
     } catch (e) {
-      print("❌ Error getting FCM token: $e");
       return null;
     }
   }

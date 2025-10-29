@@ -41,7 +41,6 @@ async def init_db():
     database = client.get_database("relo-social-network")
 
     await init_beanie(database=database, document_models=DOCUMENT_MODELS)
-    print("✅ Đã kết nối MongoDB và khởi tạo Beanie (singleton).")
 
     return client
 

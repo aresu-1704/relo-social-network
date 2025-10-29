@@ -20,6 +20,34 @@ class MessageService {
     }
   }
 
+  /// Lấy thông tin một cuộc trò chuyện theo ID
+  Future<Map<String, dynamic>?> fetchConversationById(
+    String conversationId,
+  ) async {
+    try {
+      final response = await _dio.get('messages/conversations/$conversationId');
+      return response.data as Map<String, dynamic>?;
+    } on DioException catch (e) {
+      // Nếu là 404 hoặc 403, thử fetch từ danh sách conversations và tìm conversation
+      if (e.response?.statusCode == 404 || e.response?.statusCode == 403) {
+        try {
+          final conversations = await fetchConversations();
+          for (var conv in conversations) {
+            if (conv['id'] == conversationId) {
+              return conv as Map<String, dynamic>?;
+            }
+          }
+        } catch (e2) {
+          // Silent fail
+        }
+      }
+
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   //Lấy danh sách tin nhắn trong một cuộc trò chuyện
   Future<List<Message>> getMessages(
     String conversationId, {

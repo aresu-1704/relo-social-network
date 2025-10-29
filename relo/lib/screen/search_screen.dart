@@ -202,8 +202,7 @@ class _UserSearchResultItem extends StatefulWidget {
 }
 
 class _UserSearchResultItemState extends State<_UserSearchResultItem> {
-  final String _fallbackAvatarUrl =
-      'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
+  final String _fallbackAvatarUrl = 'assets/none_images/avatar.jpg';
   final UserService _userService = ServiceLocator.userService;
 
   late String _friendStatus;
@@ -247,12 +246,17 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundImage: NetworkImage(
-                widget.user.avatarUrl != null &&
+              backgroundImage: (() {
+                final url =
+                    widget.user.avatarUrl != null &&
                         widget.user.avatarUrl!.isNotEmpty
                     ? widget.user.avatarUrl!
-                    : _fallbackAvatarUrl,
-              ),
+                    : _fallbackAvatarUrl;
+                return (url.startsWith('assets/')
+                        ? AssetImage(url)
+                        : NetworkImage(url))
+                    as ImageProvider;
+              })(),
               onBackgroundImageError: (_, __) {},
               backgroundColor: Colors.grey[200],
             ),

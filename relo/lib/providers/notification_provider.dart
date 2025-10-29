@@ -37,7 +37,14 @@ class NotificationProvider extends ChangeNotifier {
     _webSocketSubscription?.cancel(); // Cancel old subscription if exists
     _webSocketSubscription = webSocketService.stream.listen((message) {
       try {
+        // DEBUG: In thông tin để kiểm tra
+        print(
+          "🔔 [DEBUG] NotificationProvider received WebSocket message: $message",
+        );
         final data = jsonDecode(message);
+        print(
+          "🔔 [DEBUG] NotificationProvider parsed data: type=${data['type']}, payload=${data['payload']}",
+        );
 
         // Handle friend request accepted
         if (data['type'] == 'friend_request_accepted') {
@@ -58,7 +65,6 @@ class NotificationProvider extends ChangeNotifier {
         if (data['type'] == 'new_post') {
           _handleNewPost(data['payload']);
         }
-
       } catch (e) {
         debugPrint('Error parsing WebSocket message: $e');
       }

@@ -2,6 +2,7 @@ import asyncio
 import os
 from datetime import datetime
 from typing import List
+from fastapi import UploadFile
 from ..models import User
 from ..models import FriendRequest
 from ..schemas import UserUpdate
@@ -567,12 +568,21 @@ class UserService:
             if "avatarBase64" in update_data and update_data["avatarBase64"]:
                 avatar_data = update_data["avatarBase64"]
                 
-                # Giải mã base64
+                # Giải mã base64 với padding tự động
                 if "," in avatar_data:
                     header, data = avatar_data.split(",", 1)
-                    image_bytes = base64.b64decode(data)
+                    # Thêm padding nếu cần
+                    missing_padding = len(data) % 4
+                    if missing_padding:
+                        data += "=" * (4 - missing_padding)
+                    image_bytes = base64.b64decode(data, validate=True)
                 else:
-                    image_bytes = base64.b64decode(avatar_data)
+                    # Thêm padding nếu cần
+                    data = avatar_data
+                    missing_padding = len(data) % 4
+                    if missing_padding:
+                        data += "=" * (4 - missing_padding)
+                    image_bytes = base64.b64decode(data, validate=True)
 
                 # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -596,12 +606,21 @@ class UserService:
             if "backgroundBase64" in update_data and update_data["backgroundBase64"]:
                 background_data = update_data["backgroundBase64"]
                 
-                # Giải mã base64
+                # Giải mã base64 với padding tự động
                 if "," in background_data:
                     header, data = background_data.split(",", 1)
-                    image_bytes = base64.b64decode(data)
+                    # Thêm padding nếu cần
+                    missing_padding = len(data) % 4
+                    if missing_padding:
+                        data += "=" * (4 - missing_padding)
+                    image_bytes = base64.b64decode(data, validate=True)
                 else:
-                    image_bytes = base64.b64decode(background_data)
+                    # Thêm padding nếu cần
+                    data = background_data
+                    missing_padding = len(data) % 4
+                    if missing_padding:
+                        data += "=" * (4 - missing_padding)
+                    image_bytes = base64.b64decode(data, validate=True)
 
                 # Lưu tạm file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -649,6 +668,70 @@ class UserService:
                     pass
             
             raise ValueError(f"Lỗi cập nhật thông tin: {str(e)}")
+    
+    @staticmethod
+    async def update_user_avatar(user_id: str, avatar_file: UploadFile):
+        """Cập nhật avatar từ file upload."""
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Đọc file content
+        file_content = await avatar_file.read()
+        
+        # Lưu tạm file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            tmp.write(file_content)
+            tmp_avatar_path = tmp.name
+        
+        try:
+            # Xóa ảnh cũ nếu có
+            if user.avatarPublicId:
+                destroy(user.avatarPublicId)
+            
+            # Upload lên Cloudinary
+            result = cloudinary_upload(tmp_avatar_path, folder="avatars")
+            user.avatarUrl = result["secure_url"]
+            user.avatarPublicId = result["public_id"]
+            
+            await user.save()
+            return user
+        finally:
+            # Clean up temp file
+            if os.path.exists(tmp_avatar_path):
+                os.unlink(tmp_avatar_path)
+    
+    @staticmethod
+    async def update_user_background(user_id: str, background_file: UploadFile):
+        """Cập nhật background từ file upload."""
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("Không tìm thấy người dùng.")
+        
+        # Đọc file content
+        file_content = await background_file.read()
+        
+        # Lưu tạm file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            tmp.write(file_content)
+            tmp_background_path = tmp.name
+        
+        try:
+            # Xóa ảnh cũ nếu có
+            if user.backgroundPublicId:
+                destroy(user.backgroundPublicId)
+            
+            # Upload lên Cloudinary
+            result = cloudinary_upload(tmp_background_path, folder="backgrounds")
+            user.backgroundUrl = result["secure_url"]
+            user.backgroundPublicId = result["public_id"]
+            
+            await user.save()
+            return user
+        finally:
+            # Clean up temp file
+            if os.path.exists(tmp_background_path):
+                os.unlink(tmp_background_path)
 
     @staticmethod
     async def delete_account(user_id: str):

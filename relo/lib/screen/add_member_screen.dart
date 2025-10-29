@@ -141,7 +141,6 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
         Navigator.of(context).pop(); // Close loading dialog
         Navigator.of(context).pop(); // Close add member screen
       }
-
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
@@ -272,49 +271,43 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     return InkWell(
       onTap: () => _toggleFriendSelection(friend.id),
       child: Container(
-        color: isSelected ? const Color(0xFFE8E0F5) : Colors.white,
+        color: isSelected ? Colors.grey[300] : Colors.white,
         child: ListTile(
-          leading: Stack(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty
-                    ? NetworkImage(friend.avatarUrl!)
-                    : null,
-                child: friend.avatarUrl == null || friend.avatarUrl!.isEmpty
-                    ? Text(
-                        friend.displayName.isNotEmpty
-                            ? friend.displayName[0].toUpperCase()
-                            : '#',
-                      )
-                    : null,
-              ),
-              if (isSelected)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7A2FC0),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ),
-            ],
+          leading: CircleAvatar(
+            backgroundImage:
+                friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty
+                ? NetworkImage(friend.avatarUrl!)
+                : null,
+            child: friend.avatarUrl == null || friend.avatarUrl!.isEmpty
+                ? Text(
+                    friend.displayName.isNotEmpty
+                        ? friend.displayName[0].toUpperCase()
+                        : '#',
+                  )
+                : null,
           ),
           title: Text(
             friend.displayName,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w500,
-              color: isSelected ? const Color(0xFF7A2FC0) : Colors.black87,
+              color: Colors.black87,
             ),
             overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? const Color(0xFF7A2FC0) : Colors.grey,
+                width: 2,
+              ),
+              color: isSelected ? const Color(0xFF7A2FC0) : Colors.transparent,
+            ),
+            child: isSelected
+                ? const Icon(Icons.check, color: Colors.white, size: 16)
+                : null,
           ),
         ),
       ),

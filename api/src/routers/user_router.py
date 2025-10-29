@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body, Form
 from typing import List
 from ..services import UserService
 from ..schemas import FriendRequestCreate, FriendRequestResponse, UserPublic, UserUpdate, UserSearchResult
@@ -59,17 +59,49 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 # Cập nhật hồ sơ của người dùng hiện tại
 @router.put("/me")
 async def update_user_me(
-    user_update: UserUpdate,
+    displayName: str = Form(None),
+    bio: str = Form(None),
+    avatar: UploadFile = File(None),
+    background: UploadFile = File(None),
     current_user: User = Depends(get_current_user)
 ):
     """
     Cập nhật hồ sơ của người dùng hiện tại.
+    Nhận form-data với các file upload cho avatar và background.
     """
     try:
-        updated_user = await UserService.update_user(
-            user_id=str(current_user.id),
-            user_update=user_update
-        )
+        # Tạo UserUpdate từ form data
+        user_update_data = {}
+        if displayName is not None:
+            user_update_data["displayName"] = displayName
+        if bio is not None:
+            user_update_data["bio"] = bio
+        
+        # Tạo UserUpdate object
+        user_update = UserUpdate(**user_update_data)
+        
+        # Upload files nếu có và cập nhật text fields cùng lúc
+        updated_user = current_user
+        
+        if avatar:
+            updated_user = await UserService.update_user_avatar(
+                user_id=str(current_user.id),
+                avatar_file=avatar
+            )
+        
+        if background:
+            updated_user = await UserService.update_user_background(
+                user_id=str(current_user.id),
+                background_file=background
+            )
+        
+        # Cập nhật text fields nếu có
+        if displayName is not None or bio is not None:
+            updated_user = await UserService.update_user(
+                user_id=str(updated_user.id),
+                user_update=user_update
+            )
+        
         return {
             "message": "Cập nhật thành công.",
             "user": {
@@ -82,6 +114,8 @@ async def update_user_me(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Gửi yêu cầu kết bạn
 @router.post("/friend-request", status_code=201)

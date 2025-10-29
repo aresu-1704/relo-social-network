@@ -184,6 +184,17 @@ class WebSocketService {
       _channel!.stream.listen(
         (data) {
           try {
+            // DEBUG: In thông tin để kiểm tra
+            print("🔵 [DEBUG] WebSocket message received (raw): $data");
+            try {
+              final decoded = jsonDecode(data);
+              print(
+                "🔵 [DEBUG] WebSocket message parsed: type=${decoded['type']}, payload keys=${decoded['payload']?.keys}",
+              );
+            } catch (e) {
+              print("🔵 [DEBUG] Failed to parse WebSocket message as JSON: $e");
+            }
+
             // Wrap in try-catch to prevent crashes from unhandled messages
             if (!_streamController.isClosed) {
               _streamController.add(data);

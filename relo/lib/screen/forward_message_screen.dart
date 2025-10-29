@@ -153,10 +153,11 @@ class _ForwardMessageScreenState extends State<ForwardMessageScreen> {
       title =
           conversation['name'] ??
           otherParticipants.map((p) => p['displayName']).join(", ");
-      avatar = NetworkImage(
-        conversation['avatarUrl'] ??
-            'https://img.freepik.com/premium-vector/group-chat-icon-3d-vector-illustration-design_48866-1609.jpg',
-      );
+      final groupAvatarUrl =
+          conversation['avatarUrl'] ?? 'assets/none_images/group.jpg';
+      avatar = groupAvatarUrl.startsWith('assets/')
+          ? AssetImage(groupAvatarUrl)
+          : NetworkImage(groupAvatarUrl);
     } else {
       final friend = otherParticipants.first;
       final isDeletedAccount =
@@ -169,8 +170,10 @@ class _ForwardMessageScreenState extends State<ForwardMessageScreen> {
         title = friend['displayName'];
         final avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
             ? friend['avatarUrl']
-            : 'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
-        avatar = NetworkImage(avatarUrl!);
+            : 'assets/none_images/avatar.jpg';
+        avatar = avatarUrl!.startsWith('assets/')
+            ? AssetImage(avatarUrl!)
+            : NetworkImage(avatarUrl!);
       }
     }
 

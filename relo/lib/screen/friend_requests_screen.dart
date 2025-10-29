@@ -111,8 +111,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                 return const SizedBox.shrink();
               }
 
-              final fallbackAvatarUrl =
-                  'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
+              final fallbackAvatarUrl = 'assets/none_images/avatar.jpg';
               final avatarUrl = fromUser['avatarUrl'] as String?;
 
               return Padding(
@@ -139,8 +138,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                             radius: 28,
                             backgroundImage:
                                 avatarUrl != null && avatarUrl.isNotEmpty
-                                ? NetworkImage(avatarUrl)
-                                : NetworkImage(fallbackAvatarUrl)
+                                ? (avatarUrl.startsWith('assets/')
+                                      ? AssetImage(avatarUrl)
+                                      : NetworkImage(avatarUrl))
+                                : AssetImage(fallbackAvatarUrl)
                                       as ImageProvider,
                             onBackgroundImageError: (_, __) {},
                           ),

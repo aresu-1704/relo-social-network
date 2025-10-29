@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../models/user.dart';
+import 'package:dio/dio.dart' show MultipartFile, FormData, Options;
 
 class UserService {
   final Dio _dio;
@@ -186,32 +187,54 @@ class UserService {
   Future<void> updateProfile({
     String? displayName,
     String? bio,
-    String? avatarBase64,
-    String? backgroundBase64,
+    String? avatarPath,
+    String? backgroundPath,
   }) async {
     try {
-      Map<String, dynamic> data = {};
-      if (displayName != null) data['displayName'] = displayName;
-      if (bio != null) data['bio'] = bio;
-      if (avatarBase64 != null) data['avatarBase64'] = avatarBase64;
-      if (backgroundBase64 != null) data['backgroundBase64'] = backgroundBase64;
+      final formData = FormData.fromMap({});
 
-      await _dio.put('users/me', data: data);
+      if (displayName != null) {
+        formData.fields.add(MapEntry('displayName', displayName));
+      }
+      if (bio != null) {
+        formData.fields.add(MapEntry('bio', bio));
+      }
+      if (avatarPath != null) {
+        final file = await MultipartFile.fromFile(avatarPath);
+        formData.files.add(MapEntry('avatar', file));
+      }
+      if (backgroundPath != null) {
+        final file = await MultipartFile.fromFile(backgroundPath);
+        formData.files.add(MapEntry('background', file));
+      }
+
+      await _dio.put(
+        'users/me',
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
     } catch (e) {
       throw Exception('Không thể cập nhật hồ sơ: $e');
     }
   }
 
   // Cập nhật avatar và trả về user data mới
-  Future<User> updateAvatar(String base64Image) async {
+  Future<User> updateAvatar(String imagePath) async {
     try {
+      final file = await MultipartFile.fromFile(imagePath);
+      final formData = FormData.fromMap({'avatar': file});
+
       final response = await _dio.put(
         'users/me',
-        data: {'avatarBase64': base64Image},
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
       );
-      return User.fromJson(response.data);
+
+      if (response.data != null && response.data['user'] != null) {
+        return User.fromJson(response.data['user']);
+      }
+      throw Exception('Phản hồi không hợp lệ từ server');
     } on DioException catch (e) {
-      print('Error updating avatar: ${e.response?.data}');
       throw Exception('Không thể cập nhật ảnh đại diện: ${e.message}');
     } catch (e) {
       throw Exception('Không thể cập nhật ảnh đại diện: $e');
@@ -219,15 +242,22 @@ class UserService {
   }
 
   // Cập nhật ảnh bìa và trả về user data mới
-  Future<User> updateBackground(String base64Image) async {
+  Future<User> updateBackground(String imagePath) async {
     try {
+      final file = await MultipartFile.fromFile(imagePath);
+      final formData = FormData.fromMap({'background': file});
+
       final response = await _dio.put(
         'users/me',
-        data: {'backgroundBase64': base64Image},
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
       );
-      return User.fromJson(response.data);
+
+      if (response.data != null && response.data['user'] != null) {
+        return User.fromJson(response.data['user']);
+      }
+      throw Exception('Phản hồi không hợp lệ từ server');
     } on DioException catch (e) {
-      print('Error updating background: ${e.response?.data}');
       throw Exception('Không thể cập nhật ảnh bìa: ${e.message}');
     } catch (e) {
       throw Exception('Không thể cập nhật ảnh bìa: $e');

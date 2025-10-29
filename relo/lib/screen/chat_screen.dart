@@ -399,53 +399,163 @@ class _ChatScreenState extends State<ChatScreen> {
     final TextEditingController nameController = TextEditingController(
       text: widget.chatName ?? '',
     );
+    bool isLoading = false;
 
     await showDialog(
       context: context,
-      builder: (dialogBuildContext) => AlertDialog(
-        title: const Text('Đổi tên nhóm'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(hintText: 'Nhập tên nhóm mới'),
-          maxLength: 50,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogBuildContext),
-            child: const Text('Hủy'),
+      builder: (dialogBuildContext) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          TextButton(
-            onPressed: () async {
-              final newName = nameController.text.trim();
-              if (newName.isEmpty) {
-                Navigator.pop(dialogBuildContext);
-                return;
-              }
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 340),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                const Text(
+                  'Đổi tên nhóm',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Text Field
+                TextField(
+                  controller: nameController,
+                  enabled: !isLoading,
+                  autofocus: true,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: 'Nhập tên nhóm mới',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF7A2FC0),
+                        width: 2,
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    counterText: '',
+                  ),
+                  maxLength: 50,
+                  maxLines: 1,
+                ),
+                const SizedBox(height: 24),
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: isLoading
+                          ? null
+                          : () => Navigator.pop(dialogBuildContext),
+                      child: Text(
+                        'Hủy',
+                        style: TextStyle(
+                          color: isLoading ? Colors.grey[400] : Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              final newName = nameController.text.trim();
+                              if (newName.isEmpty) {
+                                Navigator.pop(dialogBuildContext);
+                                return;
+                              }
 
-              Navigator.pop(dialogBuildContext);
-              try {
-                await _messageService.updateGroupName(
-                  _conversationId!,
-                  newName,
-                );
-                if (mounted) {
-                  await ShowNotification.showToast(
-                    dialogContext,
-                    'Đã đổi tên nhóm',
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  await ShowNotification.showToast(
-                    dialogContext,
-                    'Không thể đổi tên nhóm',
-                  );
-                }
-              }
-            },
-            child: const Text('Đổi tên'),
+                              setDialogState(() {
+                                isLoading = true;
+                              });
+
+                              try {
+                                await _messageService.updateGroupName(
+                                  _conversationId!,
+                                  newName,
+                                );
+                                if (context.mounted) {
+                                  Navigator.pop(dialogBuildContext);
+                                  if (mounted) {
+                                    await ShowNotification.showToast(
+                                      dialogContext,
+                                      'Đã đổi tên nhóm',
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                setDialogState(() {
+                                  isLoading = false;
+                                });
+                                if (mounted) {
+                                  await ShowNotification.showToast(
+                                    dialogContext,
+                                    'Không thể đổi tên nhóm',
+                                  );
+                                }
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7A2FC0),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Lưu',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

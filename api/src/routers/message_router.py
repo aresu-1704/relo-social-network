@@ -46,6 +46,81 @@ async def get_user_conversations(
 
     return convos
 
+@router.get("/conversations/{conversation_id}", response_model=ConversationWithParticipants)
+async def get_conversation_by_id(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Lấy thông tin một cuộc trò chuyện theo ID."""
+    try:
+        # Thử tìm conversation trong danh sách của user trước (có đầy đủ thông tin)
+        convos = await MessageService.get_conversations_for_user(
+            user_id=str(current_user.id),
+        )
+        
+        # Tìm conversation trong danh sách để có đầy đủ thông tin participants
+        # convos là list của ConversationWithParticipants objects, không phải dict
+        for convo in convos:
+            if convo.id == conversation_id:
+                return convo
+        
+        # Nếu không tìm thấy trong danh sách, thử lấy trực tiếp từ DB
+        conversation = await MessageService.get_conversation_by_id(conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Không tìm thấy cuộc trò chuyện.")
+        
+        # Kiểm tra quyền truy cập
+        participant_ids = [p.userId for p in conversation.participants]
+        if str(current_user.id) not in participant_ids:
+            raise HTTPException(status_code=403, detail="Bạn không có quyền truy cập cuộc trò chuyện này.")
+        
+        # Nếu conversation tồn tại nhưng không có trong danh sách (có thể bị xóa)
+        # Vẫn trả về để user có thể mở lại
+        # Nhưng cần tạo ConversationWithParticipants đầy đủ
+        # Lấy thông tin participants
+        from ..services.user_service import UserService
+        participants = await UserService.get_users_by_ids([p.userId for p in conversation.participants])
+        participants_map = {str(p.id): p for p in participants}
+        
+        participant_publics = []
+        for participant_info in conversation.participants:
+            participant_user = participants_map.get(participant_info.userId)
+            if participant_user and participant_user.status != 'deleted':
+                from ..schemas.user_schema import UserPublic
+                participant_publics.append(
+                    UserPublic(
+                        id=str(participant_user.id),
+                        username=participant_user.username,
+                        email=participant_user.email,
+                        displayName=participant_user.displayName,
+                        avatarUrl=participant_user.avatarUrl,
+                        backgroundUrl=participant_user.backgroundUrl,
+                        bio=participant_user.bio
+                    )
+                )
+        
+        # Tạo ConversationWithParticipants
+        from ..schemas.message_schema import ConversationWithParticipants
+        from ..models.conversation import ParticipantInfo
+        
+        return ConversationWithParticipants(
+            id=str(conversation.id),
+            participantsInfo=conversation.participants,
+            participants=participant_publics,
+            lastMessage=conversation.lastMessage.model_dump() if conversation.lastMessage else None,
+            updatedAt=conversation.updatedAt,
+            seenIds=conversation.seenIds,
+            isGroup=conversation.isGroup,
+            name=conversation.name,
+            avatarUrl=conversation.avatarUrl
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/conversations/{conversation_id}/messages")
 async def send_message(

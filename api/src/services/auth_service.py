@@ -19,7 +19,6 @@ class AuthService:
     @staticmethod
     def get_password_hash(password):
         """Băm một mật khẩu thuần túy."""
-        print(f"DEBUG Hashing password: '{password}', type: {type(password)}, len: {len(str(password))}")
         return pwd_context.hash(password)
 
     @staticmethod

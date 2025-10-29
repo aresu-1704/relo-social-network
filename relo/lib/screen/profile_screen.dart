@@ -383,11 +383,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       PaintingBinding.instance.imageCache.clearLiveImages();
 
       // Upload image
-      User? updatedUser;
       if (isAvatar) {
-        updatedUser = await _userService.updateAvatar(image.path);
+        await _userService.updateAvatar(image.path);
       } else {
-        updatedUser = await _userService.updateBackground(image.path);
+        await _userService.updateBackground(image.path);
         await Future.delayed(Duration(seconds: 1));
       }
 

@@ -70,6 +70,7 @@ flutter:
 
   assets:
     - assets/icons/
+    - assets/none_images/
 
 #Cấu hình Icon
 flutter_launcher_icons:

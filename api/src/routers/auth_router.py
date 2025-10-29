@@ -276,34 +276,15 @@ async def logout_user(
             if user.deviceTokens is None:
                 user.deviceTokens = []
             
-            # Log để debug
-            print(f"📱 Logout: User {user_id}, Device token: {device_token[:20]}...")
-            print(f"📱 Current deviceTokens count: {len(user.deviceTokens)}")
-            
             # Xóa device token nếu có trong list
             if device_token in user.deviceTokens:
-                original_count = len(user.deviceTokens)
                 user.deviceTokens.remove(device_token)
-                print(f"✅ Device token removed. Count: {original_count} -> {len(user.deviceTokens)}")
                 
                 # Save user với updatedAt
                 user.updatedAt = datetime.utcnow() + timedelta(hours=7)
                 
                 # Sử dụng replace() thay vì save() để đảm bảo update được ghi vào database
                 await user.replace()
-                
-                # Verify sau khi save
-                updated_user = await User.find_one(User.id == ObjectId(user_id))
-                if updated_user:
-                    print(f"✅ User saved successfully. Verified count: {len(updated_user.deviceTokens)}")
-                else:
-                    print(f"⚠️ Could not verify user after save")
-            else:
-                print(f"⚠️ Device token not found in list.")
-                print(f"   Searching for: {device_token[:20] if len(device_token) > 20 else device_token}...")
-                print(f"   Available tokens ({len(user.deviceTokens)}): {[token[:20] + '...' if len(token) > 20 else token for token in (user.deviceTokens or [])]}")
-        else:
-            print(f"⚠️ No device_token provided in logout request")
         
         return {"message": "Đăng xuất thành công"}
     except HTTPException:

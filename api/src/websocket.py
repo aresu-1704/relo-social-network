@@ -38,10 +38,12 @@ class ConnectionManager:
 
     async def broadcast_to_user(self, user_id: str, data: dict):
         """Gửi một tin nhắn JSON đến tất cả các kết nối đang hoạt động của một người dùng."""
+        
         if user_id in self.active_connections:
             json_ready_data = self._serialize_for_json(data)
             for connection in self.active_connections[user_id]:
                 await connection.send_json(json_ready_data)
+
     
     def is_user_online(self, user_id: str) -> bool:
         """Kiểm tra user có đang online (có WebSocket connection) không."""

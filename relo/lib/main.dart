@@ -18,7 +18,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("📩 Background message: ${message.notification?.title}");
 }
 
 void main() async {
@@ -134,10 +133,6 @@ void main() async {
 void _setupNotificationCallbacks(AppNotificationService notificationService) {
   // Callback khi tap vào notification
   notificationService.setOnNotificationTapped((String conversationId) async {
-    print(
-      "📱 Notification tapped, navigating to conversation: $conversationId",
-    );
-
     // Đợi một chút để đảm bảo app đã sẵn sàng
     await Future.delayed(const Duration(milliseconds: 300));
 
@@ -161,18 +156,108 @@ void _setupNotificationCallbacks(AppNotificationService notificationService) {
 }
 
 /// Helper function để navigate tới ChatScreen
-void _navigateToChatScreen(String conversationId, NavigatorState navigator) {
-  // Đơn giản: chỉ cần navigate tới ChatScreen
-  // ChatScreen sẽ tự load conversation và hiển thị
-  navigator.push(
-    MaterialPageRoute(
-      builder: (context) => ChatScreen(
-        conversationId: conversationId,
-        memberIds: const [], // Sẽ được load trong ChatScreen
-        isGroup: false, // Sẽ được xác định trong ChatScreen
+Future<void> _navigateToChatScreen(
+  String conversationId,
+  NavigatorState navigator,
+) async {
+  try {
+    // Fetch conversation details để có đầy đủ thông tin
+    final messageService = ServiceLocator.messageService;
+    final secureStorage = const SecureStorageService();
+    final currentUserId = await secureStorage.getUserId();
+
+    if (currentUserId == null) {
+      return;
+    }
+
+    // Fetch conversation details
+    final conversation = await messageService.fetchConversationById(
+      conversationId,
+    );
+
+    if (conversation == null) {
+      return;
+    }
+
+    // Extract thông tin như trong MessagesScreen
+    final participants = List<Map<String, dynamic>>.from(
+      conversation['participants'] ?? [],
+    );
+    final otherParticipants = participants
+        .where((p) => p['id'] != currentUserId)
+        .toList();
+
+    String? title;
+    String? avatarUrl;
+    final isGroup = conversation['isGroup'] ?? false;
+
+    if (isGroup) {
+      title =
+          conversation['name'] ??
+          otherParticipants.map((p) => p['displayName']).join(", ");
+      avatarUrl = conversation['avatarUrl'] ?? 'assets/none_images/group.jpg';
+    } else {
+      final friend = otherParticipants.isNotEmpty
+          ? otherParticipants.first
+          : null;
+      if (friend != null) {
+        final isDeletedAccount =
+            friend['username'] == 'deleted' || friend['id'] == 'deleted';
+
+        if (isDeletedAccount) {
+          title = 'Tài khoản không tồn tại';
+          avatarUrl = null;
+        } else {
+          title = friend['displayName'];
+          avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
+              ? friend['avatarUrl']
+              : 'assets/none_images/avatar.jpg';
+        }
+      }
+    }
+
+    final memberIds = participants
+        .map((p) => p['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    final memberCount = participants.length;
+
+    // Navigate với đầy đủ thông tin
+    navigator.push(
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: conversationId,
+          isGroup: isGroup,
+          chatName: title,
+          avatarUrl: avatarUrl,
+          memberIds: memberIds,
+          memberCount: memberCount,
+          onConversationSeen: (String conversationId) {
+            // Mark as seen
+            messageService.markAsSeen(conversationId, currentUserId);
+          },
+          onLeftGroup: () {
+            // Handler cho khi rời nhóm
+          },
+          onMuteToggled: () {
+            // Handler cho khi toggle mute
+          },
+        ),
       ),
-    ),
-  );
+    );
+
+    // Mark as seen
+    await messageService.markAsSeen(conversationId, currentUserId);
+  } catch (e) {
+    // Fallback: navigate với thông tin tối thiểu
+    navigator.push(
+      MaterialPageRoute(
+        builder: (context) =>
+            ChatScreen(conversationId: conversationId, isGroup: false),
+      ),
+    );
+  }
 }
 
 /// Setup notification callbacks để xử lý tap và reply (continued)
@@ -190,21 +275,17 @@ void _setupNotificationCallbacksContinued(
       final senderId = await storage.getUserId();
 
       if (senderId == null) {
-        print("❌ Cannot send reply: User not logged in");
         return;
       }
 
       // Gửi tin nhắn reply qua API
       final messageService = ServiceLocator.messageService;
-
       await messageService.sendMessage(conversationId, {
         'type': 'text',
         'text': messageText,
       }, senderId);
-
-      print("✅ Reply sent: $messageText to conversation: $conversationId");
     } catch (e) {
-      print("❌ Error sending reply: $e");
+      // Silent fail
     }
   });
 }
@@ -236,8 +317,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     // Khi app trở lại foreground
     if (state == AppLifecycleState.resumed) {
-      print('📱 App resumed - checking WebSocket connection...');
-
       // Delay một chút để đảm bảo app đã sẵn sàng
       Future.delayed(const Duration(milliseconds: 1000), () async {
         // Kiểm tra nếu user đã đăng nhập
@@ -252,16 +331,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               // Chỉ gọi connect một lần, không reconnect liên tục
               await webSocketService.connect();
             } catch (e) {
-              print('❌ Error reconnecting WebSocket: $e');
               // Không làm gì, để tránh vòng lặp reconnect
             }
-          } else {
-            print('✅ WebSocket still connected');
-          }
+          } else {}
         }
       });
     } else if (state == AppLifecycleState.paused) {
-      print('📱 App paused - WebSocket will remain connected');
       // Không disconnect WebSocket khi app vào background
       // Để server tự disconnect sau một thời gian, sau đó reconnect khi app quay lại
     }

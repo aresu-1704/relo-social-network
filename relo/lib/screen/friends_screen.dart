@@ -98,7 +98,9 @@ class _FriendsScreenState extends State<FriendsScreen>
     List<Future> tasks = [];
     for (var friend in friends) {
       if (friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty) {
-        final image = NetworkImage(friend.avatarUrl!);
+        final ImageProvider image = friend.avatarUrl!.startsWith('assets/')
+            ? AssetImage(friend.avatarUrl!)
+            : NetworkImage(friend.avatarUrl!);
         tasks.add(precacheImage(image, context));
       }
     }
@@ -468,7 +470,9 @@ class _FriendsScreenState extends State<FriendsScreen>
               radius: 22,
               backgroundImage:
                   friend.avatarUrl != null && friend.avatarUrl!.isNotEmpty
-                  ? NetworkImage(friend.avatarUrl!)
+                  ? (friend.avatarUrl!.startsWith('assets/')
+                        ? AssetImage(friend.avatarUrl!)
+                        : NetworkImage(friend.avatarUrl!))
                   : null,
               child: friend.avatarUrl == null || friend.avatarUrl!.isEmpty
                   ? Text(
@@ -485,14 +489,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                 style: const TextStyle(fontSize: 16),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.call_outlined, color: Colors.grey),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.videocam_outlined, color: Colors.grey),
-              onPressed: () {},
-            ),
           ],
         ),
       ),
@@ -505,14 +501,13 @@ class _FriendsScreenState extends State<FriendsScreen>
       if (group['avatarUrl'] != null &&
           group['avatarUrl'].toString().isNotEmpty) {
         try {
-          final image = NetworkImage(group['avatarUrl'].toString());
-          tasks.add(
-            precacheImage(image, context).catchError((e) {
-              print('Error preloading group image: $e');
-            }),
-          );
+          final url = group['avatarUrl'].toString();
+          final ImageProvider image = url.startsWith('assets/')
+              ? AssetImage(url)
+              : NetworkImage(url);
+          tasks.add(precacheImage(image, context).catchError((e) {}));
         } catch (e) {
-          print('Error creating NetworkImage: $e');
+          // Silent fail
         }
       }
     }
@@ -603,10 +598,14 @@ class _FriendsScreenState extends State<FriendsScreen>
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundImage: NetworkImage(
-                group['avatarUrl'] ??
-                    'https://img.freepik.com/premium-vector/group-chat-icon-3d-vector-illustration-design_48866-1609.jpg',
-              ),
+              backgroundImage: (() {
+                final url =
+                    group['avatarUrl'] ?? 'assets/none_images/group.jpg';
+                return (url.startsWith('assets/')
+                        ? AssetImage(url)
+                        : NetworkImage(url))
+                    as ImageProvider;
+              })(),
               onBackgroundImageError: (_, __) {},
               backgroundColor: Colors.grey[300],
             ),

@@ -493,10 +493,8 @@ class _ConversationSettingsScreenState
 
   Widget _buildAvatarHeader() {
     // Fallback avatar URLs
-    final String fallbackUserAvatar =
-        'https://images.squarespace-cdn.com/content/v1/54b7b93ce4b0a3e130d5d232/1519987020970-8IQ7F6Z61LLBCX85A65S/icon.png?format=1000w';
-    final String fallbackGroupAvatar =
-        'https://img.freepik.com/premium-vector/group-chat-icon-3d-vector-illustration-design_48866-1609.jpg';
+    final String fallbackUserAvatar = 'assets/none_images/avatar.jpg';
+    final String fallbackGroupAvatar = 'assets/none_images/group.jpg';
 
     final String displayAvatarUrl = widget.avatarUrl?.isNotEmpty == true
         ? widget.avatarUrl!
@@ -512,7 +510,9 @@ class _ConversationSettingsScreenState
             backgroundColor: Colors.white,
             child: CircleAvatar(
               radius: 42,
-              backgroundImage: NetworkImage(displayAvatarUrl),
+              backgroundImage: displayAvatarUrl.startsWith('assets/')
+                  ? AssetImage(displayAvatarUrl)
+                  : NetworkImage(displayAvatarUrl),
             ),
           ),
           const SizedBox(height: 12),

@@ -1,11 +1,16 @@
 import os
 import json
+import base64
 import httpx
 from typing import List, Optional, Dict
 from pathlib import Path
 from google.oauth2 import service_account
 import google.auth.transport.requests
+from dotenv import load_dotenv
 from ..models import User
+
+# Load environment variables
+load_dotenv()
 
 
 class FCMService:
@@ -17,9 +22,62 @@ class FCMService:
     
     @staticmethod
     def _load_service_account() -> Optional[service_account.Credentials]:
-        """Load Firebase service account credentials từ file JSON"""
+        """Load Firebase service account credentials từ environment variables hoặc file JSON
+        
+        Thứ tự ưu tiên:
+        1. FIREBASE_CREDENTIALS_BASE64 (base64-encoded JSON) - cho Vercel deployment
+        2. FIREBASE_* individual env vars - cho local development với .env
+        3. GOOGLE_APPLICATION_CREDENTIALS hoặc relo-api.json - fallback
+        """
         try:
-            # Tìm file service account JSON
+            # Ưu tiên 1: Đọc từ base64-encoded JSON (cho Vercel)
+            firebase_creds_base64 = os.getenv("FIREBASE_CREDENTIALS_BASE64")
+            if firebase_creds_base64:
+                try:
+                    # Decode base64
+                    decoded_bytes = base64.b64decode(firebase_creds_base64)
+                    service_account_info = json.loads(decoded_bytes.decode('utf-8'))
+                    
+                    credentials = service_account.Credentials.from_service_account_info(
+                        service_account_info,
+                        scopes=FCMService.FCM_SCOPES
+                    )
+                    return credentials
+                except Exception as e:
+                    print(f"⚠️ Error decoding FIREBASE_CREDENTIALS_BASE64: {e}")
+                    # Continue to next option
+            
+            # Ưu tiên 2: Đọc từ các biến môi trường riêng lẻ (cho local .env)
+            project_id = os.getenv("FIREBASE_PROJECT_ID")
+            private_key = os.getenv("FIREBASE_PRIVATE_KEY")
+            client_email = os.getenv("FIREBASE_CLIENT_EMAIL")
+            
+            if project_id and private_key and client_email:
+                # Tạo service account info từ env vars
+                # Xử lý private_key: loại bỏ dấu ngoặc kép nếu có và thay \n thành newline thực sự
+                clean_private_key = private_key.strip('"').replace('\\n', '\n')
+                
+                service_account_info = {
+                    "type": os.getenv("FIREBASE_TYPE", "service_account"),
+                    "project_id": project_id,
+                    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID", ""),
+                    "private_key": clean_private_key,
+                    "client_email": client_email,
+                    "client_id": os.getenv("FIREBASE_CLIENT_ID", ""),
+                    "auth_uri": os.getenv("FIREBASE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+                    "token_uri": os.getenv("FIREBASE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+                    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
+                    "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL", ""),
+                    "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN", "googleapis.com")
+                }
+                
+                credentials = service_account.Credentials.from_service_account_info(
+                    service_account_info,
+                    scopes=FCMService.FCM_SCOPES
+                )
+                return credentials
+            
+            # Fallback: Tìm file service account JSON
             service_account_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
             
             if not service_account_path:
@@ -37,7 +95,7 @@ class FCMService:
                 )
                 return credentials
             else:
-                print("⚠️ Firebase service account file not found")
+                print("⚠️ Firebase service account credentials not found in .env or JSON file")
                 return None
         except Exception as e:
             print(f"⚠️ Error loading Firebase service account: {e}")
@@ -140,7 +198,7 @@ class FCMService:
                         "conversation_id": conversation_id or "",
                         "sender_id": sender_id or "",
                         "sender_name": sender_name or "",
-                        "sender_avatar": sender_avatar or "",
+                        "sender_avatar": str(sender_avatar) if sender_avatar else "",  # Đảm bảo convert thành string
                         "content_type": message_type or "text",
                         "has_reply": "true" if conversation_id else "false",
                         "conversation_name": conversation_name or "",
@@ -181,13 +239,8 @@ class FCMService:
                         successful_tokens.append(token)
                     else:
                         failed_tokens.append(token)
-                        print(f"⚠️ FCM API error: {response.status_code} - {response.text}")
             except Exception as e:
                 failed_tokens.append(token)
-                print(f"⚠️ Error sending notification to {token}: {e}")
-        
-        if failed_tokens:
-            print(f"⚠️ Failed to send notifications to {len(failed_tokens)} devices")
         
         return successful_tokens
     
@@ -210,6 +263,7 @@ class FCMService:
         Returns:
             Số lượng notifications đã gửi thành công
         """
+        
         if not offline_user_ids:
             return 0
         
