@@ -12,10 +12,7 @@
   - **lib/**: code main, widget, services
   - **assets/**: hình ảnh/logo
   - **pubspec.yaml**: cấu hình package, splash, icon
-- `api/` ‒ FastAPI Python Backend:
-  - **src/**: routers, models, schemas, services
-  - **.env**: key bảo mật (Firebase, DB...)
-  - **requirements.txt**: dependencies Python
+    
 
 ## 🚀 Chạy nhanh dev
 
