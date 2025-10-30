@@ -18,7 +18,7 @@
 
 ### Chuẩn bị backend
 
-> Tham khảo chi tiết và hướng dẫn mới nhất ở: [https://github.com/aresu-1704/Relo-Social-Network-API](https://github.com/aresu-1704/Relo-Social-Network-API)
+> Tham khảo chi tiết và hướng dẫn mới nhất ở: [https://github.com/aresu-1704/relo-social-network-api]([https://github.com/aresu-1704/Relo-Social-Network-API](https://github.com/aresu-1704/relo-social-network-api))
 
 
 ### Chuẩn bị app Flutter (`relo/`)
