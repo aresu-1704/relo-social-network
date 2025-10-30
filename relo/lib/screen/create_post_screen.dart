@@ -110,10 +110,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       if (mounted) {
         Navigator.pop(context, true); // Return true to indicate success
-        await ShowNotification.showToast(
-          context,
-          'Đã đăng bài viết thành công!',
-        );
       }
     } catch (e) {
       if (mounted) {

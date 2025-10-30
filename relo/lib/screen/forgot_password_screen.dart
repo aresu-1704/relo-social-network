@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/services/auth_service.dart';
+import 'package:relo/services/service_locator.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:relo/screen/verify_otp_screen.dart';
 
@@ -13,7 +14,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService();
+  final AuthService _authService = ServiceLocator.authService;
   final TextEditingController _usernameController = TextEditingController();
   bool _isLoading = false;
 

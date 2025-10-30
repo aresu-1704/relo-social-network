@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:relo/models/notification.dart' as models;
-import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/service_locator.dart';
 
 class NotificationProvider extends ChangeNotifier {
@@ -35,7 +34,9 @@ class NotificationProvider extends ChangeNotifier {
 
   void _listenToWebSocket() {
     _webSocketSubscription?.cancel(); // Cancel old subscription if exists
-    _webSocketSubscription = webSocketService.stream.listen((message) {
+    _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
+      message,
+    ) {
       try {
         // DEBUG: In thông tin để kiểm tra
         print(

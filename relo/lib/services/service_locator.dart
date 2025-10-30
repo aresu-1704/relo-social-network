@@ -9,6 +9,8 @@ import 'package:relo/services/message_service.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/post_service.dart';
 import 'package:relo/services/notification_service.dart';
+import 'package:relo/services/comment_service.dart';
+import 'package:relo/services/websocket_service.dart';
 
 class ServiceLocator {
   // Global navigator key to allow navigation from outside the widget tree
@@ -22,8 +24,10 @@ class ServiceLocator {
   static late final MessageService messageService;
   static late final PostService postService;
   static late final NotificationService notificationService;
+  static late final CommentService commentService;
   static late final ConnectivityService connectivityService;
   static late final AppConnectivityService appConnectivityService;
+  static late final WebSocketService websocketService;
 
   /// Initializes all the services.
   static void init() {
@@ -100,6 +104,9 @@ class ServiceLocator {
     messageService = MessageService(dio);
     postService = PostService(dio);
     notificationService = NotificationService(dio);
+    commentService = CommentService(dio);
+    // Use global singleton instance for WebSocket to keep single connection
+    websocketService = webSocketService;
 
     // Initialize the connectivity service
     connectivityService = ConnectivityService();

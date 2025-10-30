@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
 
@@ -58,7 +57,9 @@ class MessageProvider extends ChangeNotifier {
 
   void _listenToWebSocket() {
     _webSocketSubscription?.cancel();
-    _webSocketSubscription = webSocketService.stream.listen((message) {
+    _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
+      message,
+    ) {
       try {
         final data = jsonDecode(message);
 

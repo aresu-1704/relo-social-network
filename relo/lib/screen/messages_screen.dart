@@ -5,7 +5,6 @@ import 'package:relo/screen/chat_screen.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
-import 'package:relo/services/websocket_service.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/utils/format.dart';
 import 'package:shimmer/shimmer.dart';
@@ -59,7 +58,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
     // Cancel subscription cũ nếu có
     _webSocketSubscription?.cancel();
 
-    _webSocketSubscription = webSocketService.stream.listen((message) {
+    _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
+      message,
+    ) {
       final data = jsonDecode(message);
 
       if (data['type'] == 'new_message') {

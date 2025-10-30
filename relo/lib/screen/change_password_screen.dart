@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:relo/services/auth_service.dart';
+import 'package:relo/services/service_locator.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   final String email; // Email từ OTP verification
@@ -13,7 +14,7 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService();
+  final AuthService _authService = ServiceLocator.authService;
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();

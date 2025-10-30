@@ -141,7 +141,7 @@ class MainScreenState extends State<MainScreen> {
                     left: 0,
                     right: 0,
                     child: Container(
-                      color: Colors.red.shade600,
+                      color: Colors.red.shade600.withOpacity(0.2),
                       padding: const EdgeInsets.symmetric(
                         vertical: 8,
                         horizontal: 16,

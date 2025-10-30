@@ -12,8 +12,7 @@ class MessageService {
     try {
       final response = await _dio.get('messages/conversations');
       return response.data;
-    } on DioException catch (e) {
-      print('Failed to fetch conversations: $e');
+    } on DioException {
       return [];
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
@@ -169,7 +168,6 @@ class MessageService {
     } catch (e) {
       final failedMessage = tempMessage.copyWith(status: 'failed');
       await MessageDatabase.instance.update(failedMessage);
-      print("Send message error: $e");
       return failedMessage;
     }
   }
@@ -193,7 +191,6 @@ class MessageService {
     } else {
       // Nếu tin nhắn đã được gửi, hãy gọi API để thu hồi
       try {
-        print(message.id);
         await _dio.post('messages/messages/${message.id}/recall');
       } on DioException catch (e) {
         throw Exception('Failed to recall message: $e');

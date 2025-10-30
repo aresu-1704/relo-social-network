@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/services/auth_service.dart';
+import 'package:relo/services/service_locator.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:relo/screen/reset_password_screen.dart';
 import 'package:relo/screen/change_password_screen.dart';
@@ -31,7 +32,7 @@ class VerifyOTPScreen extends StatefulWidget {
 }
 
 class _VerifyOTPScreenState extends State<VerifyOTPScreen> {
-  final AuthService _authService = AuthService();
+  final AuthService _authService = ServiceLocator.authService;
   final List<TextEditingController> _controllers = List.generate(
     6,
     (_) => TextEditingController(),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:relo/widgets/text_form_field.dart';
 import '../services/auth_service.dart'; // Import service
+import 'package:relo/services/service_locator.dart';
+import 'package:relo/utils/show_notification.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -11,7 +13,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   // Service để gọi API
-  final AuthService _authService = AuthService();
+  final AuthService _authService = ServiceLocator.authService;
 
   // Key để quản lý Form state
   final _formKey = GlobalKey<FormState>();
@@ -79,28 +81,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Đăng ký thành công! Chuẩn bị quay lại trang đăng nhập.",
-          ),
-          backgroundColor: Color(0xFF7A2FC0),
-        ),
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: 'Đăng ký thành công! Quay lại trang đăng nhập.',
+        buttonText: 'OK',
+        buttonColor: const Color(0xFF7A2FC0),
       );
-
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.pop(context);
-        }
-      });
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst("Exception: ", "")),
-          backgroundColor: Colors.redAccent,
-        ),
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: e.toString().replaceFirst("Exception: ", ""),
+        buttonText: 'Đóng',
+        buttonColor: Colors.red,
       );
       // Only set loading to false on error, so the user can try again.
       setState(() => _isLoading = false);

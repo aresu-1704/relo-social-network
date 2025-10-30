@@ -7,7 +7,6 @@ import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/user_service.dart';
 import 'package:uuid/uuid.dart';
-import 'package:relo/services/websocket_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:relo/widgets/messages/message_list.dart';
 import 'package:relo/widgets/messages/message_composer.dart';
@@ -114,7 +113,9 @@ class _ChatScreenState extends State<ChatScreen> {
     // Cancel subscription cũ nếu có
     _webSocketSubscription?.cancel();
 
-    _webSocketSubscription = webSocketService.stream.listen((message) async {
+    _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
+      message,
+    ) async {
       try {
         final data = jsonDecode(message);
 
@@ -800,9 +801,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   icon: LucideIcons.trash2,
                   label: 'Thu hồi',
                   color: const Color(0xFFFF5252),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
-                    _recallMessage(message);
+                    final confirm = await ShowNotification.showConfirmDialog(
+                      context,
+                      title: 'Bạn có chắc muốn thu hồi tin nhắn này?',
+                      cancelText: 'Hủy',
+                      confirmText: 'Thu hồi',
+                      confirmColor: const Color(0xFFFF5252),
+                    );
+                    if (confirm == true) {
+                      await _recallMessage(message);
+                    }
                   },
                 ),
             ],

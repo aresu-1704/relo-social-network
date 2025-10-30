@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:relo/services/auth_service.dart';
+import 'package:relo/services/service_locator.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:relo/screen/login_screen.dart';
 
@@ -15,7 +16,7 @@ class ResetPasswordScreen extends StatefulWidget {
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService();
+  final AuthService _authService = ServiceLocator.authService;
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();

@@ -5,7 +5,6 @@ import 'package:relo/screen/main_screen.dart' show MainScreen;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/services/service_locator.dart';
-import 'package:relo/services/websocket_service.dart';
 import 'package:relo/screen/login_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
@@ -38,7 +37,7 @@ void main() async {
   _setupNotificationCallbacks(notificationService);
 
   // Set up WebSocket auth error handler
-  webSocketService.setAuthErrorHandler(() async {
+  ServiceLocator.websocketService.setAuthErrorHandler(() async {
     final context = ServiceLocator.navigatorKey.currentContext;
 
     if (context == null) return;
@@ -118,7 +117,7 @@ void main() async {
     if (user != null) {
       // Session is valid, connect the WebSocket.
       // The service will handle getting the token internally.
-      webSocketService.connect();
+      ServiceLocator.websocketService.connect();
     } else {
       // Could not validate session (e.g., offline), treat as logged out for now.
       // The connectivity service will show an offline banner.
@@ -179,7 +178,7 @@ Future<void> _navigateToChatScreen(
       return;
     }
 
-    // Extract thông tin như trong MessagesScreen
+    // Extract thông tin như
     final participants = List<Map<String, dynamic>>.from(
       conversation['participants'] ?? [],
     );
@@ -192,10 +191,16 @@ Future<void> _navigateToChatScreen(
     final isGroup = conversation['isGroup'] ?? false;
 
     if (isGroup) {
+      final nameList = otherParticipants
+          .map((p) => p['displayName'] as String? ?? '')
+          .where((name) => name.isNotEmpty)
+          .join(", ");
       title =
-          conversation['name'] ??
-          otherParticipants.map((p) => p['displayName']).join(", ");
-      avatarUrl = conversation['avatarUrl'] ?? 'assets/none_images/group.jpg';
+          conversation['name'] as String? ??
+          (nameList.isNotEmpty ? nameList : 'Nhóm chat');
+      avatarUrl =
+          conversation['avatarUrl'] as String? ??
+          'assets/none_images/group.jpg';
     } else {
       final friend = otherParticipants.isNotEmpty
           ? otherParticipants.first
@@ -208,16 +213,19 @@ Future<void> _navigateToChatScreen(
           title = 'Tài khoản không tồn tại';
           avatarUrl = null;
         } else {
-          title = friend['displayName'];
-          avatarUrl = (friend['avatarUrl'] ?? '').isNotEmpty
-              ? friend['avatarUrl']
+          title = friend['displayName'] as String? ?? 'Người dùng';
+          avatarUrl = ((friend['avatarUrl'] as String?) ?? '').isNotEmpty
+              ? friend['avatarUrl'] as String?
               : 'assets/none_images/avatar.jpg';
         }
+      } else {
+        title = 'Người dùng';
+        avatarUrl = 'assets/none_images/avatar.jpg';
       }
     }
 
     final memberIds = participants
-        .map((p) => p['id']?.toString() ?? '')
+        .map((p) => (p['id']?.toString() ?? ''))
         .where((id) => id.isNotEmpty)
         .toList();
 
@@ -325,11 +333,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         if (refreshToken != null) {
           // Chỉ reconnect nếu thực sự disconnected
           // Tránh reconnect liên tục
-          if (!webSocketService.isConnected) {
-            print('🔄 WebSocket disconnected - attempting reconnect once...');
+          if (!ServiceLocator.websocketService.isConnected) {
             try {
               // Chỉ gọi connect một lần, không reconnect liên tục
-              await webSocketService.connect();
+              await ServiceLocator.websocketService.connect();
             } catch (e) {
               // Không làm gì, để tránh vòng lặp reconnect
             }

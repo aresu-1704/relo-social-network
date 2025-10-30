@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:relo/models/post.dart';
 import 'package:relo/screen/edit_post_screen.dart';
@@ -6,10 +7,12 @@ import 'package:relo/screen/media_fullscreen_viewer.dart';
 import 'package:relo/services/post_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/secure_storage_service.dart';
+import 'package:relo/services/comment_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:relo/widgets/posts/auto_play_video_widget.dart';
 import 'package:relo/utils/show_notification.dart';
+import 'package:relo/widgets/posts/comments_bottom_sheet.dart';
 
 class EnhancedPostCard extends StatefulWidget {
   final Post post;
@@ -23,15 +26,32 @@ class EnhancedPostCard extends StatefulWidget {
 
 class _EnhancedPostCardState extends State<EnhancedPostCard> {
   final PostService _postService = ServiceLocator.postService;
+  final CommentService _commentService = ServiceLocator.commentService;
   final SecureStorageService _secureStorage = const SecureStorageService();
   late Post _currentPost;
   String? _currentUserId;
+  int _commentCount = 0;
+  final Map<String, Size> _imageSizeCache = {};
 
   @override
   void initState() {
     super.initState();
     _currentPost = widget.post;
     _loadCurrentUserId();
+    _loadCommentCount();
+  }
+
+  Future<void> _loadCommentCount() async {
+    try {
+      final count = await _commentService.getCommentCount(_currentPost.id);
+      if (mounted) {
+        setState(() {
+          _commentCount = count;
+        });
+      }
+    } catch (e) {
+      // Silent fail
+    }
   }
 
   @override
@@ -197,49 +217,108 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
 
     Widget mediaWidget;
     if (isVideo) {
-      // Use auto-play video widget for news feed
-      mediaWidget = AutoPlayVideoWidget(
-        videoUrl: url,
-        height: 300,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MediaFullScreenViewer(
-                mediaUrls: _currentPost.mediaUrls,
-                initialIndex: index ?? 0,
+      // Video: dùng tỉ lệ mặc định 16:9 theo chiều rộng màn hình
+      final screenWidth = MediaQuery.of(context).size.width;
+      final videoHeight = screenWidth * 9 / 16;
+      mediaWidget = SizedBox(
+        height: videoHeight,
+        width: double.infinity,
+        child: AutoPlayVideoWidget(
+          videoUrl: url,
+          height: videoHeight,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MediaFullScreenViewer(
+                  mediaUrls: _currentPost.mediaUrls,
+                  initialIndex: index ?? 0,
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       );
     } else {
-      mediaWidget = GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MediaFullScreenViewer(
-                mediaUrls: _currentPost.mediaUrls,
-                initialIndex: index ?? 0,
-              ),
-            ),
+      mediaWidget = LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          return FutureBuilder<Size>(
+            future: _getImageSize(url),
+            builder: (context, snapshot) {
+              final hasSize = snapshot.hasData && snapshot.data!.width > 0;
+              final aspectRatio = hasSize
+                  ? snapshot.data!.width / snapshot.data!.height
+                  : 16 / 9; // fallback
+              final height = hasSize
+                  ? screenWidth / aspectRatio
+                  : screenWidth * 9 / 16;
+
+              return SizedBox(
+                width: double.infinity,
+                height: height,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MediaFullScreenViewer(
+                          mediaUrls: _currentPost.mediaUrls,
+                          initialIndex: index ?? 0,
+                        ),
+                      ),
+                    );
+                  },
+                  child: CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.contain,
+                    width: double.infinity,
+                    placeholder: (context, url) =>
+                        const Center(child: CircularProgressIndicator()),
+                    errorWidget: (context, url, error) => const Center(
+                      child: Icon(
+                        LucideIcons.imageOff,
+                        color: Colors.grey,
+                        size: 50,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           );
         },
-        child: CachedNetworkImage(
-          imageUrl: url,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          placeholder: (context, url) =>
-              const Center(child: CircularProgressIndicator()),
-          errorWidget: (context, url, error) => const Center(
-            child: Icon(LucideIcons.imageOff, color: Colors.grey, size: 50),
-          ),
-        ),
       );
     }
 
     return mediaWidget;
+  }
+
+  Future<Size> _getImageSize(String url) async {
+    if (_imageSizeCache.containsKey(url)) {
+      return _imageSizeCache[url]!;
+    }
+
+    final completer = Completer<Size>();
+    final Image image = Image.network(url);
+    image.image
+        .resolve(const ImageConfiguration())
+        .addListener(
+          ImageStreamListener(
+            (ImageInfo info, bool _) {
+              final mySize = Size(
+                info.image.width.toDouble(),
+                info.image.height.toDouble(),
+              );
+              _imageSizeCache[url] = mySize;
+              completer.complete(mySize);
+            },
+            onError: (error, stackTrace) {
+              completer.complete(const Size(16, 9));
+            },
+          ),
+        );
+    return completer.future;
   }
 
   void _showReactionPicker() {
@@ -402,50 +481,51 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
 
             // ==== Media (ảnh/video) ====
             if (_currentPost.mediaUrls.isNotEmpty)
-              SizedBox(
-                height: 300,
-                child: _currentPost.mediaUrls.length == 1
-                    ? _buildMediaItem(_currentPost.mediaUrls[0], index: 0)
-                    : PageView.builder(
-                        itemCount: _currentPost.mediaUrls.length,
-                        itemBuilder: (context, index) {
-                          return _buildMediaItem(
-                            _currentPost.mediaUrls[index],
-                            index: index,
-                          );
-                        },
-                      ),
-              ),
+              (_currentPost.mediaUrls.length == 1)
+                  ? _buildMediaItem(_currentPost.mediaUrls[0], index: 0)
+                  : PageView.builder(
+                      itemCount: _currentPost.mediaUrls.length,
+                      itemBuilder: (context, index) {
+                        return _buildMediaItem(
+                          _currentPost.mediaUrls[index],
+                          index: index,
+                        );
+                      },
+                    ),
 
             const SizedBox(height: 8),
 
             const Divider(height: 1),
 
-            // ==== Reaction button with count on same line ====
+            // ==== Reaction and Comment buttons ====
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 12.0,
                 vertical: 8,
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  _buildReactionButton(),
-                  // Reactions count right next to button with separator
-                  if (_currentPost.reactionCounts.isNotEmpty) ...[
-                    Container(
-                      height: 20,
-                      width: 1,
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      color: Colors.grey[400],
-                    ),
-                    _buildReactionIcons(),
-                    const SizedBox(width: 4),
-                    Text(
-                      _getTotalReactions().toString(),
-                      style: TextStyle(color: Colors.grey[700], fontSize: 14),
-                    ),
-                  ],
-                  const Spacer(),
+                  // Zalo-like: reaction count + react button on same row
+                  Row(
+                    children: [
+                      if (_currentPost.reactionCounts.isNotEmpty) ...[
+                        _buildReactionIcons(),
+                        const SizedBox(width: 4),
+                        Text(
+                          _getTotalReactions().toString(),
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      _buildReactionButton(),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Comment button row
+                  Row(children: [_buildCommentButton()]),
                 ],
               ),
             ),
@@ -556,5 +636,38 @@ class _EnhancedPostCardState extends State<EnhancedPostCard> {
     } catch (e) {
       return null;
     }
+  }
+
+  Widget _buildCommentButton() {
+    return TextButton.icon(
+      onPressed: _showCommentsDialog,
+      icon: const Icon(LucideIcons.messageCircle, size: 20),
+      label: Text(
+        _commentCount > 0 ? _commentCount.toString() : 'Bình luận',
+        style: const TextStyle(fontWeight: FontWeight.normal),
+      ),
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.grey[700],
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+    );
+  }
+
+  void _showCommentsDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CommentsBottomSheet(
+        postId: _currentPost.id,
+        postAuthorId: _currentPost.authorId,
+        currentUserId: _currentUserId ?? '',
+        onCommentAdded: () {
+          _loadCommentCount();
+          widget.onPostDeleted?.call();
+        },
+      ),
+    );
   }
 }

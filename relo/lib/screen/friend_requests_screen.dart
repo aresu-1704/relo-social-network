@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/services/user_service.dart';
-import 'package:relo/services/websocket_service.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:relo/screen/profile_screen.dart';
 import 'dart:async';
@@ -34,7 +33,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
   }
 
   void _listenToWebSocket() {
-    _webSocketSubscription = webSocketService.stream.listen((message) {
+    _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
+      message,
+    ) {
       try {
         final data = jsonDecode(message);
         if (data['type'] == 'friend_request_received') {

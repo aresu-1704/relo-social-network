@@ -49,7 +49,13 @@ class WebSocketService {
       // Hủy subscription cũ nếu có
       await _connectivitySubscription?.cancel();
 
-      await _connect();
+      // Nếu đang offline thì không connect ngay để tránh crash
+      final connectivity = await Connectivity().checkConnectivity();
+      if (connectivity == ConnectivityResult.none) {
+        // Chờ sự kiện mạng quay lại qua subscription bên dưới
+      } else {
+        await _connect();
+      }
     } finally {
       _isConnecting = false;
     }
@@ -65,7 +71,7 @@ class WebSocketService {
         _reconnectAttempts = 0;
         // Delay một chút để đảm bảo mạng ổn định
         _reconnectTimer?.cancel();
-        _reconnectTimer = Timer(Duration(seconds: 2), () {
+        _reconnectTimer = Timer(const Duration(seconds: 2), () {
           _reconnect();
         });
       }
@@ -74,6 +80,12 @@ class WebSocketService {
 
   Future<void> _handleDisconnect({int? closeCode}) async {
     if (_isManualDisconnect) return;
+
+    // Nếu đang offline, đợi connectivity listener xử lý, không cố gắng reconnect ngay
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) {
+      return;
+    }
 
     // Chỉ logout khi gặp lỗi 401 (Unauthorized) hoặc 403 (Forbidden)
     // WebSocket close code 1008 = Policy Violation (thường dùng cho auth errors)
@@ -184,17 +196,6 @@ class WebSocketService {
       _channel!.stream.listen(
         (data) {
           try {
-            // DEBUG: In thông tin để kiểm tra
-            print("🔵 [DEBUG] WebSocket message received (raw): $data");
-            try {
-              final decoded = jsonDecode(data);
-              print(
-                "🔵 [DEBUG] WebSocket message parsed: type=${decoded['type']}, payload keys=${decoded['payload']?.keys}",
-              );
-            } catch (e) {
-              print("🔵 [DEBUG] Failed to parse WebSocket message as JSON: $e");
-            }
-
             // Wrap in try-catch to prevent crashes from unhandled messages
             if (!_streamController.isClosed) {
               _streamController.add(data);

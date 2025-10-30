@@ -43,7 +43,6 @@ class AppNotificationService {
 
       _isInitialized = true;
     } catch (e) {
-      print("❌ Error initializing notifications: $e");
     }
   }
 
@@ -60,7 +59,6 @@ class AppNotificationService {
       return settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional;
     } catch (e) {
-      print("Error requesting permission: $e");
       return false;
     }
   }
@@ -121,7 +119,6 @@ class AppNotificationService {
         // Reply action sẽ được xử lý từ FCM payload đã có actions trong backend
       }
     } catch (e) {
-      print("Error setting up reply action: $e");
     }
   }
 
@@ -166,7 +163,6 @@ class AppNotificationService {
           onNotificationTapped!(conversationId);
         }
       } catch (e) {
-        print("Error parsing notification payload: $e");
       }
     }
   }
@@ -601,5 +597,4 @@ class AppNotificationService {
 /// Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print("📩 Background message: ${message.notification?.title}");
 }

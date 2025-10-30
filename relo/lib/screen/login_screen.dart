@@ -5,7 +5,8 @@ import 'package:relo/screen/forgot_password_screen.dart';
 import 'package:relo/services/auth_service.dart';
 import 'package:relo/services/app_notification_service.dart';
 import 'package:relo/screen/main_screen.dart';
-import 'package:relo/services/websocket_service.dart';
+import 'package:relo/utils/show_notification.dart';
+import 'package:relo/services/service_locator.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +17,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService();
+  final AuthService _authService = ServiceLocator.authService;
   final AppNotificationService _notificationService = AppNotificationService();
 
   bool _isLoading = false;
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // After successful login, connect to the WebSocket service.
         // The service will handle token retrieval internally.
-        await webSocketService.connect();
+        await ServiceLocator.websocketService.connect();
 
         // Nếu đăng nhập thành công, chuyển đến màn hình chính
         if (mounted) {
@@ -100,13 +101,13 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } catch (e) {
-        // Hiển thị lỗi cho người dùng
+        // Hiển thị lỗi cho người dùng bằng custom alert
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: Colors.red,
-            ),
+          await ShowNotification.showCustomAlertDialog(
+            context,
+            message: e.toString().replaceFirst('Exception: ', ''),
+            buttonText: 'Đóng',
+            buttonColor: Colors.red,
           );
         }
       } finally {

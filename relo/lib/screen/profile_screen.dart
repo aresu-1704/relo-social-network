@@ -22,11 +22,10 @@ import 'package:relo/screen/edit_profile_screen.dart';
 import 'package:relo/utils/image_picker_settings.dart';
 import 'package:relo/widgets/profiles/profile_header.dart';
 import 'package:relo/widgets/profiles/profile_components.dart';
-import 'package:relo/widgets/posts/enhanced_post_card.dart';
+import 'package:relo/widgets/posts/post_card.dart';
 import 'package:relo/widgets/posts/post_composer_widget.dart';
 import 'package:relo/screen/create_post_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:relo/services/websocket_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -83,7 +82,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _listenToWebSocket() {
     if (widget.userId == null) return; // Only for other users' profiles
 
-    _webSocketSubscription = webSocketService.stream.listen((message) async {
+    _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
+      message,
+    ) async {
       try {
         final data = jsonDecode(message);
         final type = data['type'] as String?;
@@ -804,7 +805,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ..._posts.map((post) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12.0),
-                              child: EnhancedPostCard(
+                              child: PostCard(
                                 post: post,
                                 onPostDeleted: _isOwnProfile
                                     ? () async {

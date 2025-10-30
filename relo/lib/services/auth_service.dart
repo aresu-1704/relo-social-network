@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:relo/services/secure_storage_service.dart';
 import 'package:relo/constants.dart';
-import 'package:relo/services/websocket_service.dart';
+// import removed; use ServiceLocator.websocketService instead
 import 'package:relo/services/service_locator.dart';
 
 /// Custom exception cho tài khoản đã bị xóa
@@ -164,7 +164,7 @@ class AuthService {
       if (skipApiCall) {
         print('📱 Logout: Skipping API call, clearing local tokens only');
         await _storageService.deleteTokens();
-        webSocketService.disconnect();
+        ServiceLocator.websocketService.disconnect();
         return;
       }
 
@@ -196,7 +196,7 @@ class AuthService {
         if (token == null) {
           print('⚠️ Cannot get valid token, clearing local tokens');
           await _storageService.deleteTokens();
-          webSocketService.disconnect();
+          ServiceLocator.websocketService.disconnect();
           return;
         }
 
@@ -209,7 +209,7 @@ class AuthService {
       // Chỉ logout khi server trả về 200 (đã xóa device token thành công)
       if (response.statusCode == 200) {
         await _storageService.deleteTokens();
-        webSocketService.disconnect();
+        ServiceLocator.websocketService.disconnect();
       } else {
         throw Exception('Đã xảy ra lỗi, không thể đăng xuất');
       }
@@ -224,7 +224,7 @@ class AuthService {
       // (Người dùng vẫn muốn logout, dù server không thể xóa device token)
       try {
         await _storageService.deleteTokens();
-        webSocketService.disconnect();
+        ServiceLocator.websocketService.disconnect();
 
         // Nếu là 401/403, có thể token đã hết hạn, vẫn cho phép logout
         if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
@@ -247,7 +247,7 @@ class AuthService {
       print('⚠️ Unexpected error during logout: $e, clearing local tokens');
       try {
         await _storageService.deleteTokens();
-        webSocketService.disconnect();
+        ServiceLocator.websocketService.disconnect();
       } catch (_) {
         // Ignore errors khi xóa tokens
       }
