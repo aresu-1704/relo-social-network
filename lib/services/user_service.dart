@@ -1,0 +1,334 @@
+import 'package:dio/dio.dart';
+import '../models/user.dart';
+import 'package:dio/dio.dart' show MultipartFile, FormData, Options;
+
+class UserService {
+  final Dio _dio;
+
+  UserService(this._dio);
+
+  Future<User?> getMe() async {
+    try {
+      final response = await _dio.get('users/me');
+      return User.fromJson(response.data);
+    } on DioException catch (e) {
+      print('DioException in getMe: ${e.message}');
+      return null;
+    } catch (e) {
+      print('Unknown error in getMe: $e');
+      return null;
+    }
+  }
+
+  Future<User> getUserById(String id) async {
+    try {
+      final response = await _dio.get('users/$id');
+      return User.fromJson(response.data);
+    } on DioException catch (e) {
+      print(e);
+      throw Exception('Không thể tải thông tin người dùng.');
+    } catch (e) {
+      print(e);
+      throw Exception('Đã xảy ra lỗi không xác định.');
+    }
+  }
+
+  // Lấy danh sách bạn bè
+  Future<List<User>> getFriends() async {
+    try {
+      final response = await _dio.get('users/friends');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => User.fromJson(json)).toList();
+      } else {
+        throw Exception('Không thể tải danh sách bạn bè');
+      }
+    } catch (e) {
+      throw Exception('Failed to load friends: $e');
+    }
+  }
+
+  // Tìm kiếm người dùng
+  Future<List<User>> searchUsers(String query) async {
+    try {
+      final response = await _dio.get(
+        'users/search',
+        queryParameters: {'query': query},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => User.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to search users');
+      }
+    } catch (e) {
+      throw Exception('Failed to search users: $e');
+    }
+  }
+
+  // Gửi yêu cầu kết bạn
+  Future<void> sendFriendRequest(String userId) async {
+    try {
+      await _dio.post('users/friend-request', data: {'to_user_id': userId});
+    } catch (e) {
+      throw Exception('Failed to send friend request: $e');
+    }
+  }
+
+  // Phản hồi yêu cầu kết bạn
+  Future<void> respondToFriendRequest(String requestId, String response) async {
+    try {
+      await _dio.post(
+        'users/friend-request/$requestId',
+        data: {'response': response}, // 'accepted' or 'declined'
+      );
+    } catch (e) {
+      throw Exception('Failed to respond to friend request: $e');
+    }
+  }
+
+  // Phản hồi yêu cầu kết bạn theo userId (cho profile screen)
+  Future<void> respondToFriendRequestByUser(
+    String userId,
+    String response,
+  ) async {
+    try {
+      final response_api = await _dio.post(
+        'users/friend-request/by-user/$userId',
+        data: {'response': response}, // 'accept' or 'reject'
+      );
+      print('Respond to friend request by user: ${response_api.statusCode}');
+    } catch (e) {
+      print('Respond to friend request error: $e');
+      throw Exception('Failed to respond to friend request: $e');
+    }
+  }
+
+  // Hủy lời mời kết bạn
+  Future<void> cancelFriendRequest(String userId) async {
+    try {
+      final response = await _dio.delete('users/friend-request/$userId');
+      print(
+        'Cancel friend request response: ${response.statusCode} - ${response.data}',
+      );
+    } on DioException catch (e) {
+      print(
+        'Cancel friend request error: ${e.response?.statusCode} - ${e.response?.data}',
+      );
+      throw Exception('Không thể hủy lời mời kết bạn');
+    } catch (e) {
+      print('Cancel friend request exception: $e');
+      throw Exception('Không thể hủy lời mời kết bạn: $e');
+    }
+  }
+
+  // Chặn người dùng
+  Future<void> blockUser(String userId) async {
+    try {
+      await _dio.post('users/block', data: {'user_id': userId});
+    } catch (e) {
+      throw Exception('Failed to block user: $e');
+    }
+  }
+
+  // Bỏ chặn người dùng
+  Future<void> unblockUser(String userId) async {
+    try {
+      await _dio.post('users/unblock', data: {'user_id': userId});
+    } catch (e) {
+      throw Exception('Failed to unblock user: $e');
+    }
+  }
+
+  // Hủy kết bạn
+  Future<void> unfriendUser(String userId) async {
+    try {
+      final response = await _dio.post('users/$userId/unfriend');
+      print('Unfriend response: ${response.statusCode} - ${response.data}');
+    } catch (e) {
+      print('Unfriend error: $e');
+      rethrow;
+    }
+  }
+
+  // Lấy hồ sơ công khai của người dùng
+  Future<User> getUserProfile(String userId) async {
+    try {
+      final response = await _dio.get('users/$userId');
+      if (response.statusCode == 200) {
+        return User.fromJson(response.data);
+      } else {
+        throw Exception('Failed to load user profile');
+      }
+    } catch (e) {
+      throw Exception('Failed to load user profile: $e');
+    }
+  }
+
+  // Lấy danh sách lời mời kết bạn đang chờ
+  Future<List<Map<String, dynamic>>> getPendingFriendRequests() async {
+    try {
+      final response = await _dio.get('users/friend-requests/pending');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => json as Map<String, dynamic>).toList();
+      } else {
+        throw Exception('Không thể tải danh sách lời mời kết bạn');
+      }
+    } catch (e) {
+      throw Exception('Failed to load pending friend requests: $e');
+    }
+  }
+
+  // Cập nhật thông tin profile người dùng
+  Future<void> updateProfile({
+    String? displayName,
+    String? bio,
+    String? avatarPath,
+    String? backgroundPath,
+  }) async {
+    try {
+      final formData = FormData.fromMap({});
+
+      if (displayName != null) {
+        formData.fields.add(MapEntry('displayName', displayName));
+      }
+      if (bio != null) {
+        formData.fields.add(MapEntry('bio', bio));
+      }
+      if (avatarPath != null) {
+        final file = await MultipartFile.fromFile(avatarPath);
+        formData.files.add(MapEntry('avatar', file));
+      }
+      if (backgroundPath != null) {
+        final file = await MultipartFile.fromFile(backgroundPath);
+        formData.files.add(MapEntry('background', file));
+      }
+
+      await _dio.put(
+        'users/me',
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
+    } catch (e) {
+      throw Exception('Không thể cập nhật hồ sơ: $e');
+    }
+  }
+
+  // Cập nhật avatar và trả về user data mới
+  Future<User> updateAvatar(String imagePath) async {
+    try {
+      final file = await MultipartFile.fromFile(imagePath);
+      final formData = FormData.fromMap({'avatar': file});
+
+      final response = await _dio.put(
+        'users/me',
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
+
+      if (response.data != null && response.data['user'] != null) {
+        return User.fromJson(response.data['user']);
+      }
+      throw Exception('Phản hồi không hợp lệ từ server');
+    } on DioException catch (e) {
+      throw Exception('Không thể cập nhật ảnh đại diện: ${e.message}');
+    } catch (e) {
+      throw Exception('Không thể cập nhật ảnh đại diện: $e');
+    }
+  }
+
+  // Cập nhật ảnh bìa và trả về user data mới
+  Future<User> updateBackground(String imagePath) async {
+    try {
+      final file = await MultipartFile.fromFile(imagePath);
+      final formData = FormData.fromMap({'background': file});
+
+      final response = await _dio.put(
+        'users/me',
+        data: formData,
+        options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      );
+
+      if (response.data != null && response.data['user'] != null) {
+        return User.fromJson(response.data['user']);
+      }
+      throw Exception('Phản hồi không hợp lệ từ server');
+    } on DioException catch (e) {
+      throw Exception('Không thể cập nhật ảnh bìa: ${e.message}');
+    } catch (e) {
+      throw Exception('Không thể cập nhật ảnh bìa: $e');
+    }
+  }
+
+  // Xóa tài khoản (soft delete)
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('users/me');
+    } on DioException catch (e) {
+      print('Error deleting account: ${e.response?.data}');
+      throw Exception('Không thể xóa tài khoản: ${e.message}');
+    } catch (e) {
+      throw Exception('Không thể xóa tài khoản: $e');
+    }
+  }
+
+  // Lấy danh sách người dùng bị chặn
+  Future<List<User>> getBlockedUsers(String userId) async {
+    try {
+      final response = await _dio.get('users/blocked-lists/$userId');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => User.fromJson(json)).toList();
+      } else if (response.statusCode == 404) {
+        return [];
+      } else {
+        throw Exception('Không thể tải danh sách người dùng bị chặn');
+      }
+    } catch (e) {
+      throw Exception('Failed to load blocked users: $e');
+    }
+  }
+
+  // Kiểm tra trạng thái block giữa 2 người dùng
+  Future<Map<String, dynamic>> checkBlockStatus(String otherUserId) async {
+    try {
+      final response = await _dio.get('users/block-status/$otherUserId');
+      return response.data;
+    } catch (e) {
+      throw Exception('Failed to check block status: $e');
+    }
+  }
+
+  // Kiểm tra trạng thái kết bạn giữa 2 người dùng
+  Future<String> checkFriendStatus(String userId) async {
+    try {
+      final response = await _dio.get('users/$userId/friend-status');
+      return response.data['status'] ?? 'none';
+    } catch (e) {
+      return 'none';
+    }
+  }
+
+  // Lấy danh sách người dùng theo danh sách ID
+  Future<List<User>> getUsersByIds(List<String> userIds) async {
+    try {
+      final response = await _dio.post(
+        'users/batch',
+        data: {'user_ids': userIds}, // Gửi object với key user_ids
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => User.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load users');
+      }
+    } catch (e) {
+      throw Exception('Failed to load users: $e');
+    }
+  }
+}
