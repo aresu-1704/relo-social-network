@@ -425,24 +425,21 @@ class _PostCardState extends State<PostCard> {
               padding: const EdgeInsets.all(12.0),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundImage:
-                        _currentPost.authorInfo.avatarUrl != null &&
-                            _currentPost.authorInfo.avatarUrl!.isNotEmpty
-                        ? CachedNetworkImageProvider(
-                            _currentPost.authorInfo.avatarUrl!,
-                          )
-                        : null,
-                    child:
-                        _currentPost.authorInfo.avatarUrl == null ||
-                            _currentPost.authorInfo.avatarUrl!.isEmpty
-                        ? Text(
-                            _currentPost.authorInfo.displayName[0]
-                                .toUpperCase(),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          )
-                        : null,
+                  Builder(
+                    builder: (context) {
+                      final avatarUrl = _currentPost.authorInfo.avatarUrl;
+                      // Nếu avatarUrl rỗng hoặc null, dùng ảnh mặc định từ assets (giống MessagesScreen)
+                      final displayAvatarUrl = (avatarUrl ?? '').isNotEmpty
+                          ? avatarUrl!
+                          : 'assets/none_images/avatar.jpg';
+
+                      return CircleAvatar(
+                        radius: 20,
+                        backgroundImage: displayAvatarUrl.startsWith('assets/')
+                            ? AssetImage(displayAvatarUrl)
+                            : NetworkImage(displayAvatarUrl),
+                      );
+                    },
                   ),
                   const SizedBox(width: 10),
                   Expanded(

@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:relo/models/notification.dart' as models;
 import 'package:relo/services/service_locator.dart';
+import 'package:relo/services/secure_storage_service.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final List<models.Notification> _notifications = [];
   Timer? _debounceTimer;
   StreamSubscription? _webSocketSubscription;
+  String? _currentUserId;
 
   List<models.Notification> get notifications => _notifications;
 
@@ -16,8 +18,18 @@ class NotificationProvider extends ChangeNotifier {
   bool get hasUnread => unreadCount > 0;
 
   NotificationProvider() {
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadCurrentUserId();
     _loadNotifications();
     _listenToWebSocket();
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    final storage = const SecureStorageService();
+    _currentUserId = await storage.getUserId();
   }
 
   Future<void> _loadNotifications() async {
@@ -64,7 +76,9 @@ class NotificationProvider extends ChangeNotifier {
 
         // Handle new post
         if (data['type'] == 'new_post') {
-          _handleNewPost(data['payload']);
+          _handleNewPost(data['payload']).catchError((e) {
+            debugPrint('Error handling new post notification: $e');
+          });
         }
       } catch (e) {
         debugPrint('Error parsing WebSocket message: $e');
@@ -129,22 +143,35 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  void _handleNewPost(Map<String, dynamic>? payload) {
+  Future<void> _handleNewPost(Map<String, dynamic>? payload) async {
     // Realtime: Add notification to the top of the list
+    // Chỉ thêm thông báo nếu có currentUserId và đảm bảo thông báo này dành cho user hiện tại
     if (payload != null) {
-      final notification = models.Notification(
-        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-        userId: payload['authorId'] ?? '',
-        type: 'new_post',
-        title: 'Bài viết mới',
-        message:
-            '${payload['authorName'] ?? 'Người dùng'} đã đăng một bài viết mới',
-        metadata: payload,
-        isRead: false,
-        createdAt: DateTime.now().toIso8601String(),
-      );
-      _notifications.insert(0, notification);
-      notifyListeners();
+      // Đảm bảo đã load currentUserId
+      if (_currentUserId == null) {
+        await _loadCurrentUserId();
+      }
+
+      // Kiểm tra: chỉ thêm thông báo nếu authorId khác với currentUserId
+      // (không hiển thị thông báo bài viết của chính mình)
+      final authorId = payload['authorId'] as String?;
+      if (authorId != null &&
+          _currentUserId != null &&
+          authorId != _currentUserId) {
+        final notification = models.Notification(
+          id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+          userId: _currentUserId!, // Sử dụng ID của người nhận (current user)
+          type: 'new_post',
+          title: 'Bài viết mới',
+          message:
+              '${payload['authorName'] ?? 'Người dùng'} đã đăng một bài viết mới',
+          metadata: payload,
+          isRead: false,
+          createdAt: DateTime.now().toIso8601String(),
+        );
+        _notifications.insert(0, notification);
+        notifyListeners();
+      }
     }
   }
 

@@ -221,19 +221,81 @@ class _ChatScreenState extends State<ChatScreen> {
         } else if (data['type'] == 'user_blocked' ||
             data['type'] == 'you_were_blocked' ||
             data['type'] == 'user_unblocked') {
-          // Handle block/unblock events
+          // Handle block/unblock events realtime
           final payload = data['payload'];
           if (payload == null) return;
 
-          final blockedUserId = payload['user_id'];
+          final blockedUserId = payload['user_id'] as String?;
+          if (blockedUserId == null) return;
 
-          // Only update if it's relevant to this conversation
-          final isRelevant =
-              _memberIds != null && _memberIds!.contains(blockedUserId);
+          // Kiểm tra xem event này có liên quan đến conversation hiện tại không
+          bool isRelevant = false;
+
+          if (!widget.isGroup) {
+            // Chat 1-1: Luôn kiểm tra vì chỉ có 2 người trong conversation
+            // Nếu blockedUserId là một trong những người tham gia, thì event này liên quan
+            if (widget.memberIds != null) {
+              isRelevant = widget.memberIds!.contains(blockedUserId);
+            } else if (_memberIds != null) {
+              isRelevant = _memberIds!.contains(blockedUserId);
+            } else {
+              // Fallback: Nếu không có memberIds, vẫn kiểm tra vì có thể là chat 1-1
+              // Event bạn_were_blocked hoặc user_blocked luôn liên quan đến chat 1-1 hiện tại
+              isRelevant = true; // Với chat 1-1, luôn kiểm tra
+            }
+          } else {
+            // Chat nhóm: Kiểm tra xem blockedUserId có trong memberIds không
+            isRelevant =
+                _memberIds != null && _memberIds!.contains(blockedUserId);
+          }
 
           if (isRelevant) {
-            // Re-check block status (silently, no toast)
-            await _checkBlockStatus();
+            // Cập nhật block status ngay lập tức dựa trên event type
+            if (data['type'] == 'you_were_blocked') {
+              // Tôi bị chặn: set _isBlocked = true ngay lập tức
+              if (mounted) {
+                setState(() {
+                  _isBlocked = true;
+                  _isBlockedByMe = false; // Tôi bị chặn, không phải tôi chặn
+                  _blockedUserId = blockedUserId;
+                });
+                print(
+                  '🔔 You were blocked by user: $blockedUserId - UI updated immediately',
+                );
+              }
+              // Sau đó check lại để đảm bảo chính xác
+              await _checkBlockStatus();
+            } else if (data['type'] == 'user_blocked') {
+              // Tôi đã chặn người khác: set _isBlockedByMe = true ngay lập tức
+              if (mounted) {
+                setState(() {
+                  _isBlocked = true;
+                  _isBlockedByMe = true; // Tôi chặn người khác
+                  _blockedUserId = blockedUserId;
+                });
+                print(
+                  '🔔 You blocked user: $blockedUserId - UI updated immediately',
+                );
+              }
+              // Sau đó check lại để đảm bảo chính xác
+              await _checkBlockStatus();
+            } else if (data['type'] == 'user_unblocked') {
+              // Đã bỏ chặn: set _isBlocked = false ngay lập tức
+              if (mounted) {
+                setState(() {
+                  _isBlocked = false;
+                  _isBlockedByMe = false;
+                });
+                print(
+                  '🔔 User unblocked: $blockedUserId - UI updated immediately',
+                );
+              }
+              // Sau đó check lại để đảm bảo chính xác
+              await _checkBlockStatus();
+            } else {
+              // Fallback: check block status như cũ
+              await _checkBlockStatus();
+            }
           }
         }
       } catch (e) {
@@ -305,29 +367,72 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_currentUserId == null) return;
 
     try {
-      if (!widget.isGroup && widget.memberIds != null) {
+      if (!widget.isGroup) {
         // Chat 1-1: Check block status với user còn lại
-        try {
-          String otherUserId = widget.memberIds!.firstWhere(
-            (id) => id != _currentUserId,
+        String? otherUserId;
+
+        // Thử lấy từ widget.memberIds trước
+        if (widget.memberIds != null && widget.memberIds!.isNotEmpty) {
+          otherUserId = widget.memberIds!.firstWhere(
+            (id) => id != _currentUserId && id.isNotEmpty,
             orElse: () => '',
           );
+          if (otherUserId.isEmpty) otherUserId = null;
+        }
 
-          if (otherUserId.isEmpty) {
-            return;
+        // Nếu không có, thử lấy từ _memberIds
+        if (otherUserId == null &&
+            _memberIds != null &&
+            _memberIds!.isNotEmpty) {
+          otherUserId = _memberIds!.firstWhere(
+            (id) => id != _currentUserId && id.isNotEmpty,
+            orElse: () => '',
+          );
+          if (otherUserId.isEmpty) otherUserId = null;
+        }
+
+        // Nếu vẫn không có, thử fetch từ conversation
+        if (otherUserId == null && _conversationId != null) {
+          try {
+            final conversation = await _messageService.fetchConversationById(
+              _conversationId!,
+            );
+            if (conversation != null) {
+              final participants = List<Map<String, dynamic>>.from(
+                conversation['participants'] ?? [],
+              );
+              final other = participants.firstWhere(
+                (p) =>
+                    (p['id']?.toString() ?? p['userId']?.toString() ?? '') !=
+                    _currentUserId,
+                orElse: () => <String, dynamic>{},
+              );
+              if (other.isNotEmpty) {
+                otherUserId =
+                    other['id']?.toString() ?? other['userId']?.toString();
+              }
+            }
+          } catch (e) {
+            // Ignore
           }
+        }
 
-          final blockStatus = await _userService.checkBlockStatus(otherUserId);
+        if (otherUserId != null && otherUserId.isNotEmpty) {
+          try {
+            final blockStatus = await _userService.checkBlockStatus(
+              otherUserId,
+            );
 
-          if (mounted) {
-            setState(() {
-              _isBlocked = blockStatus['isBlocked'] ?? false;
-              _isBlockedByMe = blockStatus['isBlockedByMe'] ?? false;
-              _blockedUserId = otherUserId;
-            });
+            if (mounted) {
+              setState(() {
+                _isBlocked = blockStatus['isBlocked'] ?? false;
+                _isBlockedByMe = blockStatus['isBlockedByMe'] ?? false;
+                _blockedUserId = otherUserId;
+              });
+            }
+          } catch (e) {
+            // Ignore errors
           }
-        } catch (e) {
-          // Ignore errors
         }
       } else if (widget.isGroup && _memberIds != null) {
         // Chat nhóm: Check xem có ai trong group bị mình block không
@@ -839,6 +944,7 @@ class _ChatScreenState extends State<ChatScreen> {
           memberIds: _memberIds,
           isDeletedAccount: isDeletedAccount,
           isBlocked: _isBlocked,
+          isBlockedByMe: _isBlockedByMe,
           initialMuted: _isMuted,
           conversationId: _conversationId!,
           onMuteToggled: (muted) async {
