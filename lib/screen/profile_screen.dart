@@ -529,7 +529,47 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (_user == null) {
       return Scaffold(
-        body: Center(child: Text('Không thể tải thông tin người dùng')),
+        appBar: AppBar(
+          backgroundColor: Color(0xFF7A2FC0),
+          iconTheme: IconThemeData(color: Colors.white),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Không thể tải thông tin người dùng',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(Icons.arrow_back, color: Colors.white),
+                label: Text('Quay về', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF7A2FC0),
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -670,11 +710,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
 
-                  // Statistics row
-                  ProfileComponents.buildStatisticsRow(
-                    _friendCount,
-                    _postCount,
-                  ),
+                  // Statistics row (chỉ hiển thị khi là profile của chính mình)
+                  if (_isOwnProfile)
+                    ProfileComponents.buildStatisticsRow(
+                      _friendCount,
+                      _postCount,
+                    ),
 
                   // User info section
                   Container(

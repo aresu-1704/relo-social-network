@@ -83,17 +83,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF7A2FC0),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: primaryColor),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Đặt lại mật khẩu',
           style: GoogleFonts.poppins(
-            color: primaryColor,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
       ),
@@ -242,7 +243,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _resetPassword,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
+                        backgroundColor: primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -250,14 +251,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                       child: _isLoading
                           ? const CircularProgressIndicator(
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                primaryColor,
+                                Colors.white,
                               ),
                             )
                           : Text(
                               'Đặt lại mật khẩu',
                               style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                color: primaryColor,
+                                fontSize: 20,
+                                color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

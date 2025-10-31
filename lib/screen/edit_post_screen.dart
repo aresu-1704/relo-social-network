@@ -3,6 +3,7 @@ import 'package:relo/models/post.dart';
 import 'package:relo/services/post_service.dart';
 import 'package:relo/services/service_locator.dart';
 import 'package:relo/widgets/media_picker_sheet.dart';
+import 'package:relo/utils/show_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'dart:io';
 
@@ -91,16 +92,22 @@ class _EditPostScreenState extends State<EditPostScreen> {
     final content = _contentController.text.trim();
 
     if (content.isEmpty && _images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập nội dung hoặc chọn ảnh')),
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: 'Vui lòng nhập nội dung hoặc chọn ảnh',
+        buttonText: 'Ok',
+        buttonColor: Color(0xFF7A2FC0),
       );
       return;
     }
 
     // Validate max 30 media items
     if (_images.length > 30) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chỉ được đăng tối đa 30 ảnh/video')),
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: 'Chỉ được đăng tối đa 30 ảnh/video',
+        buttonText: 'Ok',
+        buttonColor: Color(0xFF7A2FC0),
       );
       return;
     }
@@ -109,8 +116,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
     final totalSize = await _calculateTotalSize();
     const maxSize = 150 * 1024 * 1024; // 150MB in bytes
     if (totalSize > maxSize) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tổng dung lượng không được vượt quá 150MB')),
+      await ShowNotification.showCustomAlertDialog(
+        context,
+        message: 'Tổng dung lượng không được vượt quá 150MB',
+        buttonText: 'Ok',
+        buttonColor: Color(0xFF7A2FC0),
       );
       return;
     }
@@ -139,15 +149,15 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã cập nhật bài viết!')),
-        );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUpdating = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi cập nhật: $e')),
+        await ShowNotification.showCustomAlertDialog(
+          context,
+          message: 'Lỗi cập nhật: $e',
+          buttonText: 'Ok',
+          buttonColor: Colors.red,
         );
       }
     }

@@ -183,6 +183,10 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                         itemCount: _comments.length,
                         itemBuilder: (context, index) {
                           final comment = _comments[index];
+                          print('Avatar URL: ${comment.authorInfo.avatarUrl}');
+                          print(
+                            'Display Name: ${comment.authorInfo.displayName}',
+                          );
                           final canDelete =
                               widget.currentUserId == comment.authorId ||
                               widget.currentUserId == widget.postAuthorId;
@@ -200,20 +204,12 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                                               .avatarUrl!
                                               .isNotEmpty
                                       ? CachedNetworkImageProvider(
-                                          comment.authorInfo.avatarUrl!,
-                                        )
-                                      : null,
-                                  child:
-                                      comment.authorInfo.avatarUrl == null ||
-                                          comment.authorInfo.avatarUrl!.isEmpty
-                                      ? Text(
-                                          comment.authorInfo.displayName[0]
-                                              .toUpperCase(),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
+                                              comment.authorInfo.avatarUrl!,
+                                            )
+                                            as ImageProvider?
+                                      : const AssetImage(
+                                          'assets/none_images/avatar.jpg',
+                                        ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

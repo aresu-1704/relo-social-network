@@ -53,6 +53,7 @@ dependencies:
   pull_to_refresh: ^2.0.0
   timeago: ^3.7.0
   filesize: ^2.0.1
+  provider: ^6.1.2
 
 dev_dependencies:
   flutter_test:

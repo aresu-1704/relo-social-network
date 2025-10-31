@@ -80,16 +80,7 @@ class _PostComposerWidgetState extends State<PostComposerWidget> {
                       radius: 20,
                       backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
                           ? CachedNetworkImageProvider(avatarUrl)
-                          : null,
-                      child: avatarUrl == null || avatarUrl.isEmpty
-                          ? Text(
-                              displayName[0].toUpperCase(),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            )
-                          : null,
+                          : AssetImage('assets/none_images/avatar.jpg'),
                     ),
               const SizedBox(width: 12),
 

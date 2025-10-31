@@ -9,6 +9,7 @@ import 'package:relo/screen/profile_screen.dart';
 import 'package:relo/utils/show_notification.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shimmer/shimmer.dart';
+import 'dart:convert';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -27,11 +28,13 @@ class _SearchScreenState extends State<SearchScreen> {
   List<User> _searchResults = [];
   bool _isLoading = false;
   bool _hasSearched = false; // Để biết đã thực hiện tìm kiếm hay chưa
+  StreamSubscription? _webSocketSubscription;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _listenToWebSocket();
   }
 
   @override
@@ -39,7 +42,86 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _debounce?.cancel();
+    _webSocketSubscription?.cancel();
     super.dispose();
+  }
+
+  void _listenToWebSocket() {
+    _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
+      message,
+    ) async {
+      try {
+        final data = jsonDecode(message);
+        final type = data['type'] as String?;
+        final payload = data['payload'];
+
+        // Listen to friend-related events
+        if (payload != null && 
+            (type == 'friend_request_accepted' ||
+             type == 'friend_added' ||
+             type == 'friend_request_declined' ||
+             type == 'friend_request_received')) {
+          String? relevantUserId;
+
+          if (type == 'friend_request_received') {
+            relevantUserId = payload['from_user_id'] as String?;
+          } else if (type == 'friend_request_accepted' || type == 'friend_added') {
+            relevantUserId = payload['user_id'] as String?;
+          } else if (type == 'friend_request_declined') {
+            relevantUserId = payload['user_id'] as String?;
+          }
+
+          // Update friend status in search results if user is in the list
+          if (relevantUserId != null && mounted) {
+            _updateFriendStatusInResults(relevantUserId, type);
+          }
+        }
+      } catch (e) {
+        print('Error in WebSocket listener (SearchScreen): $e');
+      }
+    });
+  }
+
+  void _updateFriendStatusInResults(String userId, String? eventType) {
+    if (!mounted) return;
+
+    bool shouldUpdate = false;
+    final updatedResults = _searchResults.map((user) {
+      if (user.id == userId) {
+        shouldUpdate = true;
+        String newStatus;
+        if (eventType == 'friend_request_accepted' || eventType == 'friend_added') {
+          newStatus = 'friends';
+        } else if (eventType == 'friend_request_declined') {
+          newStatus = 'none';
+        } else if (eventType == 'friend_request_received') {
+          newStatus = 'pending_received';
+        } else {
+          newStatus = user.friendStatus ?? 'none';
+        }
+        
+        // Create new User object with updated friendStatus
+        return User(
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+          backgroundUrl: user.backgroundUrl,
+          bio: user.bio,
+          status: user.status,
+          createdAt: user.createdAt,
+          friendStatus: newStatus,
+        );
+      }
+      return user;
+    }).toList();
+
+    if (shouldUpdate) {
+      setState(() {
+        _searchResults = updatedResults;
+      });
+    }
   }
 
   void _onSearchChanged() {
@@ -210,24 +292,160 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
   @override
   void initState() {
     super.initState();
-    // Use friendStatus directly from API response
-    _friendStatus = widget.user.friendStatus ?? 'none';
+    // Use friendStatus directly from API response, normalize to lowercase
+    final status = widget.user.friendStatus?.toLowerCase().trim() ?? 'none';
+    _friendStatus = status;
+    // Debug: print to check if friendStatus is correct
+    print('Search result - User: ${widget.user.displayName}, friendStatus: $_friendStatus');
+  }
+
+  @override
+  void didUpdateWidget(_UserSearchResultItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update friendStatus when widget is rebuilt with new user data
+    if (oldWidget.user.id != widget.user.id || 
+        oldWidget.user.friendStatus != widget.user.friendStatus) {
+      setState(() {
+        final status = widget.user.friendStatus?.toLowerCase().trim() ?? 'none';
+        _friendStatus = status;
+      });
+    }
   }
 
   Future<void> _sendFriendRequest() async {
     try {
-      await _userService.sendFriendRequest(widget.user.id);
-      if (mounted) {
-        setState(() => _friendStatus = 'pending_sent');
+      // Nếu đã gửi lời mời, hủy lời mời
+      if (_friendStatus == 'pending_sent') {
+        await _userService.cancelFriendRequest(widget.user.id);
+        if (mounted) {
+          setState(() => _friendStatus = 'none');
+          await ShowNotification.showToast(
+            context,
+            'Đã hủy lời mời kết bạn',
+          );
+        }
+      } else if (_friendStatus == 'pending_received') {
+        // Người khác đã gửi lời mời cho tôi → Hiển thị menu chấp nhận/từ chối
+        _showPendingRequestOptions();
+      } else if (_friendStatus == 'none') {
+        // Gửi lời mời mới
+        await _userService.sendFriendRequest(widget.user.id);
+        if (mounted) {
+          setState(() => _friendStatus = 'pending_sent');
+        }
       }
+      // Không xử lý trường hợp 'friends'
     } catch (e) {
       if (mounted) {
         await ShowNotification.showToast(
           context,
-          'Không thể gửi lời mời kết bạn',
+          _friendStatus == 'pending_sent'
+              ? 'Không thể hủy lời mời kết bạn'
+              : 'Không thể gửi lời mời kết bạn',
         );
       }
     }
+  }
+
+  String _getButtonLabel() {
+    // Debug: print current status
+    print('_getButtonLabel - _friendStatus: $_friendStatus');
+    
+    if (_friendStatus == 'pending_sent') {
+      return 'Đã gửi';
+    } else if (_friendStatus == 'pending_received') {
+      return 'Phản hồi';
+    } else {
+      return 'Kết bạn';
+    }
+  }
+
+  void _showPendingRequestOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Bạn có lời mời kết bạn',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      try {
+                        await _userService.respondToFriendRequestByUser(
+                          widget.user.id,
+                          'accept',
+                        );
+                        if (mounted) {
+                          setState(() => _friendStatus = 'friends');
+                        }
+                      } catch (e) {
+                        print('Error accepting friend request: $e');
+                      }
+                    },
+                    icon: Icon(Icons.check, color: Colors.white),
+                    label: Text('Chấp nhận', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF7A2FC0),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      try {
+                        await _userService.respondToFriendRequestByUser(
+                          widget.user.id,
+                          'reject',
+                        );
+                        if (mounted) {
+                          setState(() => _friendStatus = 'none');
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          print('Error rejecting friend request: $e');
+                        }
+                      }
+                    },
+                    icon: Icon(Icons.close, color: Colors.white),
+                    label: Text('Từ chối', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Hủy'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -313,10 +531,7 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
                         size: 18,
                       ),
                 label: Text(
-                  _friendStatus == 'pending_sent' ||
-                          _friendStatus == 'pending_received'
-                      ? 'Đã gửi'
-                      : 'Kết bạn',
+                  _getButtonLabel(),
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                 ),
               ),
