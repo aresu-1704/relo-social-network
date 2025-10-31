@@ -13,11 +13,9 @@ import 'package:relo/services/app_notification_service.dart';
 import 'package:relo/screen/chat_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-// Background message handler (must be top-level function)
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-}
+// Import background handler từ app_notification_service
+import 'package:relo/services/app_notification_service.dart'
+    show firebaseMessagingBackgroundHandler;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -131,23 +129,38 @@ void main() async {
 /// Setup notification callbacks để xử lý tap và reply
 void _setupNotificationCallbacks(AppNotificationService notificationService) {
   // Callback khi tap vào notification
-  notificationService.setOnNotificationTapped((String conversationId) async {
+  notificationService.setOnNotificationTapped((
+    String conversationId,
+    Map<String, dynamic>? payloadData,
+  ) async {
+    print(
+      '🔔 onNotificationTapped called with conversationId: $conversationId',
+    );
     // Đợi một chút để đảm bảo app đã sẵn sàng
     await Future.delayed(const Duration(milliseconds: 300));
 
     final navigator = ServiceLocator.navigatorKey.currentState;
     if (navigator == null) {
+      print('🔔 Navigator is null, retrying in 1 second...');
       // Retry sau 1 giây
       Future.delayed(const Duration(seconds: 1), () {
         final retryNavigator = ServiceLocator.navigatorKey.currentState;
         if (retryNavigator != null) {
-          _navigateToChatScreen(conversationId, retryNavigator);
+          print('🔔 Retry successful, navigating...');
+          _navigateToChatScreen(
+            conversationId,
+            retryNavigator,
+            payloadData: payloadData,
+          );
+        } else {
+          print('🔔 ERROR: Navigator still null after retry');
         }
       });
       return;
     }
 
-    _navigateToChatScreen(conversationId, navigator);
+    print('🔔 Navigating to ChatScreen...');
+    _navigateToChatScreen(conversationId, navigator, payloadData: payloadData);
   });
 
   // Setup reply callback
@@ -157,8 +170,10 @@ void _setupNotificationCallbacks(AppNotificationService notificationService) {
 /// Helper function để navigate tới ChatScreen
 Future<void> _navigateToChatScreen(
   String conversationId,
-  NavigatorState navigator,
-) async {
+  NavigatorState navigator, {
+  Map<String, dynamic>? payloadData,
+}) async {
+  print('🔔 _navigateToChatScreen called with conversationId: $conversationId');
   try {
     // Fetch conversation details để có đầy đủ thông tin
     final messageService = ServiceLocator.messageService;
@@ -166,81 +181,134 @@ Future<void> _navigateToChatScreen(
     final currentUserId = await secureStorage.getUserId();
 
     if (currentUserId == null) {
+      print('🔔 ERROR: currentUserId is null');
       return;
     }
 
-    // Fetch conversation details
-    final conversation = await messageService.fetchConversationById(
-      conversationId,
-    );
-
-    if (conversation == null) {
-      return;
-    }
-
-    // Extract thông tin như
-    final participants = List<Map<String, dynamic>>.from(
-      conversation['participants'] ?? [],
-    );
-    final otherParticipants = participants
-        .where((p) => p['id'] != currentUserId)
-        .toList();
-
+    // Nếu có payloadData từ notification, sử dụng thông tin đó
     String? title;
     String? avatarUrl;
-    final isGroup = conversation['isGroup'] ?? false;
+    bool? isGroup;
+    List<String>? memberIds;
+    int? memberCount;
 
-    if (isGroup) {
-      final nameList = otherParticipants
-          .map((p) => p['displayName'] as String? ?? '')
-          .where((name) => name.isNotEmpty)
-          .join(", ");
-      title =
-          conversation['name'] as String? ??
-          (nameList.isNotEmpty ? nameList : 'Nhóm chat');
-      avatarUrl =
-          conversation['avatarUrl'] as String? ??
-          'assets/none_images/group.jpg';
-    } else {
-      final friend = otherParticipants.isNotEmpty
-          ? otherParticipants.first
-          : null;
-      if (friend != null) {
-        final isDeletedAccount =
-            friend['username'] == 'deleted' || friend['id'] == 'deleted';
-
-        if (isDeletedAccount) {
-          title = 'Tài khoản không tồn tại';
-          avatarUrl = null;
-        } else {
-          title = friend['displayName'] as String? ?? 'Người dùng';
-          avatarUrl = ((friend['avatarUrl'] as String?) ?? '').isNotEmpty
-              ? friend['avatarUrl'] as String?
-              : 'assets/none_images/avatar.jpg';
-        }
-      } else {
-        title = 'Người dùng';
-        avatarUrl = 'assets/none_images/avatar.jpg';
+    if (payloadData != null) {
+      isGroup = payloadData['is_group'] == 'true';
+      title = payloadData['chat_name'] as String?;
+      avatarUrl = payloadData['avatar_url'] as String?;
+      final memberIdsStr = payloadData['member_ids'] as String?;
+      if (memberIdsStr != null && memberIdsStr.isNotEmpty) {
+        memberIds = memberIdsStr.split(',');
+      }
+      final memberCountStr = payloadData['member_count'] as String?;
+      if (memberCountStr != null) {
+        memberCount = int.tryParse(memberCountStr);
       }
     }
 
-    final memberIds = participants
-        .map((p) => (p['id']?.toString() ?? ''))
-        .where((id) => id.isNotEmpty)
-        .toList();
+    // Nếu thiếu thông tin, fetch từ API
+    if (title == null || isGroup == null) {
+      final conversation = await messageService.fetchConversationById(
+        conversationId,
+      );
 
-    final memberCount = participants.length;
+      if (conversation == null) {
+        // Fallback với thông tin tối thiểu
+        navigator.push(
+          MaterialPageRoute(
+            builder: (context) =>
+                ChatScreen(conversationId: conversationId, isGroup: false),
+          ),
+        );
+        return;
+      }
+
+      // Extract thông tin từ conversation
+      final participants = List<Map<String, dynamic>>.from(
+        conversation['participants'] ?? [],
+      );
+      final otherParticipants = participants
+          .where((p) => p['id'] != currentUserId)
+          .toList();
+
+      isGroup = conversation['isGroup'] ?? false;
+
+      if (title == null) {
+        if (isGroup!) {
+          final nameList = otherParticipants
+              .map((p) => p['displayName'] as String? ?? '')
+              .where((name) => name.isNotEmpty)
+              .join(", ");
+          title =
+              conversation['name'] as String? ??
+              (nameList.isNotEmpty ? nameList : 'Nhóm chat');
+        } else {
+          final friend = otherParticipants.isNotEmpty
+              ? otherParticipants.first
+              : null;
+          if (friend != null) {
+            final isDeletedAccount =
+                friend['username'] == 'deleted' || friend['id'] == 'deleted';
+
+            if (isDeletedAccount) {
+              title = 'Tài khoản không tồn tại';
+              avatarUrl = null;
+            } else {
+              title = friend['displayName'] as String? ?? 'Người dùng';
+            }
+          } else {
+            title = 'Người dùng';
+          }
+        }
+      }
+
+      if (avatarUrl == null) {
+        if (isGroup!) {
+          avatarUrl =
+              conversation['avatarUrl'] as String? ??
+              'assets/none_images/group.jpg';
+        } else {
+          final friend = otherParticipants.isNotEmpty
+              ? otherParticipants.first
+              : null;
+          if (friend != null) {
+            final isDeletedAccount =
+                friend['username'] == 'deleted' || friend['id'] == 'deleted';
+            if (!isDeletedAccount) {
+              avatarUrl = ((friend['avatarUrl'] as String?) ?? '').isNotEmpty
+                  ? friend['avatarUrl'] as String?
+                  : 'assets/none_images/avatar.jpg';
+            } else {
+              avatarUrl = null;
+            }
+          } else {
+            avatarUrl = 'assets/none_images/avatar.jpg';
+          }
+        }
+      }
+
+      if (memberIds == null) {
+        memberIds = participants
+            .map((p) => (p['id']?.toString() ?? ''))
+            .where((id) => id.isNotEmpty)
+            .toList();
+      }
+
+      if (memberCount == null) {
+        memberCount = participants.length;
+      }
+    }
 
     // Navigate với đầy đủ thông tin
     navigator.push(
       MaterialPageRoute(
         builder: (context) => ChatScreen(
           conversationId: conversationId,
-          isGroup: isGroup,
-          chatName: title,
+          isGroup: isGroup ?? false,
+          chatName: title ?? 'Người dùng',
           avatarUrl: avatarUrl,
-          memberIds: memberIds,
-          memberCount: memberCount,
+          memberIds: memberIds ?? [],
+          memberCount: memberCount ?? 0,
           onConversationSeen: (String conversationId) {
             // Mark as seen
             messageService.markAsSeen(conversationId, currentUserId);
@@ -311,6 +379,32 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // Đảm bảo callback được setup sau khi app đã build xong
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Kiểm tra lại initial message sau khi app đã sẵn sàng
+      Future.delayed(const Duration(milliseconds: 1000), () async {
+        final initialMessage = await FirebaseMessaging.instance
+            .getInitialMessage();
+        if (initialMessage != null) {
+          print('🔔 Processing delayed initial message');
+          final conversationId =
+              initialMessage.data['conversation_id'] as String?;
+          if (conversationId != null && conversationId.isNotEmpty) {
+            final navigator = ServiceLocator.navigatorKey.currentState;
+            if (navigator != null) {
+              _navigateToChatScreen(
+                conversationId,
+                navigator,
+                payloadData: initialMessage.data,
+              );
+            } else {
+              print('🔔 Navigator still null after delay');
+            }
+          }
+        }
+      });
+    });
   }
 
   @override

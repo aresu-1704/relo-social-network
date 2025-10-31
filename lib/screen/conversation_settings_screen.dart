@@ -12,6 +12,7 @@ class ConversationSettingsScreen extends StatefulWidget {
   final List<String>? memberIds;
   final bool isDeletedAccount;
   final bool isBlocked;
+  final bool isBlockedByMe;
   final bool initialMuted;
   final Function(String)? onViewProfile;
   final Function()? onLeaveGroup;
@@ -31,6 +32,7 @@ class ConversationSettingsScreen extends StatefulWidget {
     this.memberIds,
     required this.isDeletedAccount,
     required this.isBlocked,
+    this.isBlockedByMe = false,
     this.initialMuted = false,
     this.onViewProfile,
     this.onLeaveGroup,
@@ -309,22 +311,61 @@ class _ConversationSettingsScreenState
               ),
 
             // === CẢNH BÁO ===
-            if (!widget.isGroup) ...[
+            // Chỉ hiển thị nút chặn/bỏ chặn nếu:
+            // - Không phải nhóm
+            // - Tài khoản không bị xóa
+            // - Tôi không phải là người bị chặn (isBlocked = false) hoặc tôi đã chặn người kia (isBlockedByMe = true)
+            if (!widget.isGroup &&
+                !widget.isDeletedAccount &&
+                (!widget.isBlocked || widget.isBlockedByMe)) ...[
               const SizedBox(height: 8),
               _buildSectionTitle('Cảnh báo'),
               _buildListTile(
                 context: context,
                 icon: Icons.block,
-                title: widget.isBlocked
+                title: widget.isBlockedByMe
                     ? 'Bỏ chặn người dùng'
                     : 'Chặn người dùng',
-                subtitle: widget.isBlocked
+                subtitle: widget.isBlockedByMe
                     ? 'Gỡ chặn người dùng này'
                     : 'Chặn tin nhắn và cuộc gọi',
                 titleColor: const Color(0xFFFF5252),
                 iconColor: const Color(0xFFFF5252),
-                onTap: !widget.isDeletedAccount && !widget.isBlocked
+                onTap: widget.isBlockedByMe
                     ? () async {
+                        // Bỏ chặn người dùng
+                        final result = await ShowNotification.showConfirmDialog(
+                          context,
+                          title: 'Bạn muốn bỏ chặn người dùng này?',
+                          confirmText: 'Bỏ chặn',
+                          cancelText: 'Hủy',
+                          confirmColor: const Color(0xFF7A2FC0),
+                        );
+
+                        if (!result!) return;
+                        Navigator.pop(context);
+
+                        if (widget.onBlockUser != null &&
+                            widget.memberIds != null) {
+                          String friendId = widget.memberIds!.firstWhere(
+                            (id) => id != widget.currentUserId,
+                            orElse: () => '',
+                          );
+
+                          if (friendId.isEmpty) {
+                            await ShowNotification.showToast(
+                              context,
+                              'Không tìm thấy người dùng',
+                            );
+                            return;
+                          }
+
+                          // Gọi callback để bỏ chặn (same callback, backend sẽ xử lý)
+                          widget.onBlockUser!(friendId);
+                        }
+                      }
+                    : () async {
+                        // Chặn người dùng
                         final result = await ShowNotification.showConfirmDialog(
                           context,
                           title: 'Bạn muốn chặn người dùng này?',
@@ -353,8 +394,7 @@ class _ConversationSettingsScreenState
 
                           widget.onBlockUser!(friendId);
                         }
-                      }
-                    : null,
+                      },
               ),
             ],
             if (widget.isGroup)

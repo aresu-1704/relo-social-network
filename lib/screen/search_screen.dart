@@ -56,16 +56,17 @@ class _SearchScreenState extends State<SearchScreen> {
         final payload = data['payload'];
 
         // Listen to friend-related events
-        if (payload != null && 
+        if (payload != null &&
             (type == 'friend_request_accepted' ||
-             type == 'friend_added' ||
-             type == 'friend_request_declined' ||
-             type == 'friend_request_received')) {
+                type == 'friend_added' ||
+                type == 'friend_request_declined' ||
+                type == 'friend_request_received')) {
           String? relevantUserId;
 
           if (type == 'friend_request_received') {
             relevantUserId = payload['from_user_id'] as String?;
-          } else if (type == 'friend_request_accepted' || type == 'friend_added') {
+          } else if (type == 'friend_request_accepted' ||
+              type == 'friend_added') {
             relevantUserId = payload['user_id'] as String?;
           } else if (type == 'friend_request_declined') {
             relevantUserId = payload['user_id'] as String?;
@@ -90,7 +91,8 @@ class _SearchScreenState extends State<SearchScreen> {
       if (user.id == userId) {
         shouldUpdate = true;
         String newStatus;
-        if (eventType == 'friend_request_accepted' || eventType == 'friend_added') {
+        if (eventType == 'friend_request_accepted' ||
+            eventType == 'friend_added') {
           newStatus = 'friends';
         } else if (eventType == 'friend_request_declined') {
           newStatus = 'none';
@@ -99,7 +101,7 @@ class _SearchScreenState extends State<SearchScreen> {
         } else {
           newStatus = user.friendStatus ?? 'none';
         }
-        
+
         // Create new User object with updated friendStatus
         return User(
           id: user.id,
@@ -296,14 +298,16 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
     final status = widget.user.friendStatus?.toLowerCase().trim() ?? 'none';
     _friendStatus = status;
     // Debug: print to check if friendStatus is correct
-    print('Search result - User: ${widget.user.displayName}, friendStatus: $_friendStatus');
+    print(
+      'Search result - User: ${widget.user.displayName}, friendStatus: $_friendStatus',
+    );
   }
 
   @override
   void didUpdateWidget(_UserSearchResultItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Update friendStatus when widget is rebuilt with new user data
-    if (oldWidget.user.id != widget.user.id || 
+    if (oldWidget.user.id != widget.user.id ||
         oldWidget.user.friendStatus != widget.user.friendStatus) {
       setState(() {
         final status = widget.user.friendStatus?.toLowerCase().trim() ?? 'none';
@@ -319,10 +323,7 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
         await _userService.cancelFriendRequest(widget.user.id);
         if (mounted) {
           setState(() => _friendStatus = 'none');
-          await ShowNotification.showToast(
-            context,
-            'Đã hủy lời mời kết bạn',
-          );
+          await ShowNotification.showToast(context, 'Đã hủy lời mời kết bạn');
         }
       } else if (_friendStatus == 'pending_received') {
         // Người khác đã gửi lời mời cho tôi → Hiển thị menu chấp nhận/từ chối
@@ -350,7 +351,7 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
   String _getButtonLabel() {
     // Debug: print current status
     print('_getButtonLabel - _friendStatus: $_friendStatus');
-    
+
     if (_friendStatus == 'pending_sent') {
       return 'Đã gửi';
     } else if (_friendStatus == 'pending_received') {
@@ -395,7 +396,10 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
                       }
                     },
                     icon: Icon(Icons.check, color: Colors.white),
-                    label: Text('Chấp nhận', style: TextStyle(color: Colors.white)),
+                    label: Text(
+                      'Chấp nhận',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFF7A2FC0),
                       padding: EdgeInsets.symmetric(vertical: 12),
@@ -425,7 +429,10 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
                       }
                     },
                     icon: Icon(Icons.close, color: Colors.white),
-                    label: Text('Từ chối', style: TextStyle(color: Colors.white)),
+                    label: Text(
+                      'Từ chối',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       padding: EdgeInsets.symmetric(vertical: 12),
@@ -454,7 +461,8 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => ProfileScreen(userId: widget.user.id),
+            builder: (context) =>
+                ProfileScreen(userId: widget.user.id, hideMessageButton: true),
           ),
         );
       },

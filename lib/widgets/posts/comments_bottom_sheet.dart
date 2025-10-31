@@ -95,7 +95,10 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
       }
     } catch (e) {
       if (mounted) {
-        await ShowNotification.showToast(context, 'Lỗi: $e');
+        await ShowNotification.showToast(
+          context,
+          'Bình luận đã bị xáo trước đó',
+        );
       }
     }
   }
@@ -191,7 +194,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                               widget.currentUserId == comment.authorId ||
                               widget.currentUserId == widget.postAuthorId;
                           return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -258,7 +261,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                                               ),
                                             ),
                                             if (canDelete) ...[
-                                              const SizedBox(width: 8),
+                                              const SizedBox(width: 4),
                                               TextButton(
                                                 onPressed: () async {
                                                   final confirm =
