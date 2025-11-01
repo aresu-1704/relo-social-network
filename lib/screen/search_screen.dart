@@ -461,8 +461,7 @@ class _UserSearchResultItemState extends State<_UserSearchResultItem> {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) =>
-                ProfileScreen(userId: widget.user.id, hideMessageButton: true),
+            builder: (context) => ProfileScreen(userId: widget.user.id),
           ),
         );
       },

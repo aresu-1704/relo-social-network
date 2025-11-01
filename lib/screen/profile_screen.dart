@@ -541,18 +541,11 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.grey[400],
-              ),
+              Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
               SizedBox(height: 16),
               Text(
                 'Không thể tải thông tin người dùng',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
               SizedBox(height: 24),
               ElevatedButton.icon(
@@ -589,6 +582,40 @@ class _ProfileScreenState extends State<ProfileScreen>
                   final secureStorage = const SecureStorageService();
                   final currentUserId = await secureStorage.getUserId();
 
+                  if (currentUserId == null) {
+                    if (mounted) {
+                      await ShowNotification.showToast(
+                        context,
+                        'Không thể xác định người dùng',
+                      );
+                    }
+                    return;
+                  }
+
+                  // Extract member IDs from participants (ParticipantInfo has 'userId' field, not 'id')
+                  List<String> memberIds;
+                  if (participants.isNotEmpty) {
+                    memberIds = participants
+                        .map(
+                          (p) =>
+                              p['userId']?.toString() ??
+                              p['id']?.toString() ??
+                              '',
+                        )
+                        .where((id) => id.isNotEmpty)
+                        .toList();
+                    // Ensure both users are in the list for 1-1 chat
+                    if (!memberIds.contains(_user!.id)) {
+                      memberIds.add(_user!.id);
+                    }
+                    if (!memberIds.contains(currentUserId)) {
+                      memberIds.add(currentUserId);
+                    }
+                  } else {
+                    // Fallback: use known IDs for 1-1 chat
+                    memberIds = [_user!.id, currentUserId];
+                  }
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -597,12 +624,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             newConversation['_id'] ?? newConversation['id'],
                         isGroup: false,
                         chatName: _user!.displayName,
-                        memberIds: participants.isNotEmpty
-                            ? participants
-                                  .map((p) => p['id']?.toString() ?? '')
-                                  .where((id) => id.isNotEmpty)
-                                  .toList()
-                            : [_user!.id, currentUserId!],
+                        memberIds: memberIds,
                         avatarUrl: _user!.avatarUrl,
                       ),
                     ),

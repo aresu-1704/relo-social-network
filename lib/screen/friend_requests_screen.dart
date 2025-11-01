@@ -107,6 +107,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
             itemBuilder: (context, index) {
               final request = _requests[index];
               final fromUser = request['fromUser'] as Map<String, dynamic>?;
+              print("ID: ${fromUser?['id']}");
 
               if (fromUser == null) {
                 return const SizedBox.shrink();
@@ -128,8 +129,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                ProfileScreen(userId: fromUser['id']),
+                            builder: (context) => ProfileScreen(
+                              userId: fromUser['id'],
+                            ),
                           ),
                         );
                       },

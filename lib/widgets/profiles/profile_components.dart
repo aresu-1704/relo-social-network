@@ -90,7 +90,7 @@ class ProfileComponents {
           context,
           title: 'Bạn có chắc muốn chặn ${user.displayName}?',
           confirmText: 'Chặn',
-          cancelText: 'Hủy',
+          cancelText: 'Đồng ý',
           confirmColor: Colors.red,
         );
 
@@ -162,7 +162,7 @@ class ProfileComponents {
               bool? confirm = await ShowNotification.showConfirmDialog(
                 context,
                 title: 'Hủy lời mời kết bạn?',
-                confirmText: 'Hủy',
+                confirmText: 'Đồng ý',
                 cancelText: 'Không',
                 confirmColor: Colors.red,
               );

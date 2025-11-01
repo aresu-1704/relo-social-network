@@ -30,8 +30,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-select initial friend nếu có
-    if (widget.initialFriendId != null) {
+    // Pre-select initial friend nếu có (normalize to string)
+    if (widget.initialFriendId != null && widget.initialFriendId!.isNotEmpty) {
       _selectedFriendIds.add(widget.initialFriendId!);
     }
     _loadFriends();
@@ -49,12 +49,33 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
       // Đảm bảo initialFriendId vẫn được select sau khi load friends
       final selectedIds = Set<String>.from(_selectedFriendIds);
+
       if (widget.initialFriendId != null &&
           widget.initialFriendId!.isNotEmpty) {
+        // Luôn giữ initialFriendId trong selectedIds
+        selectedIds.add(widget.initialFriendId!);
+
         // Kiểm tra xem initialFriendId có trong danh sách bạn bè không
-        final friendExists = friends.any((f) => f.id == widget.initialFriendId);
-        if (friendExists) {
-          selectedIds.add(widget.initialFriendId!);
+        // Normalize cả hai về string để so sánh chính xác
+        final initialIdStr = widget.initialFriendId!.toString();
+        final friendExists = friends.any(
+          (f) =>
+              f.id.toString() == initialIdStr || f.id == widget.initialFriendId,
+        );
+
+        if (!friendExists) {
+          // Nếu người dùng không có trong danh sách bạn bè,
+          // thử load thông tin người dùng và thêm vào danh sách
+          try {
+            final friendUser = await _userService.getUserById(
+              widget.initialFriendId!,
+            );
+            if (!friends.any((f) => f.id == friendUser.id)) {
+              friends.add(friendUser);
+            }
+          } catch (e) {
+            print('Could not load friend user: $e');
+          }
         }
       }
 
@@ -306,7 +327,15 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Widget _buildFriendItem(User friend) {
-    final isSelected = _selectedFriendIds.contains(friend.id);
+    // Check if friend is selected - normalize IDs to strings for comparison
+    final friendIdStr = friend.id.toString();
+    final isSelected =
+        _selectedFriendIds.contains(friend.id) ||
+        _selectedFriendIds.contains(friendIdStr) ||
+        _selectedFriendIds.any(
+          (selectedId) =>
+              selectedId.toString() == friendIdStr || selectedId == friend.id,
+        );
 
     return InkWell(
       onTap: () => _toggleFriendSelection(friend.id),
