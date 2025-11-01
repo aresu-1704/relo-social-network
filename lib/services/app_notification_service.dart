@@ -474,15 +474,10 @@ class AppNotificationService {
       
       final conversationId = data['conversation_id'] as String? ?? '';
       
-      // Đảm bảo senderName luôn có giá trị
-      final senderNameRaw = data['sender_name'] as String? ?? '';
-      final senderName = senderNameRaw.trim().isEmpty ? 'Người dùng' : senderNameRaw.trim();
+      final senderName = data['sender_name'] as String? ?? 'Người dùng không xác định';
       
-      // Đảm bảo conversationName luôn có giá trị cho group
-      final conversationNameRaw = data['conversation_name'] as String? ?? '';
-      final conversationName = conversationNameRaw.trim().isEmpty 
-          ? (isGroup ? 'Cuộc trò chuyện' : '') 
-          : conversationNameRaw.trim();
+      final conversationName = data['conversation_name'] as String? ?? 'Cuộc trò chuyện';
+
       final contentType = data['content_type'] as String? ?? 'text';
       final hasReply = data['has_reply'] == 'true' || data['has_reply'] == true;
 
@@ -495,7 +490,7 @@ class AppNotificationService {
         // Chat nhóm: lấy avatar nhóm
         avatarUrl = data['conversation_avatar'] as String?;
       } else {
-        // Chat 1-1: lấy avatar người gửi
+
         avatarUrl = data['sender_avatar'] as String?;
       }
 
