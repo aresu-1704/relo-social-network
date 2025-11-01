@@ -18,17 +18,13 @@ class NotificationProvider extends ChangeNotifier {
   bool get hasUnread => unreadCount > 0;
 
   NotificationProvider() {
-    debugPrint('🏗️ NotificationProvider: Constructor called');
     _init();
   }
 
   Future<void> _init() async {
-    debugPrint('🔧 NotificationProvider: Initializing...');
     await _loadCurrentUserId();
-    debugPrint('👤 NotificationProvider: Current user ID: $_currentUserId');
     _loadNotifications();
     _listenToWebSocket();
-    debugPrint('✅ NotificationProvider: Initialization complete');
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -38,39 +34,26 @@ class NotificationProvider extends ChangeNotifier {
 
   Future<void> _loadNotifications() async {
     try {
-      debugPrint('🔄 Loading notifications from API...');
       final fetchedNotifications = await ServiceLocator.notificationService
           .getNotifications();
-      debugPrint('📦 Fetched ${fetchedNotifications.length} notifications');
-      for (var notif in fetchedNotifications) {
-        debugPrint(
-          '  - Type: ${notif.type}, Title: ${notif.title}, Message: ${notif.message}',
-        );
-      }
       _notifications.clear();
       _notifications.addAll(fetchedNotifications);
       notifyListeners();
-      debugPrint('✅ Total notifications in list: ${_notifications.length}');
     } catch (e) {
-      debugPrint('❌ Error loading notifications: $e');
+      // Silent fail
     }
   }
 
   void _listenToWebSocket() {
-    debugPrint('👂 NotificationProvider: Setting up WebSocket listener');
     _webSocketSubscription?.cancel(); // Cancel old subscription if exists
     _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
       message,
     ) {
-      debugPrint(
-        '📩 NotificationProvider received WebSocket message: $message',
-      );
       try {
         final data = jsonDecode(message);
 
         // Handle friend request received
         if (data['type'] == 'friend_request_received') {
-          debugPrint('✅ Friend request received, adding notification');
           _handleFriendRequestReceived(data['payload']);
         }
 
@@ -91,19 +74,13 @@ class NotificationProvider extends ChangeNotifier {
 
         // Handle new post - không xử lý realtime vì không có notification ID
         // Chỉ reload từ database khi vào màn hình notifications
-        // if (data['type'] == 'new_post') {
-        //   _handleNewPost(data['payload']).catchError((e) {
-        //     debugPrint('Error handling new post notification: $e');
-        //   });
-        // }
       } catch (e) {
-        debugPrint('Error parsing WebSocket message: $e');
+        // Silent fail
       }
     });
   }
 
   void _handleFriendRequestReceived(Map<String, dynamic>? payload) {
-    debugPrint('🔔 _handleFriendRequestReceived called with payload: $payload');
     // Realtime: Add notification to the top of the list khi nhận được lời mời kết bạn
     if (payload != null) {
       final notification = models.Notification(
@@ -119,11 +96,6 @@ class NotificationProvider extends ChangeNotifier {
       );
       _notifications.insert(0, notification);
       notifyListeners();
-      debugPrint(
-        '✅ Notification added to list. Total notifications: ${_notifications.length}',
-      );
-    } else {
-      debugPrint('❌ Payload is null');
     }
   }
 
@@ -202,7 +174,7 @@ class NotificationProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('Error marking notification as read: $e');
+      // Silent fail
     }
   }
 
@@ -211,7 +183,7 @@ class NotificationProvider extends ChangeNotifier {
       await ServiceLocator.notificationService.markAllAsRead();
       await _loadNotifications();
     } catch (e) {
-      debugPrint('Error marking all as read: $e');
+      // Silent fail
     }
   }
 
@@ -223,7 +195,7 @@ class NotificationProvider extends ChangeNotifier {
       _notifications.removeWhere((n) => n.id == notificationId);
       notifyListeners();
     } catch (e) {
-      debugPrint('Error deleting notification: $e');
+      // Silent fail
     }
   }
 

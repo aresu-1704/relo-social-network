@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
@@ -11,15 +10,9 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint(
-      '🖼️ NotificationsScreen: Building with ${Provider.of<NotificationProvider>(context).notifications.length} notifications',
-    );
     return Scaffold(
       body: Consumer<NotificationProvider>(
         builder: (context, provider, child) {
-          debugPrint(
-            '📋 NotificationsScreen: Consumer rebuild, notifications count: ${provider.notifications.length}',
-          );
           if (provider.notifications.isEmpty) {
             return const Center(
               child: Column(
@@ -196,7 +189,7 @@ class NotificationsScreen extends StatelessWidget {
     switch (type) {
       case 'friend_request':
       case 'friend_request_accepted':
-        return Icons.person_add_rounded;    
+        return Icons.person_add_rounded;
       case 'friend_added':
         return Icons.people_rounded;
       case 'new_post':

@@ -21,14 +21,19 @@ class AppNotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
+  bool _isAppInForeground = true; // Track app lifecycle state
 
   // Callback để xử lý navigation và reply
   Function(String conversationId, Map<String, dynamic>? payloadData)?
   onNotificationTapped;
   Function(String conversationId, String messageText)? onNotificationReply;
 
-  // Debug: Kiểm tra callback đã được setup chưa
   bool get hasReplyCallback => onNotificationReply != null;
+
+  /// Update app lifecycle state
+  void setAppLifecycleState(bool isInForeground) {
+    _isAppInForeground = isInForeground;
+  }
 
   /// Initialize notification service
   Future<void> initialize() async {
@@ -156,34 +161,28 @@ class AppNotificationService {
     // Xử lý tap notification thông thường
     if (response.payload != null && response.payload!.isNotEmpty) {
       try {
-        debugPrint('🔔 Notification tapped, payload: ${response.payload}');
         // Parse payload
         final data = _parsePayload(response.payload!);
 
         // Sử dụng _handleNotificationTap để xử lý tất cả các loại notification
         _handleNotificationTap(data);
       } catch (e) {
-        debugPrint('🔔 Error handling notification tap: $e');
+        // Silent fail
       }
-    } else {
-      debugPrint('🔔 WARNING: Notification payload is null or empty');
     }
   }
 
   /// Parse payload string thành Map
   Map<String, dynamic> _parsePayload(String payload) {
     try {
-      debugPrint('🔔 Parsing payload: $payload');
       // Thử parse như JSON đúng cách trước
       try {
         final decoded = jsonDecode(payload);
         if (decoded is Map) {
           final result = Map<String, dynamic>.from(decoded);
-          debugPrint('🔔 Parsed payload successfully: $result');
           return result;
         }
       } catch (e) {
-        debugPrint('🔔 JSON decode failed: $e, trying manual parse');
         // Not valid JSON, try manual parse
       }
 
@@ -241,22 +240,18 @@ class AppNotificationService {
 
   /// Setup Firebase message handlers
   void _setupMessageHandlers() {
-    // Foreground messages
+    // Foreground messages - chỉ hiển thị khi app ở background
+    // Nếu app đang foreground, không hiển thị notification (WebSocket đã handle)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('🔔 FCM onMessage received: ${message.data}');
-      _showLocalNotification(message);
-
-      // Xử lý reply nếu có
-      if (message.data.containsKey('type') &&
-          message.data['type'] == 'message' &&
-          message.data.containsKey('conversation_id')) {
-        // Notification đã được hiển thị với reply action từ backend
+      // Chỉ hiển thị notification nếu app đang ở background
+      // Khi app foreground, WebSocket sẽ handle realtime messages
+      if (!_isAppInForeground) {
+        _showLocalNotification(message);
       }
     });
 
     // Background message tap (app đang ở background)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('🔔 App opened from background with notification');
       // Delay nhỏ để đảm bảo app đã resume
       Future.delayed(const Duration(milliseconds: 500), () {
         _handleNotificationTap(message.data);
@@ -267,7 +262,6 @@ class AppNotificationService {
     // Lưu lại để xử lý sau khi app đã khởi tạo xong
     _firebaseMessaging.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
-        debugPrint('🔔 App opened from terminated state with notification');
         // Delay để đảm bảo app đã sẵn sàng (navigator đã được setup)
         Future.delayed(const Duration(milliseconds: 1500), () {
           _handleNotificationTap(message.data);
@@ -282,34 +276,20 @@ class AppNotificationService {
     final conversationId = data['conversation_id'] as String?;
     final screen = data['screen'] as String?;
 
-    debugPrint(
-      '🔔 _handleNotificationTap: type=$notificationType, screen=$screen, conversationId=$conversationId',
-    );
-
     // Handle friend request notification
     if (notificationType == 'friend_request' || screen == 'friend_requests') {
-      debugPrint(
-        '🔔 Friend request detected, calling onNotificationTapped with friend_requests',
-      );
       if (onNotificationTapped != null) {
         // Sử dụng 'friend_requests' làm identifier cho friend request screen
         onNotificationTapped!('friend_requests', data);
-      } else {
-        debugPrint('🔔 WARNING: onNotificationTapped is null!');
       }
       return;
     }
 
     // Handle chat message notification
     if (conversationId != null && conversationId.isNotEmpty) {
-      debugPrint(
-        '🔔 Chat message detected, calling onNotificationTapped with conversationId',
-      );
       // Gọi callback để navigate với payload data
       if (onNotificationTapped != null) {
         onNotificationTapped!(conversationId, data);
-      } else {
-        debugPrint('🔔 WARNING: onNotificationTapped is null!');
       }
     }
   }
@@ -356,6 +336,45 @@ class AppNotificationService {
       // Copy vào temp directory
       final tempDir = await getTemporaryDirectory();
       final filePath = '${tempDir.path}/default_avatar.jpg';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      // Validate file was created successfully
+      if (await file.exists()) {
+        return filePath;
+      }
+    } catch (e) {
+      // Silent fail
+    }
+    return null;
+  }
+
+  /// Load ảnh nhóm mặc định từ assets và copy vào temp directory
+  Future<String?> _loadDefaultGroupAvatarFromAssets() async {
+    try {
+      // Thử load ảnh từ assets/none_images/group.jpg
+      ByteData data;
+      try {
+        data = await rootBundle.load('assets/none_images/group.jpg');
+      } catch (e) {
+        // Fallback: thử dùng avatar.jpg
+        try {
+          data = await rootBundle.load('assets/none_images/avatar.jpg');
+        } catch (e2) {
+          // Fallback cuối: icon.png
+          try {
+            data = await rootBundle.load('assets/icons/icon.png');
+          } catch (e3) {
+            return null;
+          }
+        }
+      }
+
+      final Uint8List bytes = data.buffer.asUint8List();
+
+      // Copy vào temp directory
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/default_group_avatar.jpg';
       final file = File(filePath);
       await file.writeAsBytes(bytes);
 
@@ -422,56 +441,107 @@ class AppNotificationService {
     return null;
   }
 
-  /// Show local notification
   Future<void> _showLocalNotification(RemoteMessage message) async {
     try {
       final data = message.data;
+      if (data.isEmpty) return;
+
+      final notification = message.notification;
       final notificationType = data['type'] as String?;
       final screen = data['screen'] as String?;
 
-      // Handle friend request notification (data-only)
+      // --- Friend request ---
       if (notificationType == 'friend_request' || screen == 'friend_requests') {
-        // Tạo notification details cho friend request từ data
-        final notification =
-            message.notification ??
+        final notif =
+            notification ??
             RemoteNotification(
               title: data['title'] as String?,
               body: data['body'] as String?,
             );
-        await _showFriendRequestNotification(notification, data);
+        await _showFriendRequestNotification(notif, data);
         return;
       }
 
-      final notification = message.notification;
-      if (notification == null) return;
+      // --- Basic fields ---
+      // PHÂN BIỆT CHAT NHÓM VÀ CHAT 1-1 dựa trên flag is_group
+      // Backend gửi: "true" (string) hoặc true (bool) = chat nhóm
+      //              "false" (string) hoặc false (bool) = chat 1-1
+      final isGroupValue = data['is_group'];
+      final isGroup = isGroupValue == 'true' || 
+                     isGroupValue == true || 
+                     isGroupValue == 1 ||
+                     isGroupValue == '1';
+      
+      final conversationId = data['conversation_id'] as String? ?? '';
+      
+      // Đảm bảo senderName luôn có giá trị
+      final senderNameRaw = data['sender_name'] as String? ?? '';
+      final senderName = senderNameRaw.trim().isEmpty ? 'Người dùng' : senderNameRaw.trim();
+      
+      // Đảm bảo conversationName luôn có giá trị cho group
+      final conversationNameRaw = data['conversation_name'] as String? ?? '';
+      final conversationName = conversationNameRaw.trim().isEmpty 
+          ? (isGroup ? 'Cuộc trò chuyện' : '') 
+          : conversationNameRaw.trim();
+      final contentType = data['content_type'] as String? ?? 'text';
+      final hasReply = data['has_reply'] == 'true' || data['has_reply'] == true;
 
-      // Handle chat message notification
-      final conversationId = data['conversation_id'] as String?;
-      final hasReply = data['has_reply'] == 'true';
-      final senderAvatar = data['sender_avatar'] as String?;
-      // final imageUrl = data['image_url'] as String?; // Reserved for future use
-      final senderName =
-          data['sender_name'] as String? ?? notification.title ?? '';
-
-      // Download avatar để hiển thị largeIcon
+      // --- Avatar: PHÂN BIỆT RÕ RÀNG ---
+      // CHAT NHÓM: dùng conversation_avatar (ảnh nhóm)
+      // CHAT 1-1: dùng sender_avatar (ảnh người gửi)
       String? avatarPath;
-      if (senderAvatar != null && senderAvatar.isNotEmpty) {
-        avatarPath = await _downloadImageForNotification(senderAvatar);
-        if (avatarPath != null && avatarPath.isEmpty) {
-          avatarPath = null;
+      String? avatarUrl;
+      if (isGroup) {
+        // Chat nhóm: lấy avatar nhóm
+        avatarUrl = data['conversation_avatar'] as String?;
+      } else {
+        // Chat 1-1: lấy avatar người gửi
+        avatarUrl = data['sender_avatar'] as String?;
+      }
+
+      if (avatarUrl != null && avatarUrl.isNotEmpty) {
+        avatarPath = await _downloadImageForNotification(avatarUrl);
+        if (avatarPath != null && avatarPath.isEmpty) avatarPath = null;
+      }
+      // Đảm bảo LUÔN có avatar (fallback về default nếu không có)
+      if (avatarPath == null) {
+        avatarPath = isGroup
+            ? await _loadDefaultGroupAvatarFromAssets()
+            : await _loadDefaultAvatarFromAssets();
+        // Nếu vẫn null, thử lại một lần nữa
+        if (avatarPath == null) {
+          try {
+            if (isGroup) {
+              // Fallback cuối cho group: dùng avatar.jpg
+              final assetData = await rootBundle.load('assets/none_images/avatar.jpg');
+              final bytes = assetData.buffer.asUint8List();
+              final tempDir = await getTemporaryDirectory();
+              final filePath = '${tempDir.path}/default_group_avatar_final.jpg';
+              final file = File(filePath);
+              await file.writeAsBytes(bytes);
+              if (await file.exists()) {
+                avatarPath = filePath;
+              }
+            } else {
+              // Fallback cuối cho 1-1: dùng icon.png
+              final assetData = await rootBundle.load('assets/icons/icon.png');
+              final bytes = assetData.buffer.asUint8List();
+              final tempDir = await getTemporaryDirectory();
+              final filePath = '${tempDir.path}/default_avatar_final.png';
+              final file = File(filePath);
+              await file.writeAsBytes(bytes);
+              if (await file.exists()) {
+                avatarPath = filePath;
+              }
+            }
+          } catch (e) {
+            // Final fallback - không có avatar
+          }
         }
       }
 
-      // Nếu không có avatar từ URL, sử dụng ảnh mặc định từ assets
-      if (avatarPath == null) {
-        avatarPath = await _loadDefaultAvatarFromAssets();
-      }
-
-      // Format message content giống MessagesScreen
-      final contentType = data['content_type'] as String? ?? 'text';
-      final messageContent = notification.body ?? '';
+      // --- Nội dung hiển thị ---
       String formattedContent;
-
       switch (contentType) {
         case 'audio':
           formattedContent = '🎤 [Tin nhắn thoại]';
@@ -486,139 +556,88 @@ class AppNotificationService {
           formattedContent = '[Tin nhắn đã bị thu hồi]';
           break;
         default:
-          formattedContent = messageContent.isNotEmpty
-              ? messageContent
-              : 'Đã gửi tin nhắn';
+          formattedContent = notification?.body ?? 'Đã gửi tin nhắn';
       }
 
-      // Parse payload thành JSON string
-      String payload;
-      try {
-        payload = jsonEncode(data);
-      } catch (e) {
-        // Fallback nếu không encode được
-        try {
-          payload = data.entries
-              .map((e) => '"${e.key}":"${e.value}"')
-              .join(',');
-          payload = '{$payload}';
-        } catch (e2) {
-          payload = data.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+      // Nếu là nhóm: thêm tên người gửi
+      if (isGroup && senderName.isNotEmpty) {
+        final prefix = '${senderName.trim()}:';
+        if (!formattedContent.toLowerCase().startsWith(prefix.toLowerCase())) {
+          formattedContent = '$senderName: $formattedContent';
         }
       }
 
-      // Sử dụng MessagingStyle để hiển thị avatar bên trái (Android 7.0+)
-      AndroidNotificationDetails androidDetails;
-      if (hasReply && conversationId != null) {
-        // Notification với reply action và inline reply
-        androidDetails = AndroidNotificationDetails(
-          'relo_channel',
-          'Relo Notifications',
-          channelDescription: 'Notifications from Relo social network',
-          importance: Importance.high,
-          priority: Priority.high,
-          showWhen: true,
-          category: AndroidNotificationCategory.message,
-          tag: conversationId, // Group notifications theo conversation_id
-          styleInformation: MessagingStyleInformation(
-            Person(
-              name: senderName,
-              icon: avatarPath != null
-                  ? BitmapFilePathAndroidIcon(avatarPath)
-                  : null,
-            ),
-            messages: [
-              Message(
-                formattedContent,
-                DateTime.now(),
-                Person(
-                  name: senderName,
-                  icon: avatarPath != null
-                      ? BitmapFilePathAndroidIcon(avatarPath)
-                      : null,
-                ),
-              ),
-            ],
-          ),
-          largeIcon: avatarPath != null
-              ? FilePathAndroidBitmap(avatarPath)
-              : null,
-          actions: [
-            AndroidNotificationAction(
-              'REPLY',
-              'Trả lời',
-              showsUserInterface: true, // Mở app khi bấm reply
-              titleColor: const Color(0xFF7A2FC0),
-              cancelNotification: false,
-            ),
-          ],
-        );
-      } else {
-        // Notification không có reply action
-        androidDetails = AndroidNotificationDetails(
-          'relo_channel',
-          'Relo Notifications',
-          channelDescription: 'Notifications from Relo social network',
-          importance: Importance.high,
-          priority: Priority.high,
-          showWhen: true,
-          tag: conversationId, // Group notifications theo conversation_id
-          styleInformation: MessagingStyleInformation(
-            Person(
-              name: senderName,
-              icon: avatarPath != null
-                  ? BitmapFilePathAndroidIcon(avatarPath)
-                  : null,
-            ),
-            messages: [
-              Message(
-                formattedContent,
-                DateTime.now(),
-                Person(
-                  name: senderName,
-                  icon: avatarPath != null
-                      ? BitmapFilePathAndroidIcon(avatarPath)
-                      : null,
-                ),
-              ),
-            ],
-          ),
-          largeIcon: avatarPath != null
-              ? FilePathAndroidBitmap(avatarPath)
-              : null,
-        );
-      }
+      // --- Title/Body: PHÂN BIỆT RÕ RÀNG ---
+      // CHAT NHÓM: Title = tên nhóm (hoặc "Cuộc trò chuyện" nếu không có tên), Body = "Tên người gửi: Nội dung"
+      // CHAT 1-1: Title = tên người gửi, Body = nội dung
+      // Đảm bảo chat nhóm LUÔN có title hợp lệ, không được dùng tên người gửi
+      final title = isGroup
+          ? (conversationName.isNotEmpty ? conversationName : 'Cuộc trò chuyện')
+          : (senderName.isNotEmpty ? senderName : 'Người dùng');
+      final body = formattedContent;
 
-      // iOS notification với reply category
+      // --- Payload JSON ---
+      String payload = jsonEncode(data);
+
+      // --- Android details ---
+      final person = Person(
+        name: senderName,
+        icon: avatarPath != null ? BitmapFilePathAndroidIcon(avatarPath) : null,
+      );
+      final style = MessagingStyleInformation(
+        person,
+        messages: [Message(formattedContent, DateTime.now(), person)],
+      );
+
+      final androidDetails = AndroidNotificationDetails(
+        'relo_channel',
+        'Relo Notifications',
+        channelDescription: 'Relo chat messages',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        category: AndroidNotificationCategory.message,
+        groupKey: conversationId.isNotEmpty ? 'conv_$conversationId' : null,
+        styleInformation: style,
+        largeIcon: avatarPath != null
+            ? FilePathAndroidBitmap(avatarPath)
+            : null,
+        actions: hasReply
+            ? [
+                AndroidNotificationAction(
+                  'REPLY',
+                  'Trả lời',
+                  showsUserInterface: true,
+                  titleColor: const Color(0xFF7A2FC0),
+                  cancelNotification: false,
+                ),
+              ]
+            : null,
+      );
+
       final iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-        categoryIdentifier: hasReply && conversationId != null
-            ? 'REPLY_CATEGORY'
-            : 'DEFAULT_CATEGORY',
       );
 
       final details = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );
-
-      // Sử dụng conversation_id để group notifications (nếu có)
-      // Cùng notificationId và tag sẽ đảm bảo chỉ có 1 notification per conversation
-      final notificationId = conversationId != null && conversationId.isNotEmpty
+      final id = conversationId.isNotEmpty
           ? conversationId.hashCode
-          : notification.hashCode;
+          : DateTime.now().hashCode;
 
       await _localNotifications.show(
-        notificationId,
-        notification.title,
-        notification.body,
+        id,
+        title,
+        body,
         details,
         payload: payload,
       );
     } catch (e) {
-      print('Error showing local notification: $e');
+      // optional: print debug log
     }
   }
 
@@ -627,19 +646,12 @@ class AppNotificationService {
     RemoteNotification notification,
     Map<String, dynamic> data,
   ) async {
-    debugPrint('🔔 _showFriendRequestNotification called with data: $data');
     try {
       final fromUserName =
-          data['from_user_name'] as String? ??
-          data['sender_name'] as String? ??
-          'Người dùng';
+          data['title'] as String? ?? data['sender_name'] as String?;
       final fromUserAvatar =
           data['sender_avatar'] as String? ??
           data['from_user_avatar'] as String?;
-
-      debugPrint(
-        '🔔 Friend request from: $fromUserName, avatar: $fromUserAvatar',
-      );
 
       // Download avatar để hiển thị
       String? avatarPath;
@@ -651,7 +663,7 @@ class AppNotificationService {
       }
 
       // Nếu không có avatar, sử dụng ảnh mặc định
-      if (avatarPath == null) {
+      if (avatarPath == null || avatarPath.isEmpty) {
         avatarPath = await _loadDefaultAvatarFromAssets();
       }
 
@@ -662,8 +674,6 @@ class AppNotificationService {
       } catch (e) {
         payload = data.entries.map((e) => '${e.key}: ${e.value}').join(', ');
       }
-
-      debugPrint('🔔 Friend request notification payload: $payload');
 
       // Tạo notification details
       final androidDetails = AndroidNotificationDetails(
@@ -698,9 +708,8 @@ class AppNotificationService {
         details,
         payload: payload,
       );
-      debugPrint('🔔 ✅ Friend request notification shown successfully');
     } catch (e) {
-      debugPrint('❌ Error showing friend request notification: $e');
+      // Silent fail
     }
   }
 
@@ -899,9 +908,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Handle friend request notification (data-only)
   if (notificationType == 'friend_request' || screen == 'friend_requests') {
     final fromUserName =
-        data['from_user_name'] as String? ??
-        data['sender_name'] as String? ??
-        'Người dùng';
+        data['from_user_name'] as String? ?? data['sender_name'] as String?;
 
     // Parse payload
     String payload;
@@ -945,14 +952,142 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 
   // Handle chat message notification
+  // Backend gửi data-only messages, cần xử lý từ data
   final notification = message.notification;
-  if (notification == null) return;
-
+  
   final conversationId = data['conversation_id'] as String?;
   final hasReply = data['has_reply'] == 'true';
-  final senderName = data['sender_name'] as String? ?? notification.title ?? '';
+  
+  // PHÂN BIỆT CHAT NHÓM VÀ CHAT 1-1 dựa trên flag is_group
+  // Backend gửi: "true" (string) hoặc true (bool) = chat nhóm
+  //              "false" (string) hoặc false (bool) = chat 1-1
+  final isGroupValue = data['is_group'];
+  final isGroup = isGroupValue == 'true' || 
+                 isGroupValue == true || 
+                 isGroupValue == 1 ||
+                 isGroupValue == '1';
+  
+  // Đảm bảo senderName luôn có giá trị
+  final senderNameRaw = (data['sender_name'] as String? ?? '').trim();
+  final senderName = senderNameRaw.isEmpty 
+      ? ((notification?.title ?? '').trim().isEmpty ? 'Người dùng' : notification!.title!)
+      : senderNameRaw;
+  
   final contentType = data['content_type'] as String? ?? 'text';
-  final messageContent = notification.body ?? '';
+  final messageContent = (data['body'] as String? ?? '').trim().isEmpty
+      ? (notification?.body ?? '')
+      : (data['body'] as String? ?? '');
+  
+  // --- Avatar: PHÂN BIỆT RÕ RÀNG ---
+  // CHAT NHÓM: lấy conversation_avatar (ảnh nhóm)
+  // CHAT 1-1: lấy sender_avatar (ảnh người gửi)
+  String? avatarUrl;
+  if (isGroup) {
+    // Chat nhóm: dùng avatar nhóm
+    avatarUrl = data['conversation_avatar'] as String?;
+  } else {
+    // Chat 1-1: dùng avatar người gửi
+    avatarUrl = data['sender_avatar'] as String?;
+  }
+  
+  // Download avatar nếu có
+  String? avatarPath;
+  if (avatarUrl != null && avatarUrl.isNotEmpty) {
+    try {
+      final response = await http.get(Uri.parse(avatarUrl));
+      if (response.statusCode == 200) {
+        final tempDir = await getTemporaryDirectory();
+        final hash = avatarUrl.hashCode.abs().toString();
+        final extension = avatarUrl.toLowerCase().contains('.png')
+            ? '.png'
+            : (avatarUrl.toLowerCase().contains('.jpg') || avatarUrl.toLowerCase().contains('.jpeg'))
+                ? '.jpg'
+                : '.png';
+        final filePath = '${tempDir.path}/notification_$hash$extension';
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+        if (await file.exists()) {
+          avatarPath = filePath;
+        }
+      }
+    } catch (e) {
+      // Silent fail, sẽ dùng default avatar
+    }
+  }
+  
+  // Đảm bảo LUÔN có avatar (fallback về default nếu không có)
+  if (avatarPath == null) {
+    if (isGroup) {
+      // Load default group avatar từ assets
+      try {
+        final assetData = await rootBundle.load('assets/none_images/group.jpg');
+        final bytes = assetData.buffer.asUint8List();
+        final tempDir = await getTemporaryDirectory();
+        final filePath = '${tempDir.path}/default_group_avatar.jpg';
+        final file = File(filePath);
+        await file.writeAsBytes(bytes);
+        if (await file.exists()) {
+          avatarPath = filePath;
+        }
+      } catch (e) {
+        // Fallback tiếp: dùng avatar.jpg
+        try {
+          final assetData = await rootBundle.load('assets/none_images/avatar.jpg');
+          final bytes = assetData.buffer.asUint8List();
+          final tempDir = await getTemporaryDirectory();
+          final filePath = '${tempDir.path}/default_group_avatar_fallback.jpg';
+          final file = File(filePath);
+          await file.writeAsBytes(bytes);
+          if (await file.exists()) {
+            avatarPath = filePath;
+          }
+        } catch (e2) {
+          // Fallback cuối: dùng icon.png
+          try {
+            final assetData = await rootBundle.load('assets/icons/icon.png');
+            final bytes = assetData.buffer.asUint8List();
+            final tempDir = await getTemporaryDirectory();
+            final filePath = '${tempDir.path}/default_group_avatar_final.png';
+            final file = File(filePath);
+            await file.writeAsBytes(bytes);
+            if (await file.exists()) {
+              avatarPath = filePath;
+            }
+          } catch (e3) {
+            // Final fallback - không có avatar
+          }
+        }
+      }
+    } else {
+      // Load default avatar từ assets cho chat 1-1
+      try {
+        final assetData = await rootBundle.load('assets/none_images/avatar.jpg');
+        final bytes = assetData.buffer.asUint8List();
+        final tempDir = await getTemporaryDirectory();
+        final filePath = '${tempDir.path}/default_avatar.jpg';
+        final file = File(filePath);
+        await file.writeAsBytes(bytes);
+        if (await file.exists()) {
+          avatarPath = filePath;
+        }
+      } catch (e) {
+        // Fallback: dùng icon.png
+        try {
+          final assetData = await rootBundle.load('assets/icons/icon.png');
+          final bytes = assetData.buffer.asUint8List();
+          final tempDir = await getTemporaryDirectory();
+          final filePath = '${tempDir.path}/default_avatar_fallback.png';
+          final file = File(filePath);
+          await file.writeAsBytes(bytes);
+          if (await file.exists()) {
+            avatarPath = filePath;
+          }
+        } catch (e2) {
+          // Final fallback - không có avatar
+        }
+      }
+    }
+  }
 
   String formattedContent;
   switch (contentType) {
@@ -974,6 +1109,28 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           : 'Đã gửi tin nhắn';
   }
 
+  // Nếu là group chat và nội dung chưa có format "Tên người gửi: " thì thêm vào
+  if (isGroup && senderName.isNotEmpty) {
+    // Kiểm tra xem formattedContent đã có format "Tên: " chưa
+    final senderNamePrefix = '$senderName: ';
+    if (!formattedContent.startsWith(senderNamePrefix)) {
+      formattedContent = '$senderNamePrefix$formattedContent';
+    }
+  }
+
+  // --- Title/Body: PHÂN BIỆT RÕ RÀNG ---
+  // CHAT NHÓM: title = tên nhóm (fallback "Cuộc trò chuyện"), body = "Tên người gửi: Nội dung"
+  // CHAT 1-1: title = tên người gửi, body = nội dung
+  // Đảm bảo chat nhóm LUÔN có title hợp lệ, không được dùng tên người gửi
+  final conversationNameRaw = (data['conversation_name'] as String? ?? '').trim();
+  final conversationName = conversationNameRaw.isEmpty 
+      ? (isGroup ? 'Cuộc trò chuyện' : '') 
+      : conversationNameRaw;
+  final notificationTitle = isGroup
+      ? (conversationName.isNotEmpty ? conversationName : 'Cuộc trò chuyện')
+      : (senderName.isNotEmpty ? senderName : 'Người dùng');
+  final notificationBody = formattedContent;
+
   // Parse payload thành JSON string
   String payload;
   try {
@@ -989,6 +1146,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 
   // Tạo notification details với tag để group notifications
+  // Tạo Person với avatar
+  final person = Person(
+    name: senderName,
+    icon: avatarPath != null ? BitmapFilePathAndroidIcon(avatarPath) : null,
+  );
+  
   AndroidNotificationDetails androidDetails;
   if (hasReply && conversationId != null) {
     androidDetails = AndroidNotificationDetails(
@@ -1001,11 +1164,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       category: AndroidNotificationCategory.message,
       tag: conversationId, // Group notifications theo conversation_id
       styleInformation: MessagingStyleInformation(
-        Person(name: senderName),
+        person,
         messages: [
-          Message(formattedContent, DateTime.now(), Person(name: senderName)),
+          Message(formattedContent, DateTime.now(), person),
         ],
       ),
+      largeIcon: avatarPath != null
+          ? FilePathAndroidBitmap(avatarPath)
+          : null,
       actions: [
         AndroidNotificationAction(
           'REPLY',
@@ -1026,11 +1192,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       showWhen: true,
       tag: conversationId, // Group notifications theo conversation_id
       styleInformation: MessagingStyleInformation(
-        Person(name: senderName),
+        person,
         messages: [
-          Message(formattedContent, DateTime.now(), Person(name: senderName)),
+          Message(formattedContent, DateTime.now(), person),
         ],
       ),
+      largeIcon: avatarPath != null
+          ? FilePathAndroidBitmap(avatarPath)
+          : null,
     );
   }
 
@@ -1048,8 +1217,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   await localNotifications.show(
     notificationId,
-    notification.title,
-    notification.body,
+    notificationTitle,
+    notificationBody,
     details,
     payload: payload,
   );
