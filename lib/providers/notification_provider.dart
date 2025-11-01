@@ -18,13 +18,17 @@ class NotificationProvider extends ChangeNotifier {
   bool get hasUnread => unreadCount > 0;
 
   NotificationProvider() {
+    debugPrint('🏗️ NotificationProvider: Constructor called');
     _init();
   }
 
   Future<void> _init() async {
+    debugPrint('🔧 NotificationProvider: Initializing...');
     await _loadCurrentUserId();
+    debugPrint('👤 NotificationProvider: Current user ID: $_currentUserId');
     _loadNotifications();
     _listenToWebSocket();
+    debugPrint('✅ NotificationProvider: Initialization complete');
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -34,30 +38,41 @@ class NotificationProvider extends ChangeNotifier {
 
   Future<void> _loadNotifications() async {
     try {
+      debugPrint('🔄 Loading notifications from API...');
       final fetchedNotifications = await ServiceLocator.notificationService
           .getNotifications();
+      debugPrint('📦 Fetched ${fetchedNotifications.length} notifications');
+      for (var notif in fetchedNotifications) {
+        debugPrint(
+          '  - Type: ${notif.type}, Title: ${notif.title}, Message: ${notif.message}',
+        );
+      }
       _notifications.clear();
       _notifications.addAll(fetchedNotifications);
       notifyListeners();
+      debugPrint('✅ Total notifications in list: ${_notifications.length}');
     } catch (e) {
-      debugPrint('Error loading notifications: $e');
+      debugPrint('❌ Error loading notifications: $e');
     }
   }
 
   void _listenToWebSocket() {
+    debugPrint('👂 NotificationProvider: Setting up WebSocket listener');
     _webSocketSubscription?.cancel(); // Cancel old subscription if exists
     _webSocketSubscription = ServiceLocator.websocketService.stream.listen((
       message,
     ) {
+      debugPrint(
+        '📩 NotificationProvider received WebSocket message: $message',
+      );
       try {
-        // DEBUG: In thông tin để kiểm tra
-        print(
-          "🔔 [DEBUG] NotificationProvider received WebSocket message: $message",
-        );
         final data = jsonDecode(message);
-        print(
-          "🔔 [DEBUG] NotificationProvider parsed data: type=${data['type']}, payload=${data['payload']}",
-        );
+
+        // Handle friend request received
+        if (data['type'] == 'friend_request_received') {
+          debugPrint('✅ Friend request received, adding notification');
+          _handleFriendRequestReceived(data['payload']);
+        }
 
         // Handle friend request accepted
         if (data['type'] == 'friend_request_accepted') {
@@ -74,23 +89,49 @@ class NotificationProvider extends ChangeNotifier {
           _handlePostReaction(data['payload']);
         }
 
-        // Handle new post
-        if (data['type'] == 'new_post') {
-          _handleNewPost(data['payload']).catchError((e) {
-            debugPrint('Error handling new post notification: $e');
-          });
-        }
+        // Handle new post - không xử lý realtime vì không có notification ID
+        // Chỉ reload từ database khi vào màn hình notifications
+        // if (data['type'] == 'new_post') {
+        //   _handleNewPost(data['payload']).catchError((e) {
+        //     debugPrint('Error handling new post notification: $e');
+        //   });
+        // }
       } catch (e) {
         debugPrint('Error parsing WebSocket message: $e');
       }
     });
   }
 
+  void _handleFriendRequestReceived(Map<String, dynamic>? payload) {
+    debugPrint('🔔 _handleFriendRequestReceived called with payload: $payload');
+    // Realtime: Add notification to the top of the list khi nhận được lời mời kết bạn
+    if (payload != null) {
+      final notification = models.Notification(
+        id: payload['id'] ?? 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        userId: _currentUserId ?? '',
+        type: 'friend_request',
+        title: 'Lời mời kết bạn',
+        message:
+            '${payload['displayName'] ?? 'Người dùng'} muốn kết bạn với bạn',
+        metadata: payload,
+        isRead: false,
+        createdAt: DateTime.now().toIso8601String(),
+      );
+      _notifications.insert(0, notification);
+      notifyListeners();
+      debugPrint(
+        '✅ Notification added to list. Total notifications: ${_notifications.length}',
+      );
+    } else {
+      debugPrint('❌ Payload is null');
+    }
+  }
+
   void _handleFriendRequestAccepted(Map<String, dynamic>? payload) {
     // Realtime: Add notification to the top of the list
     if (payload != null) {
       final notification = models.Notification(
-        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        id: payload['id'] ?? 'temp_${DateTime.now().millisecondsSinceEpoch}',
         userId: payload['userId'] ?? '',
         type: 'friend_request_accepted',
         title: 'Đã chấp nhận lời mời kết bạn',
@@ -109,7 +150,7 @@ class NotificationProvider extends ChangeNotifier {
     // Realtime: Add notification to the top of the list
     if (payload != null) {
       final notification = models.Notification(
-        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        id: payload['id'] ?? 'temp_${DateTime.now().millisecondsSinceEpoch}',
         userId: payload['userId'] ?? '',
         type: 'friend_added',
         title: 'Đã kết bạn',
@@ -128,7 +169,7 @@ class NotificationProvider extends ChangeNotifier {
     // Realtime: Add notification to the top of the list
     if (payload != null) {
       final notification = models.Notification(
-        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        id: payload['id'] ?? 'temp_${DateTime.now().millisecondsSinceEpoch}',
         userId: payload['userId'] ?? '',
         type: 'post_reaction',
         title: 'Có người thích bài viết của bạn',
@@ -140,38 +181,6 @@ class NotificationProvider extends ChangeNotifier {
       );
       _notifications.insert(0, notification);
       notifyListeners();
-    }
-  }
-
-  Future<void> _handleNewPost(Map<String, dynamic>? payload) async {
-    // Realtime: Add notification to the top of the list
-    // Chỉ thêm thông báo nếu có currentUserId và đảm bảo thông báo này dành cho user hiện tại
-    if (payload != null) {
-      // Đảm bảo đã load currentUserId
-      if (_currentUserId == null) {
-        await _loadCurrentUserId();
-      }
-
-      // Kiểm tra: chỉ thêm thông báo nếu authorId khác với currentUserId
-      // (không hiển thị thông báo bài viết của chính mình)
-      final authorId = payload['authorId'] as String?;
-      if (authorId != null &&
-          _currentUserId != null &&
-          authorId != _currentUserId) {
-        final notification = models.Notification(
-          id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-          userId: _currentUserId!, // Sử dụng ID của người nhận (current user)
-          type: 'new_post',
-          title: 'Bài viết mới',
-          message:
-              '${payload['authorName'] ?? 'Người dùng'} đã đăng một bài viết mới',
-          metadata: payload,
-          isRead: false,
-          createdAt: DateTime.now().toIso8601String(),
-        );
-        _notifications.insert(0, notification);
-        notifyListeners();
-      }
     }
   }
 

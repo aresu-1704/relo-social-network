@@ -290,8 +290,20 @@ class AppNotificationService {
 
   /// Handle notification tap và navigate
   void _handleNotificationTap(Map<String, dynamic> data) {
+    final notificationType = data['type'] as String?;
     final conversationId = data['conversation_id'] as String?;
+    final screen = data['screen'] as String?;
 
+    // Handle friend request notification
+    if (notificationType == 'friend_request' || screen == 'friend_requests') {
+      if (onNotificationTapped != null) {
+        // Sử dụng 'friend_requests' làm identifier cho friend request screen
+        onNotificationTapped!('friend_requests', data);
+      }
+      return;
+    }
+
+    // Handle chat message notification
     if (conversationId != null && conversationId.isNotEmpty) {
       // Gọi callback để navigate với payload data
       if (onNotificationTapped != null) {
@@ -415,6 +427,16 @@ class AppNotificationService {
       if (notification == null) return;
 
       final data = message.data;
+      final notificationType = data['type'] as String?;
+      final screen = data['screen'] as String?;
+
+      // Handle friend request notification
+      if (notificationType == 'friend_request' || screen == 'friend_requests') {
+        await _showFriendRequestNotification(notification, data);
+        return;
+      }
+
+      // Handle chat message notification
       final conversationId = data['conversation_id'] as String?;
       final hasReply = data['has_reply'] == 'true';
       final senderAvatar = data['sender_avatar'] as String?;
@@ -588,6 +610,80 @@ class AppNotificationService {
       );
     } catch (e) {
       print('Error showing local notification: $e');
+    }
+  }
+
+  /// Show friend request notification
+  Future<void> _showFriendRequestNotification(
+    RemoteNotification notification,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final fromUserName =
+          data['from_user_name'] as String? ??
+          data['sender_name'] as String? ??
+          'Người dùng';
+      final fromUserAvatar =
+          data['sender_avatar'] as String? ??
+          data['from_user_avatar'] as String?;
+
+      // Download avatar để hiển thị
+      String? avatarPath;
+      if (fromUserAvatar != null && fromUserAvatar.isNotEmpty) {
+        avatarPath = await _downloadImageForNotification(fromUserAvatar);
+        if (avatarPath != null && avatarPath.isEmpty) {
+          avatarPath = null;
+        }
+      }
+
+      // Nếu không có avatar, sử dụng ảnh mặc định
+      if (avatarPath == null) {
+        avatarPath = await _loadDefaultAvatarFromAssets();
+      }
+
+      // Parse payload
+      String payload;
+      try {
+        payload = jsonEncode(data);
+      } catch (e) {
+        payload = data.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+      }
+
+      // Tạo notification details
+      final androidDetails = AndroidNotificationDetails(
+        'relo_channel',
+        'Relo Notifications',
+        channelDescription: 'Notifications from Relo social network',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        largeIcon: avatarPath != null
+            ? FilePathAndroidBitmap(avatarPath)
+            : null,
+      );
+
+      final iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // Hiển thị notification
+      await _localNotifications.show(
+        'friend_request_${data['from_user_id'] ?? DateTime.now().millisecondsSinceEpoch}'
+            .hashCode,
+        notification.title ?? 'Lời mời kết bạn',
+        notification.body ?? '$fromUserName muốn kết bạn với bạn',
+        details,
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('Error showing friend request notification: $e');
     }
   }
 
@@ -782,6 +878,58 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final notification = message.notification;
   if (notification != null) {
     final data = message.data;
+    final notificationType = data['type'] as String?;
+    final screen = data['screen'] as String?;
+
+    // Handle friend request notification
+    if (notificationType == 'friend_request' || screen == 'friend_requests') {
+      final fromUserName =
+          data['from_user_name'] as String? ??
+          data['sender_name'] as String? ??
+          'Người dùng';
+
+      // Parse payload
+      String payload;
+      try {
+        payload = jsonEncode(data);
+      } catch (e) {
+        payload = data.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+      }
+
+      // Tạo notification details cho friend request
+      final androidDetails = AndroidNotificationDetails(
+        'relo_channel',
+        'Relo Notifications',
+        channelDescription: 'Notifications from Relo social network',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+      );
+
+      final iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // Hiển thị notification
+      await localNotifications.show(
+        'friend_request_${data['from_user_id'] ?? DateTime.now().millisecondsSinceEpoch}'
+            .hashCode,
+        notification.title ?? 'Lời mời kết bạn',
+        notification.body ?? '$fromUserName muốn kết bạn với bạn',
+        details,
+        payload: payload,
+      );
+      return;
+    }
+
+    // Handle chat message notification
     final conversationId = data['conversation_id'] as String?;
     final hasReply = data['has_reply'] == 'true';
     final senderName =

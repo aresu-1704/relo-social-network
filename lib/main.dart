@@ -11,6 +11,7 @@ import 'package:relo/providers/notification_provider.dart';
 import 'package:relo/providers/message_provider.dart';
 import 'package:relo/services/app_notification_service.dart';
 import 'package:relo/screen/chat_screen.dart';
+import 'package:relo/screen/friend_requests_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 // Import background handler từ app_notification_service
@@ -147,11 +148,16 @@ void _setupNotificationCallbacks(AppNotificationService notificationService) {
         final retryNavigator = ServiceLocator.navigatorKey.currentState;
         if (retryNavigator != null) {
           print('🔔 Retry successful, navigating...');
-          _navigateToChatScreen(
-            conversationId,
-            retryNavigator,
-            payloadData: payloadData,
-          );
+          // Check if friend request notification
+          if (conversationId == 'friend_requests') {
+            _navigateToFriendRequestsScreen(retryNavigator);
+          } else {
+            _navigateToChatScreen(
+              conversationId,
+              retryNavigator,
+              payloadData: payloadData,
+            );
+          }
         } else {
           print('🔔 ERROR: Navigator still null after retry');
         }
@@ -159,12 +165,29 @@ void _setupNotificationCallbacks(AppNotificationService notificationService) {
       return;
     }
 
-    print('🔔 Navigating to ChatScreen...');
-    _navigateToChatScreen(conversationId, navigator, payloadData: payloadData);
+    // Check if friend request notification
+    if (conversationId == 'friend_requests') {
+      print('🔔 Navigating to FriendRequestsScreen...');
+      _navigateToFriendRequestsScreen(navigator);
+    } else {
+      print('🔔 Navigating to ChatScreen...');
+      _navigateToChatScreen(
+        conversationId,
+        navigator,
+        payloadData: payloadData,
+      );
+    }
   });
 
   // Setup reply callback
   _setupNotificationCallbacksContinued(notificationService);
+}
+
+/// Helper function để navigate tới FriendRequestsScreen
+void _navigateToFriendRequestsScreen(NavigatorState navigator) {
+  navigator.push(
+    MaterialPageRoute(builder: (context) => const FriendRequestsScreen()),
+  );
 }
 
 /// Helper function để navigate tới ChatScreen

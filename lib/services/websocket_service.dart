@@ -26,13 +26,16 @@ class WebSocketService {
   }
 
   Future<void> connect() async {
+    print('[WebSocketService] Connect called');
     // Tránh connect đồng thời nhiều lần
     if (_isConnecting || _isReconnecting) {
+      print('[WebSocketService] Already connecting or reconnecting, skipping');
       return;
     }
 
     // Nếu đã connected rồi thì không cần connect lại
     if (isConnected) {
+      print('[WebSocketService] Already connected, skipping');
       return;
     }
 
@@ -43,7 +46,12 @@ class WebSocketService {
     try {
       // Tạo StreamController mới nếu cái cũ đã bị đóng
       if (_streamController.isClosed) {
+        print(
+          '[WebSocketService] StreamController was closed, creating new one',
+        );
         _streamController = StreamController<dynamic>.broadcast();
+      } else {
+        print('[WebSocketService] StreamController is still open');
       }
 
       // Hủy subscription cũ nếu có
@@ -52,8 +60,10 @@ class WebSocketService {
       // Nếu đang offline thì không connect ngay để tránh crash
       final connectivity = await Connectivity().checkConnectivity();
       if (connectivity == ConnectivityResult.none) {
+        print('[WebSocketService] No connectivity, waiting for network');
         // Chờ sự kiện mạng quay lại qua subscription bên dưới
       } else {
+        print('[WebSocketService] Calling _connect()...');
         await _connect();
       }
     } finally {
@@ -174,12 +184,14 @@ class WebSocketService {
   Future<void> _connect() async {
     final token = await _authService.accessToken;
     if (token == null) {
+      print('[WebSocketService] No token available');
       _isConnecting = false;
       _isReconnecting = false;
       return;
     }
 
     final url = 'ws://$webSocketBaseUrl/ws?token=$token';
+    print('[WebSocketService] Connecting to: $url');
     try {
       // Đóng channel cũ nếu có và chưa đóng
       if (_channel != null) {
@@ -192,19 +204,28 @@ class WebSocketService {
       }
 
       _channel = WebSocketChannel.connect(Uri.parse(url));
+      print('[WebSocketService] WebSocket channel created');
 
       _channel!.stream.listen(
         (data) {
+          print('[WebSocketService] Received data: $data');
           try {
             // Wrap in try-catch to prevent crashes from unhandled messages
             if (!_streamController.isClosed) {
               _streamController.add(data);
+              print('[WebSocketService] Added data to stream');
+            } else {
+              print(
+                '[WebSocketService] StreamController is closed, cannot add data',
+              );
             }
           } catch (e) {
+            print('[WebSocketService] Error adding data to stream: $e');
             // Ignore errors
           }
         },
         onDone: () async {
+          print('[WebSocketService] Stream onDone');
           // Chỉ handle disconnect nếu không phải đang reconnect từ app resume
           // Tránh vòng lặp reconnect
           if (!_isReconnecting && !_isConnecting) {
@@ -213,6 +234,7 @@ class WebSocketService {
           }
         },
         onError: (error) async {
+          print('[WebSocketService] Stream onError: $error');
           if (!_streamController.isClosed) {
             _streamController.addError(error);
           }
@@ -228,7 +250,9 @@ class WebSocketService {
       _reconnectAttempts = 0;
       _isConnecting = false;
       _isReconnecting = false;
+      print('[WebSocketService] Connection successful');
     } catch (e) {
+      print('[WebSocketService] Connection failed: $e');
       _isConnecting = false;
       _isReconnecting = false;
       // Chỉ handle disconnect nếu không phải từ app resume

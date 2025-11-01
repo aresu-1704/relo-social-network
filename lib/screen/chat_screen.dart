@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:relo/models/message.dart';
 import 'package:relo/services/message_service.dart';
 import 'package:relo/services/service_locator.dart';
@@ -787,16 +790,77 @@ class _ChatScreenState extends State<ChatScreen> {
     Set<String> conversationIds,
   ) async {
     try {
-      // Create forward content
       Map<String, dynamic> forwardContent;
+      String? downloadedFilePath;
+      List<String>? downloadedFilePaths;
 
+      // Xử lý theo loại tin nhắn
       if (message.content['type'] == 'text') {
+        // Forward text message
         forwardContent = {
           'type': 'text',
           'text': '[Chuyển tiếp] ${message.content['text']}',
         };
+      } else if (message.content['type'] == 'audio' ||
+          message.content['type'] == 'file') {
+        // Forward audio hoặc file
+        final url = message.content['url'] as String?;
+        if (url == null || url.isEmpty) {
+          // Nếu không có URL, forward như text thông báo
+          forwardContent = {
+            'type': 'text',
+            'text': '[Chuyển tiếp] [${message.content['type']}]',
+          };
+        } else {
+          // Download file từ URL về local
+          try {
+            downloadedFilePath = await _downloadFileForForward(url);
+            forwardContent = {
+              'type': message.content['type'],
+              'path': downloadedFilePath,
+            };
+          } catch (e) {
+            // Nếu download thất bại, forward như text thông báo
+            if (mounted) {
+              await ShowNotification.showToast(
+                context,
+                'Không thể tải file, chỉ chuyển tiếp thông báo',
+              );
+            }
+            forwardContent = {
+              'type': 'text',
+              'text': '[Chuyển tiếp] [${message.content['type']}]',
+            };
+          }
+        }
+      } else if (message.content['type'] == 'media') {
+        // Forward media (hình ảnh/video)
+        final urls = message.content['urls'] as List<dynamic>?;
+        if (urls == null || urls.isEmpty) {
+          // Nếu không có URLs, forward như text thông báo
+          forwardContent = {'type': 'text', 'text': '[Chuyển tiếp] [media]'};
+        } else {
+          // Download các file từ URLs về local
+          try {
+            downloadedFilePaths = [];
+            for (var url in urls) {
+              final filePath = await _downloadFileForForward(url.toString());
+              downloadedFilePaths.add(filePath);
+            }
+            forwardContent = {'type': 'media', 'paths': downloadedFilePaths};
+          } catch (e) {
+            // Nếu download thất bại, forward như text thông báo
+            if (mounted) {
+              await ShowNotification.showToast(
+                context,
+                'Không thể tải file, chỉ chuyển tiếp thông báo',
+              );
+            }
+            forwardContent = {'type': 'text', 'text': '[Chuyển tiếp] [media]'};
+          }
+        }
       } else {
-        // For other message types, forward as text with a note
+        // Các loại khác, forward như text thông báo
         forwardContent = {
           'type': 'text',
           'text': '[Chuyển tiếp] [${message.content['type']}]',
@@ -810,6 +874,30 @@ class _ChatScreenState extends State<ChatScreen> {
           forwardContent,
           _currentUserId!,
         );
+      }
+
+      // Xóa các file tạm sau khi forward xong
+      if (downloadedFilePath != null) {
+        try {
+          final file = File(downloadedFilePath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (e) {
+          // Ignore delete errors
+        }
+      }
+      if (downloadedFilePaths != null) {
+        for (var path in downloadedFilePaths) {
+          try {
+            final file = File(path);
+            if (await file.exists()) {
+              await file.delete();
+            }
+          } catch (e) {
+            // Ignore delete errors
+          }
+        }
       }
 
       if (mounted) {
@@ -826,6 +914,18 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     }
+  }
+
+  // Helper method để download file từ URL về local
+  Future<String> _downloadFileForForward(String url) async {
+    final dio = Dio();
+    final tempDir = await getTemporaryDirectory();
+    final fileName = url.split('/').last.split('?').first;
+    final filePath =
+        '${tempDir.path}/forward_${DateTime.now().millisecondsSinceEpoch}_$fileName';
+
+    await dio.download(url, filePath);
+    return filePath;
   }
 
   void _showMessageActions(Message message) {

@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:relo/providers/notification_provider.dart';
 import 'package:relo/models/notification.dart' as models;
+import 'package:relo/screen/friend_requests_screen.dart';
 import 'package:intl/intl.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -9,9 +11,15 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+      '🖼️ NotificationsScreen: Building with ${Provider.of<NotificationProvider>(context).notifications.length} notifications',
+    );
     return Scaffold(
       body: Consumer<NotificationProvider>(
         builder: (context, provider, child) {
+          debugPrint(
+            '📋 NotificationsScreen: Consumer rebuild, notifications count: ${provider.notifications.length}',
+          );
           if (provider.notifications.isEmpty) {
             return const Center(
               child: Column(
@@ -61,7 +69,15 @@ class NotificationsScreen extends StatelessWidget {
         // Navigate based on notification type
         final metadata = notification.metadata;
 
-        if (metadata['userId'] != null &&
+        if (notification.type == 'friend_request') {
+          // Navigate to friend requests screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const FriendRequestsScreen(),
+            ),
+          );
+        } else if (metadata['userId'] != null &&
             (notification.type == 'friend_request_accepted' ||
                 notification.type == 'friend_added')) {
           // Navigate to user profile
@@ -79,17 +95,7 @@ class NotificationsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Avatar
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: _getNotificationIconColor(
-                notification.type,
-              ).withOpacity(0.1),
-              child: Icon(
-                _getNotificationIcon(notification.type),
-                color: _getNotificationIconColor(notification.type),
-                size: 24,
-              ),
-            ),
+            _buildAvatar(notification),
             const SizedBox(width: 12),
 
             // Content
@@ -151,17 +157,54 @@ class NotificationsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildAvatar(models.Notification notification) {
+    // Kiểm tra nếu có avatar trong metadata
+    final metadata = notification.metadata;
+    final avatarUrl = metadata['avatar'] ?? metadata['avatarUrl'];
+
+    // Nếu có avatar URL và là thông báo kết bạn, hiển thị avatar
+    if (avatarUrl != null &&
+        avatarUrl.toString().isNotEmpty &&
+        (notification.type == 'friend_request' ||
+            notification.type == 'friend_request_accepted' ||
+            notification.type == 'friend_added')) {
+      return CircleAvatar(
+        radius: 24,
+        backgroundImage: avatarUrl.toString().startsWith('assets/')
+            ? AssetImage(avatarUrl.toString()) as ImageProvider
+            : NetworkImage(avatarUrl.toString()),
+        onBackgroundImageError: (_, __) {},
+        backgroundColor: Colors.grey[300],
+      );
+    }
+
+    // Nếu không có avatar, hiển thị icon
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: _getNotificationIconColor(
+        notification.type,
+      ).withOpacity(0.1),
+      child: Icon(
+        _getNotificationIcon(notification.type),
+        color: _getNotificationIconColor(notification.type),
+        size: 24,
+      ),
+    );
+  }
+
   IconData _getNotificationIcon(String type) {
     switch (type) {
+      case 'friend_request':
       case 'friend_request_accepted':
-      case 'friend_request_rejected':
-        return Icons.person_add_rounded;
+        return Icons.person_add_rounded;    
       case 'friend_added':
         return Icons.people_rounded;
       case 'new_post':
         return Icons.article_rounded;
       case 'post_reaction':
         return Icons.favorite_rounded;
+      case 'post_comment':
+        return Icons.comment_rounded;
       default:
         return Icons.notifications_rounded;
     }
@@ -169,8 +212,8 @@ class NotificationsScreen extends StatelessWidget {
 
   Color _getNotificationIconColor(String type) {
     switch (type) {
+      case 'friend_request':
       case 'friend_request_accepted':
-      case 'friend_request_rejected':
         return Colors.blue;
       case 'friend_added':
         return Colors.green;
@@ -178,6 +221,8 @@ class NotificationsScreen extends StatelessWidget {
         return Colors.purple;
       case 'post_reaction':
         return Colors.red;
+      case 'post_comment':
+        return Colors.orange;
       default:
         return Colors.grey;
     }
